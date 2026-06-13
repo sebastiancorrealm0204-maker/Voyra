@@ -127,8 +127,8 @@ BOGOTA = [
         "confianza": "alta",
     },
     {
-        "city_display": "Bogotá", "name": "Colo Coffee", "category": "cafe", "zona": "Parque de la 93 (Chicó)",
-        "lat": 4.6757, "lng": -74.0478,
+        "city_display": "Bogotá", "name": "Colo Coffee", "category": "cafe", "zona": "Zona T / Chicó Norte",
+        "lat": 4.6648, "lng": -74.0518,
         "descripcion": "Cafetería de especialidad amplia, con WiFi rápido — citada en rutas de café de especialidad de Bogotá (2026) como buen lugar para trabajar o pasar la tarde cerca de la Calle 93.",
         "confianza": "media_alta",
     },
@@ -153,7 +153,7 @@ BOGOTA = [
     # ════════ BARES Y VIDA NOCTURNA ════════
     {
         "city_display": "Bogotá", "name": "KOSH", "category": "bar", "zona": "Zona T",
-        "lat": 4.6685, "lng": -74.0535,
+        "lat": 4.6675, "lng": -74.0548,
         "descripcion": "Rooftop bar frente al Centro Comercial Andino con vista panorámica a la Zona T. Cócteles de autor y ambiente nocturno — punto de referencia para salir de fiesta en la zona.",
         "confianza": "alta",
     },
