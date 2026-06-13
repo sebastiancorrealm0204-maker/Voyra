@@ -175,7 +175,7 @@ def nearby_recommendations(trip_id: str, limit: int = 3) -> dict:
         extra = {
             "place_name": p["name"],
             "distancia_km": p["distancia_km"],
-            "maps_link": geo.maps_link(p["lat"], p["lng"], modo),
+            "maps_link": geo.maps_link(p["lat"], p["lng"], modo, p.get("maps_query")),
         }
         r = engine.ingest(trip_id, source=f"Curación de destino — {p['name']}",
                          category="recomendacion", operational=False, payload=payload, extra=extra)

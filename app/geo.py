@@ -33,13 +33,22 @@ def suggest_mode(distance_km: float | None) -> str:
     return "driving"
 
 
-def maps_link(lat: float, lng: float, mode: str = "walking") -> str:
-    """Deep link de Google Maps con coordenadas exactas del lugar curado.
+def maps_link(lat: float, lng: float, mode: str = "walking",
+             maps_query: str | None = None) -> str:
+    """Deep link de Google Maps hacia el lugar curado.
 
-    Usamos lat/lng en vez del nombre porque la búsqueda por texto es ambigua:
-    "KOSH" resuelve a "Koshcampo SAS" (error real). Con coordenadas, Maps
-    siempre lleva al punto exacto de la curación, sin homonimias.
+    Dos estrategias según el tipo de lugar:
+    - Restaurantes/bares/cafés (maps_query=None): usa lat,lng exacto del lugar.
+      Evita ambigüedades de nombre ("KOSH" → "Koshcampo SAS").
+    - Parques/zonas/plazas/landmarks (maps_query=str): usa el nombre buscable.
+      Google Maps tiene el pin oficial de "Parque de la 93" o "Cerro de
+      Monserrate" y lleva a la entrada principal — mejor que un punto en el
+      centro del parque. Para estos lugares el nombre ES más preciso que coords.
     """
+    import urllib.parse
+    if maps_query:
+        dest = urllib.parse.quote(maps_query)
+        return f"https://www.google.com/maps/dir/?api=1&destination={dest}&travelmode={mode}"
     return f"https://www.google.com/maps/dir/?api=1&destination={lat},{lng}&travelmode={mode}"
 
 
