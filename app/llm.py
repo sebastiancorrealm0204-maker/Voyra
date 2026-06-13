@@ -18,7 +18,6 @@ Keys:
 """
 import json
 import os
-import time
 
 import httpx
 
@@ -71,46 +70,28 @@ EXTRACT_PROVIDER = os.environ.get("EXTRACT_PROVIDER") or _default_cheap()
 MODE = "mock" if not _available() else f"scoring={SCORING_PROVIDER}, chat={CHAT_PROVIDER}, extract={EXTRACT_PROVIDER}"
 
 
-def _post_with_retry(url: str, headers: dict, json_body: dict, timeout: int = 60,
-                     retries: int = 2, backoff: float = 0.6) -> httpx.Response:
-    """POST con un par de reintentos cortos para blips transitorios de red/DNS.
-
-    /nearby hace varias llamadas de scoring seguidas (una por lugar candidato);
-    sin esto, un solo hiccup de DNS tumba todo el endpoint con 500. Solo
-    reintenta errores de transporte (DNS, conexión, timeouts) — nunca errores
-    HTTP (4xx/5xx con respuesta real), esos se propagan tal cual.
-    """
-    last_err = None
-    for attempt in range(retries + 1):
-        try:
-            resp = httpx.post(url, headers=headers, json=json_body, timeout=timeout)
-            resp.raise_for_status()
-            return resp
-        except httpx.TransportError as e:
-            last_err = e
-            if attempt < retries:
-                time.sleep(backoff * (attempt + 1))
-    raise last_err
-
-
 def _call(provider: str, system: str, messages: list[dict], max_tokens: int = 800) -> str:
     cfg = PROVIDERS[provider]
     if cfg["style"] == "anthropic":
-        resp = _post_with_retry(
+        resp = httpx.post(
             cfg["url"],
             headers={"x-api-key": cfg["key"], "anthropic-version": "2023-06-01",
                      "content-type": "application/json"},
-            json_body={"model": cfg["model"], "max_tokens": max_tokens, "system": system,
+            json={"model": cfg["model"], "max_tokens": max_tokens, "system": system,
                   "messages": messages},
+            timeout=60,
         )
+        resp.raise_for_status()
         return "".join(b.get("text", "") for b in resp.json()["content"] if b.get("type") == "text")
     # estilo OpenAI (DeepSeek, Groq): el system va como primer mensaje
-    resp = _post_with_retry(
+    resp = httpx.post(
         cfg["url"],
         headers={"Authorization": f"Bearer {cfg['key']}", "Content-Type": "application/json"},
-        json_body={"model": cfg["model"], "max_tokens": max_tokens,
+        json={"model": cfg["model"], "max_tokens": max_tokens,
               "messages": [{"role": "system", "content": system}] + messages},
+        timeout=60,
     )
+    resp.raise_for_status()
     return resp.json()["choices"][0]["message"]["content"]
 
 
@@ -129,14 +110,38 @@ _MOCK_SCORES = {
 }
 
 
-def score_event(system: str, source: str, payload: str, category: str) -> dict:
+def score_event(system: str, source: str, payload: str, category: str,
+                extra: dict | None = None) -> dict:
     if SCORING_PROVIDER == "mock" or not _available():
         score, reason = _MOCK_SCORES.get(category, (35, "Sin cruce claro con el contexto del viaje."))
         return {"score": score, "razon": reason, "titulo": f"[demo] señal de {category}",
                 "mensaje": payload[:140], "accion": "Ver opciones" if score >= 70 else None,
                 "_mode": "mock"}
+
+    # Si la señal viene con un lugar curado (place_name + distancia_km calculados por
+    # Haversine desde destination_places), se lo damos explícitamente al LLM para que
+    # lo use en "titulo" y "mensaje" SIN inventar nombres, distancias ni URLs.
+    lugar_block = ""
+    if extra and extra.get("place_name"):
+        dist = extra.get("distancia_km", "")
+        dist_str = f" · {dist} km" if dist else ""
+        lugar_block = (
+            f"\nLUGAR CURADO (usa ESTE nombre y distancia — NO inventes otros): "
+            f"{extra['place_name']}{dist_str}\n"
+        )
+    else:
+        # Sin lugar curado: el LLM NO debe inventar nombres de sitios específicos.
+        # El mensaje debe ser genérico y orientar al usuario a preguntar al Companion.
+        lugar_block = (
+            "\nIMPORTANTE: esta señal NO viene con un lugar verificado. "
+            "NO menciones nombres de restaurantes, cafés, bares u otros sitios específicos en 'titulo' ni 'mensaje'. "
+            "Habla en términos generales ('hay opciones cerca', 'la zona tiene buen ambiente') "
+            "y anima al usuario a preguntarle al Companion para recomendaciones concretas.\n"
+        )
+
     prompt = (
-        f"Llegó esta señal de los watchers del servidor:\nFUENTE: {source}\nSEÑAL: {payload}\n\n"
+        f"Llegó esta señal de los watchers del servidor:\nFUENTE: {source}\nSEÑAL: {payload}\n"
+        f"{lugar_block}\n"
         "Evalúa su relevancia para ESTE usuario en ESTE momento, cruzando con itinerario, gustos, "
         "ubicación y planes contados. Responde SOLO JSON válido sin markdown: "
         '{"score": <0-100>, "razon": "<1 frase>", "titulo": "<máx 6 palabras>", '

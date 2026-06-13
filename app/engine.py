@@ -72,7 +72,7 @@ def ingest(trip_id: str, source: str, category: str, operational: bool, payload:
         return {"decision_id": did, "filter": filtro, "score": None, "decision": decision, "notification": None}
 
     system = context.build(trip)
-    r = llm.score_event(system, source, payload, category)
+    r = llm.score_event(system, source, payload, category, extra=extra)
     score = max(int(r["score"]), 90) if operational else int(r["score"])
     decision = "push" if score >= 70 else "feed" if score >= 40 else "silence"
 
