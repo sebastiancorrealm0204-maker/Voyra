@@ -18,8 +18,32 @@ def duffel_webhook(trip_id: str, payload: dict) -> dict:
                          operational=True, payload=f"Webhook Duffel ({tipo}): {desc}")
 
 
-def update_location(trip_id: str, zona: str, disparar_geofence: bool = False) -> dict:
-    db.update_trip(trip_id, {"zona_actual": zona})
+def update_location(trip_id: str, zona: str, disparar_geofence: bool = False,
+                    lat: float | None = None, lng: float | None = None) -> dict:
+    """Actualiza la ubicación del trip.
+
+    Sin lat/lng: comportamiento anterior — `zona` tal cual la mande el
+    cliente (dropdown manual, fallback si no hay permiso de GPS).
+
+    Con lat/lng (GPS real del celular): se guardan como lat_actual/lng_actual
+    — esto es lo que /nearby va a usar como origen para Haversine contra las
+    coordenadas reales de cada lugar curado, sin pasar por ninguna zona. Y
+    `zona` se reemplaza por geo.nearest_known_label(lat, lng) — una etiqueta
+    legible para el Companion ("Chapinero Alto") más precisa que cualquier
+    selección manual, calculada gratis por cercanía real.
+    """
+    trip = db.get_trip(trip_id)
+    patch: dict = {}
+
+    if lat is not None and lng is not None:
+        label = geo.nearest_known_label(trip["ciudad"], lat, lng)
+        zona = label or zona
+        patch["lat_actual"] = lat
+        patch["lng_actual"] = lng
+
+    patch["zona_actual"] = zona
+    db.update_trip(trip_id, patch)
+
     result = {"trip_id": trip_id, "zona_actual": zona, "geofence_event": None}
     if disparar_geofence:
         result["geofence_event"] = engine.ingest(
@@ -105,11 +129,15 @@ def scan_destination(trip_id: str) -> dict:
 
 def nearby_recommendations(trip_id: str, limit: int = 3) -> dict:
     """Recomendaciones desde la base curada (destination_places), rankeadas por
-    distancia REAL (Haversine) a la zona_actual del usuario. Cero búsquedas,
-    cero costo — y cada una sale con su deep link de Google Maps listo.
+    distancia REAL (Haversine). Cero búsquedas, cero costo — y cada una sale
+    con su deep link de Google Maps listo.
 
-    Esto es el Nivel 1 + 1.5 que acordamos: coordenadas reales de la curación
-    + matemática simple + link de "Cómo llegar", sin tocar ninguna API nueva.
+    Origen de la distancia, en orden de prioridad:
+    1. lat_actual/lng_actual (GPS real del celular, vía update_location) —
+       Haversine directo contra las coordenadas reales de cada lugar curado.
+       Esto YA es precisión real, no aproximación de zona.
+    2. geo.zone_coords(zona_actual) — fallback si todavía no hay GPS (ej.
+       cliente sin permiso de ubicación, o testing manual con el dropdown).
 
     Dedup (24h): los lugares ya recomendados a este viaje se saltan, así cada
     llamada muestra opciones nuevas en vez de repetir/silenciar las mismas.
@@ -123,7 +151,9 @@ def nearby_recommendations(trip_id: str, limit: int = 3) -> dict:
         return {"city": city, "zona_actual": zona, "candidatos": 0, "resultados": [],
                 "nota": f"Sin lugares curados para '{city}' todavía."}
 
-    origin = geo.zone_coords(city, zona)
+    origin = (trip["lat_actual"], trip["lng_actual"]) \
+        if trip.get("lat_actual") is not None and trip.get("lng_actual") is not None \
+        else geo.zone_coords(city, zona)
 
     enriquecidos = []
     for p in places:

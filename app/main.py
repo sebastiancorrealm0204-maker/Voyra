@@ -47,7 +47,9 @@ class SignalIn(BaseModel):
 
 
 class LocationIn(BaseModel):
-    zona: str
+    zona: str = "En el hotel"
+    lat: float | None = None
+    lng: float | None = None
     disparar_geofence: bool = False
 
 
@@ -113,7 +115,7 @@ def duffel(tid: str, payload: dict):
 def location(tid: str, loc: LocationIn):
     if not db.get_trip(tid):
         raise HTTPException(404, "trip no existe")
-    return watchers.update_location(tid, loc.zona, loc.disparar_geofence)
+    return watchers.update_location(tid, loc.zona, loc.disparar_geofence, lat=loc.lat, lng=loc.lng)
 
 
 @app.post("/trips/{tid}/checkin")

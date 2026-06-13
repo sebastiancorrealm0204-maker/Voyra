@@ -13,7 +13,7 @@ fricción.
 import math
 import urllib.parse
 
-from .db import norm_city
+from .db import norm_city, places_for_city
 
 
 def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -85,3 +85,33 @@ def zone_coords(city: str, zona: str) -> tuple[float, float] | None:
         if k in z or z in k:
             return v
     return None
+
+
+def nearest_known_label(city: str, lat: float, lng: float) -> str | None:
+    """Reverse-geocode gratis: dado un punto GPS, devuelve el nombre de zona/
+    lugar conocido más cercano — para que el Companion hable en términos
+    humanos ("Estás en Chapinero Alto") sin que el usuario elija nada.
+
+    Busca en dos fuentes y se queda con la más cercana:
+    - ZONE_COORDS[city]: zonas generales, incluye casos especiales sin
+      lugares curados cerca (ej. "aeropuerto").
+    - destination_places (la curación real, con coordenadas propias): da
+      etiquetas más finas — "Chapinero Alto", "Parque de la 93 (Chicó)",
+      "Usaquén" — exactamente el mismo vocabulario que ya usan las
+      descripciones de /nearby.
+
+    None si la ciudad no tiene ninguna referencia todavía (sin curación y
+    sin ZONE_COORDS) — el caller debe mantener la zona anterior en ese caso.
+    """
+    candidatos: list[tuple[float, str]] = []
+
+    for nombre, (zlat, zlng) in ZONE_COORDS.get(norm_city(city), {}).items():
+        candidatos.append((haversine_km(lat, lng, zlat, zlng), nombre.title()))
+
+    for p in places_for_city(city):
+        candidatos.append((haversine_km(lat, lng, p["lat"], p["lng"]), p["zona"]))
+
+    if not candidatos:
+        return None
+    candidatos.sort(key=lambda x: x[0])
+    return candidatos[0][1]
