@@ -7,6 +7,7 @@ import json
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from . import context, db, engine, llm, search, seed_data, watchers
@@ -200,3 +201,13 @@ def decisions(tid: str):
 @app.get("/health")
 def health():
     return {"status": "ok", "llm_mode": llm.MODE, "search_mode": search.MODE}
+
+
+# ── Frontend ──
+@app.get("/")
+def frontend():
+    """Sirve companion-agente.html desde la raíz del repo (mismo dominio que
+    la API). Necesario para que navigator.geolocation funcione en el celular
+    — el navegador exige contexto seguro (HTTPS o localhost); abrir el HTML
+    como archivo local o desde otro dominio no cumple eso."""
+    return FileResponse("companion-agente.html")

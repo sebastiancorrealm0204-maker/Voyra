@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Voyra Companion — local</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.development.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.development.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+
+const { useState, useRef, useEffect } = React;
+
+// ─── Voyra Companion — frontend conectado al backend real ───
+// Todas las llamadas de IA van al backend.
+// El frontend ya no habla con ningún proveedor de LLM directamente.
+//
+// URL del backend: en dev (este archivo abierto en localhost o file://)
+// apunta a localhost:8000. En producción, este HTML se sirve DESDE el
+// mismo backend en Railway (ver GET / en main.py) — mismo origen, HTTPS,
+// y navigator.geolocation funciona (requiere contexto seguro).
+const API = (typeof process !== "undefined" && process.env?.REACT_APP_API_URL)
+  || (window.location.hostname === "localhost" || window.location.protocol === "file:"
+      ? "http://localhost:8000"
+      : window.location.origin);
+
+const api = {
+  post: async (path, body) => {
+    const r = await fetch(`${API}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+    return r.json();
+  },
+  get: async (path) => {
+    const r = await fetch(`${API}${path}`);
+    if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+    return r.json();
+  },
+};
+
+const C = {
+  bg: "#F7F6F2",
+  ink: "#17242F",
+  inkSoft: "#5C6B77",
+  teal: "#0E7C66",
+  tealSoft: "#E3F1ED",
+  amber: "#D98E1F",
+  amberSoft: "#FBF1DE",
+  coral: "#D5503C",
+  coralSoft: "#FAE7E3",
+  line: "#E4E1D8",
+  card: "#FFFFFF",
+};
+
+const GUSTOS = ["Gastronomía local", "Vida nocturna", "Playas", "Historia y cultura", "Café de especialidad", "Fotografía", "Planes tranquilos"];
+
+const SENALES = [
+  {
+    id: "vuelo_retraso",
+    nombre: "Retraso de vuelo +2h",
+    fuente: "Webhook Duffel",
+    operativo: true,
+    categoria: "vuelo",
+    payload: "El vuelo de regreso del usuario se retrasó 2 horas. Nueva hora de salida: 2 horas después de la original.",
+  },
+  {
+    id: "geofence",
+    nombre: "Cruce de geofence: zona turística",
+    fuente: "Geofencing del OS",
+    operativo: false,
+    categoria: "zona",
+    payload: "El usuario acaba de entrar caminando a una zona turística popular del destino (barrio histórico / zona gastronómica), son las 12:45 del mediodía.",
+  },
+  {
+    id: "viral",
+    nombre: "Lugar viral detectado cerca",
+    fuente: "Destination Scanner (TikTok/IG)",
+    operativo: false,
+    categoria: "recomendacion",
+    payload: "El scanner detectó un restaurante con terraza, rating 4.9, que aparece en 8 TikToks geoetiquetados esta semana, a ~200 metros de la última ubicación conocida del usuario.",
+  },
+  {
+    id: "clima",
+    nombre: "Lluvia fuerte mañana",
+    fuente: "Weather watcher",
+    operativo: false,
+    categoria: "clima",
+    payload: "Pronóstico: lluvia fuerte mañana de 10am a 4pm en el destino del usuario. Puede afectar actividades al aire libre.",
+  },
+  {
+    id: "actividad",
+    nombre: "Recordatorio de actividad",
+    fuente: "Itinerary watcher",
+    operativo: false,
+    categoria: "itinerario",
+    payload: "Mañana a las 9:00 am el usuario tiene una actividad/tour reservado. El punto de encuentro está a ~20 minutos de su hotel.",
+  },
+  {
+    id: "manifestacion",
+    nombre: "Manifestación / cierres viales",
+    fuente: "News watcher (Google News + X + TikTok/IG)",
+    operativo: true,
+    categoria: "seguridad",
+    payload: "Detectado en Google News y X: manifestación convocada hoy a las 4:00 pm en el centro de la ciudad, con cierres viales anunciados en las avenidas principales. Videos geoetiquetados en TikTok e IG confirman concentración de gente desde las 3pm. Puede afectar traslados del usuario.",
+  },
+  {
+    id: "spam",
+    nombre: "Promo genérica de cadena hotelera",
+    fuente: "Señal de baja calidad",
+    operativo: false,
+    categoria: "promo_no_solicitada",
+    payload: "Promoción genérica de puntos de una cadena hotelera, sin relación con el viaje actual.",
+  },
+];
+
+const PRESUPUESTO_DIARIO = 4;
+
+// Zonas de Bogotá — deben matchear (después de norm_city en el backend) con
+// las keys de ZONE_COORDS["bogota"] en geo.py, para que /nearby pueda
+// calcular distancias reales desde zona_actual.
+const ZONAS = ["En el hotel", "La Candelaria", "Zona G", "Zona T / Zona Rosa", "Usaquén", "Aeropuerto"];
+
+// Replica geo.suggest_mode() y geo.maps_link() del backend — fallback por si
+// la respuesta de /nearby no trae ya el maps_link armado.
+const suggestModeJS = (distKm) => (distKm != null && distKm < 1.5) ? "walking" : "driving";
+
+const mapsLinkJS = (lugar, ciudad, modo) => {
+  const destino = `${lugar}, ${ciudad}, Colombia`;
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destino)}&travelmode=${modo}`;
+};
+
+// Las coordenadas de geo.ZONE_COORDS son por ZONA, no por lugar — si zona_actual
+// y la zona del lugar son la misma (ej. "En el hotel" y "Zona G" comparten punto
+// de referencia), la distancia sale 0.0 exacto. "0 km" suena a "estás parado
+// encima"; "en tu zona" es honesto sobre la granularidad real del dato.
+const distLabel = (distKm) => {
+  if (distKm == null) return "";
+  if (distKm < 0.05) return " · en tu zona";
+  return ` · ${distKm} km`;
+};
+
+function VoyraCompanion() {
+  const [fase, setFase] = useState("setup");
+  const [tripId, setTripId] = useState(null);
+  const [viaje, setViaje] = useState({ ciudad: "Bogotá", hotel: "Hotel NH Collection Bogotá Teusaquillo", inicio: "2026-07-12", fin: "2026-07-18", vueloIda: "AV245 MIA→BOG, llega 12 jul 15:40", vueloRegreso: "AV244 BOG→MIA, sale 18 jul 14:20", pais: "Colombia", gustos: ["Gastronomía local", "Historia y cultura"] });
+  const [notifs, setNotifs] = useState([]);
+  const [feed, setFeed] = useState([]);
+  const [log, setLog] = useState([]);
+  const [chat, setChat] = useState([]);
+  const [input, setInput] = useState("");
+  const [pensando, setPensando] = useState(false);
+  const [evaluando, setEvaluando] = useState(null);
+  const [pushUsados, setPushUsados] = useState(0);
+  const [categoriasHoy, setCategoriasHoy] = useState([]);
+  const [ubicacion, setUbicacion] = useState("En el hotel");
+  const [zonaActual, setZonaActual] = useState("En el hotel"); // zona_actual real (GPS o manual) según el backend
+  const [gpsEstado, setGpsEstado] = useState("inactivo"); // inactivo | buscando | ok | denegado | no_soportado | error | manual
+  const [docs, setDocs] = useState([]);
+  const [escuchando, setEscuchando] = useState(false);
+  const [vozActiva, setVozActiva] = useState(false);
+  const [subiendo, setSubiendo] = useState(false);
+  const [cargandoCerca, setCargandoCerca] = useState(false);
+  const [escaneando, setEscaneando] = useState(false);
+  const recRef = useRef(null);
+  const fileRef = useRef(null);
+  const phoneRef = useRef(null);
+
+  useEffect(() => {
+    if (phoneRef.current) phoneRef.current.scrollTop = phoneRef.current.scrollHeight;
+  }, [notifs, feed, chat, pensando]);
+
+  // Pide GPS al navegador y lo manda al backend. geo.nearest_known_label()
+  // calcula zona_actual real (la etiqueta de la curación más cercana — ej.
+  // "Chapinero Alto" — no una de las 9 zonas genéricas) y /nearby usa
+  // lat/lng directo para distancias exactas contra los 37 lugares curados.
+  // Requiere contexto seguro (HTTPS o localhost) — por eso este HTML se
+  // sirve desde el mismo dominio Railway del backend.
+  const actualizarGPS = () => {
+    if (!tripId) return;
+    if (!navigator.geolocation) {
+      setGpsEstado("no_soportado");
+      return;
+    }
+    setGpsEstado("buscando");
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        try {
+          const data = await api.post(`/trips/${tripId}/location`, {
+            lat: latitude, lng: longitude, zona: ubicacion, disparar_geofence: false,
+          });
+          setZonaActual(data.zona_actual);
+          setGpsEstado("ok");
+          addLog({
+            senal: "Ubicación GPS actualizada",
+            fuente: "GPS del navegador",
+            filtro: `Zona detectada: ${data.zona_actual} (coordenadas reales — nearest_known_label)`,
+            score: null, decision: "silencio",
+          });
+        } catch (e) {
+          setGpsEstado("error");
+          addLog({ senal: "Ubicación GPS", fuente: "GPS del navegador", filtro: "Error al contactar el backend", score: null, decision: "error", razon: e.message });
+        }
+      },
+      (err) => {
+        setGpsEstado(err.code === 1 ? "denegado" : "error");
+        addLog({
+          senal: "Ubicación GPS",
+          fuente: "GPS del navegador",
+          filtro: err.code === 1 ? "Permiso denegado — usando zona manual" : `No se pudo obtener GPS: ${err.message}`,
+          score: null, decision: "silencio",
+        });
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+  };
+
+  // Sincroniza la ubicación inicial con el backend en cuanto existe el trip.
+  // Primero intenta GPS real (más preciso); si no hay permiso/soporte, cae
+  // al dropdown manual — comportamiento anterior, sin romper nada.
+  useEffect(() => {
+    if (!tripId) return;
+    setZonaActual(ubicacion);
+    if (navigator.geolocation) {
+      actualizarGPS();
+    } else {
+      setGpsEstado("no_soportado");
+      (async () => {
+        try { await api.post(`/trips/${tripId}/location`, { zona: ubicacion, disparar_geofence: false }); } catch {}
+      })();
+    }
+  }, [tripId]);
+
+
+  const toggleGusto = (g) => setViaje((v) => ({ ...v, gustos: v.gustos.includes(g) ? v.gustos.filter((x) => x !== g) : [...v.gustos, g] }));
+
+  const addLog = (entry) => setLog((l) => [{ ...entry, t: new Date().toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) }, ...l]);
+
+  // Saludo inicial: viene del backend al crear el trip
+
+  const hablar = (texto) => {
+    if (!vozActiva || !window.speechSynthesis) return;
+    const u = new SpeechSynthesisUtterance(texto.replace(/[*_#]/g, ""));
+    u.lang = "es-MX";
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(u);
+  };
+
+  const toggleMic = () => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      setChat((c) => [...c, { rol: "companion", texto: "Tu navegador no soporta dictado por voz todavía. Escríbeme mientras tanto 🙂" }]);
+      return;
+    }
+    if (escuchando) {
+      recRef.current && recRef.current.stop();
+      setEscuchando(false);
+      return;
+    }
+    const rec = new SR();
+    rec.lang = "es-419";
+    rec.interimResults = true;
+    rec.continuous = false;
+    rec.onresult = (e) => {
+      const t = Array.from(e.results).map((r) => r[0].transcript).join("");
+      setInput(t);
+    };
+    rec.onend = () => setEscuchando(false);
+    rec.onerror = () => setEscuchando(false);
+    recRef.current = rec;
+    rec.start();
+    setEscuchando(true);
+  };
+
+  // ── Subida de documentos: extracción al Trip Context ──
+  const subirDoc = async (file) => {
+    if (!file || subiendo || !tripId) return;
+    const esTexto = file.type === "text/plain" || file.name.toLowerCase().endsWith(".txt");
+    if (!esTexto) {
+      setChat((c) => [...c, { rol: "companion", texto: "Por ahora puedo leer archivos de texto (.txt) — pega el texto de tu confirmación ahí. Fotos y PDFs llegan en la siguiente versión del backend (extracción multimodal)." }]);
+      return;
+    }
+    setSubiendo(true);
+    setChat((c) => [...c, { rol: "user", texto: `📎 Subió: ${file.name}` }]);
+    try {
+      // Extraer texto del archivo para mandarlo al backend
+      const text = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result);
+        r.onerror = () => rej(new Error("read failed"));
+        r.readAsText(file);
+      }).catch(() => `[archivo binario: ${file.name}]`);
+      const data = await api.post(`/trips/${tripId}/documents`, {
+        filename: file.name,
+        text_content: text.slice(0, 6000),
+      });
+      setDocs((d) => [...d, { nombre: file.name, tipo: data.tipo, resumen: data.resumen }]);
+      setChat((c) => [...c, { rol: "companion", texto: data.confirmacion }]);
+      addLog({ senal: `Documento subido: ${file.name}`, fuente: "Usuario (foto/PDF)", filtro: `✓ Extraído al Trip Context (tipo: ${data.tipo})`, score: null, decision: "silencio" });
+    } catch (e) {
+      setChat((c) => [...c, { rol: "companion", texto: "No pude leer ese archivo. ¿Probamos con una foto más clara o el PDF original?" }]);
+    }
+    setSubiendo(false);
+  };
+
+  // ── Check-in nocturno → backend (cron 8pm) ──
+  const checkInNocturno = async () => {
+    if (pensando || !tripId) return;
+    setPensando(true);
+    addLog({ senal: "Check-in nocturno", fuente: "Cron 8pm hora local", filtro: "✓ Pasa — rutina diaria de contexto", score: null, decision: "push" });
+    try {
+      const data = await api.post(`/trips/${tripId}/checkin`, {});
+      setChat((c) => [...c, { rol: "companion", texto: data.message }]);
+      hablar(data.message);
+    } catch (e) {
+      setChat((c) => [...c, { rol: "companion", texto: "¿Qué planes tienes para mañana? Así te organizo el día." }]);
+    }
+    setPensando(false);
+  };
+
+  // ── Motor de relevancia → backend ──
+  const evaluar = async (senal) => {
+    if (evaluando || !tripId) return;
+    setEvaluando(senal.id);
+    const payloadFinal = senal.id === "geofence"
+      ? `El usuario acaba de entrar caminando a la zona "${ubicacion === "En el hotel" ? "La Candelaria" : ubicacion}" de ${viaje.ciudad}. Son las 12:45 del mediodía.`
+      : senal.payload;
+    if (senal.id === "geofence" && ubicacion === "En el hotel") setUbicacion("La Candelaria");
+    try {
+      // Actualizar ubicación en el backend primero (gratis, sin AI)
+      if (senal.id === "geofence") {
+        await api.post(`/trips/${tripId}/location`, { zona: ubicacion === "En el hotel" ? "La Candelaria" : ubicacion, disparar_geofence: false });
+      }
+      // Ingestar la señal en el motor de relevancia
+      const data = await api.post(`/trips/${tripId}/signals`, {
+        source: senal.fuente,
+        category: senal.categoria,
+        operational: senal.operativo,
+        payload: payloadFinal,
+      });
+      const filtroMsg = data.filter !== "pass"
+        ? `✕ Muere en el filtro: ${data.filter}`
+        : `✓ Pasa el filtro — score ${data.score}`;
+      addLog({ senal: senal.nombre, fuente: senal.fuente, filtro: filtroMsg, score: data.score, razon: data.reason, decision: data.decision });
+      if (data.notification) {
+        const n = data.notification;
+        if (n.kind === "push") {
+          setNotifs((prev) => [...prev, { id: n.id, titulo: n.title, mensaje: n.body, accion: n.action, operativo: senal.operativo }]);
+          if (!senal.operativo) setPushUsados((p) => p + 1);
+        } else if (n.kind === "feed") {
+          setFeed((f) => [...f, { id: n.id, titulo: n.title, mensaje: n.body }]);
+        }
+      }
+    } catch (e) {
+      addLog({ senal: senal.nombre, fuente: senal.fuente, filtro: "Error al contactar el backend", score: null, decision: "error", razon: e.message });
+    }
+    setEvaluando(null);
+  };
+
+  // ── "Qué hay cerca de mí" → /nearby (curación por distancia real + maps_link, dedup 24h) ──
+  const buscarCerca = async () => {
+    if (!tripId || cargandoCerca) return;
+    setCargandoCerca(true);
+    try {
+      const data = await api.post(`/trips/${tripId}/nearby`, {});
+      const resultados = data.resultados || [];
+      const zonaTxt = data.zona_actual || "tu zona";
+      const nuevosFeed = []; // reemplaza el bloque anterior de /nearby, ver setFeed abajo
+
+      if (resultados.length === 0) {
+        addLog({
+          senal: "Qué hay cerca de mí",
+          fuente: "Curación de destino (Nivel 1+1.5)",
+          filtro: data.nota || `Sin candidatos nuevos en ${zonaTxt}.`,
+          score: null, decision: "silencio",
+        });
+        nuevosFeed.push({
+          id: `nearby-vacio-${Date.now()}`,
+          titulo: "Nada nuevo por ahora",
+          mensaje: data.nota || `Ya te mostré los lugares cercanos a "${zonaTxt}" en las últimas 24h.`,
+          origenNearby: true,
+        });
+      } else {
+        resultados.forEach((r) => {
+          const modo = suggestModeJS(r.distancia_km);
+          // El backend manda extra={place_name, distancia_km, maps_link} al
+          // motor; si llega aquí lo usamos, si no lo armamos igual en el cliente.
+          const mapsLink = r.maps_link || (r.notification && r.notification.maps_link) || mapsLinkJS(r.lugar, viaje.ciudad, modo);
+          const distTxt = r.distancia_km == null ? "distancia desconocida"
+            : r.distancia_km < 0.05 ? "en tu zona"
+            : `a ~${r.distancia_km} km de ti`;
+          addLog({
+            senal: `Cerca de ti: ${r.lugar} (${distTxt})`,
+            fuente: "Curación de destino (Nivel 1+1.5)",
+            filtro: r.filter !== "pass" ? `✕ Muere en el filtro: ${r.filter}` : `✓ Pasa el filtro — score ${r.score}`,
+            score: r.score, razon: r.reason, decision: r.decision,
+          });
+          if (r.notification) {
+            const n = r.notification;
+            const item = { id: n.id, titulo: n.title, mensaje: n.body, accion: n.action, lugar: r.lugar, distancia_km: r.distancia_km, mapsLink };
+            if (n.kind === "push") {
+              // Las push quedan como historial — es lo que el Companion ya te
+              // avisó en su momento, no se reemplaza al cambiar de zona.
+              setNotifs((prev) => [...prev, { ...item, operativo: false }]);
+              setPushUsados((p) => p + 1);
+            } else {
+              nuevosFeed.push({ ...item, origenNearby: true });
+            }
+          } else {
+            // Score bajo del motor (decisión "silencio") — pero esto fue una
+            // búsqueda explícita del usuario ("qué hay cerca"), no una
+            // notificación proactiva. Igual mostramos el resultado con su
+            // link de Maps; el presupuesto de push no se toca.
+            nuevosFeed.push({
+              id: `nearby-${r.lugar}-${Date.now()}`,
+              titulo: r.lugar,
+              mensaje: `${distTxt}${r.reason ? ` · ${r.reason}` : ""}`,
+              lugar: r.lugar, distancia_km: r.distancia_km, mapsLink,
+              origenNearby: true,
+            });
+          }
+        });
+      }
+
+      // Reemplaza el bloque de /nearby en "PARA TI": si cambiaste de zona,
+      // las distancias del click anterior (calculadas desde la zona vieja)
+      // ya no aplican y mostrarlas mezcladas con las nuevas confunde (ej.
+      // "El Chato a 0.28km" calculado en Zona G, mostrado mientras estás en
+      // Usaquén). Lo de /scan y las push de notifs NO se tocan aquí.
+      setFeed((f) => [...f.filter((x) => !x.origenNearby), ...nuevosFeed]);
+    } catch (e) {
+      addLog({ senal: "Qué hay cerca de mí", fuente: "Curación de destino", filtro: "Error al contactar el backend", score: null, decision: "error", razon: e.message });
+    }
+    setCargandoCerca(false);
+  };
+
+  // ── "Escanear destino" → /scan (News watcher + Destination Scanner vía Tavily) ──
+  const escanearDestino = async () => {
+    if (!tripId || escaneando) return;
+    setEscaneando(true);
+    try {
+      const data = await api.post(`/trips/${tripId}/scan`, {});
+      const resultados = data.resultados || [];
+      if (resultados.length === 0) {
+        addLog({
+          senal: "Escaneo del destino",
+          fuente: `Tavily (${data.search_mode || "?"})`,
+          filtro: `${data.procesados ?? 0} resultados procesados de ${data.encontrados ?? 0} encontrados.`,
+          score: null, decision: "silencio",
+        });
+      } else {
+        resultados.forEach((r) => {
+          const esNoticia = r.tipo === "noticia";
+          addLog({
+            senal: `${esNoticia ? "Noticia/seguridad" : "Tendencia/recomendación"}: ${r.fuente}`,
+            fuente: esNoticia ? "News watcher (Tavily)" : "Destination Scanner (Tavily)",
+            filtro: r.filter !== "pass" ? `✕ Muere en el filtro: ${r.filter}` : `✓ Pasa el filtro — score ${r.score}`,
+            score: r.score, razon: r.reason, decision: r.decision,
+          });
+          if (r.notification) {
+            const n = r.notification;
+            const item = { id: n.id, titulo: n.title, mensaje: n.body, accion: n.action };
+            if (n.kind === "push") {
+              setNotifs((prev) => [...prev, { ...item, operativo: esNoticia }]);
+              setPushUsados((p) => p + 1);
+            } else {
+              setFeed((f) => [...f, item]);
+            }
+          }
+        });
+      }
+    } catch (e) {
+      addLog({ senal: "Escaneo del destino", fuente: "Tavily", filtro: "Error al contactar el backend", score: null, decision: "error", razon: e.message });
+    }
+    setEscaneando(false);
+  };
+
+  // ── Chat / acciones de 1 tap ──
+  const enviar = async (display, apiTexto) => {
+    const msgDisplay = (display || input).trim();
+    const msgApi = (apiTexto || msgDisplay).trim();
+    if (!msgDisplay || pensando || !tripId) return;
+    setInput("");
+    setChat((prev) => [...prev, { rol: "user", texto: msgDisplay }]);
+    setPensando(true);
+    try {
+      const data = await api.post(`/trips/${tripId}/chat`, { message: msgApi });
+      setChat((c) => [...c, { rol: "companion", texto: data.reply }]);
+      hablar(data.reply);
+    } catch (e) {
+      setChat((c) => [...c, { rol: "companion", texto: "Se me cruzaron los cables un segundo. ¿Me lo repites?" }]);
+    }
+    setPensando(false);
+  };
+  // ─────────── SETUP ───────────
+  if (fase === "setup") {
+    const listo = viaje.ciudad && viaje.hotel && viaje.inicio && viaje.fin;
+    return (
+      <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "ui-sans-serif, system-ui, sans-serif", color: C.ink }} className="flex items-center justify-center p-6">
+        <div style={{ maxWidth: 520, width: "100%" }}>
+          <div className="mb-8">
+            <div style={{ color: C.teal, letterSpacing: "0.18em", fontSize: 12, fontWeight: 600 }}>VOYRA · COMPANION EN DESTINO</div>
+            <h1 style={{ fontSize: 32, fontWeight: 700, lineHeight: 1.15, marginTop: 10 }}>Cuéntame lo básico de tu viaje y yo me encargo del resto.</h1>
+            <p style={{ color: C.inkSoft, marginTop: 10, fontSize: 15 }}>Con esto activo los watchers de vuelo, clima, itinerario y señales sociales del destino.</p>
+          </div>
+
+          <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 16, padding: 24 }} className="space-y-4">
+            {[
+              ["Ciudad de destino", "ciudad", "Bogotá"],
+              ["Hotel", "hotel", "Hotel NH Collection Bogotá Teusaquillo"],
+              ["Vuelo de ida", "vueloIda", "AV245 MIA→BOG, 12 jul 15:40"],
+              ["Vuelo de regreso", "vueloRegreso", "AV244 BOG→MIA, 18 jul 14:20"],
+              ["País de origen (para emergencias y consulados)", "pais", "Colombia"],
+            ].map(([label, key, ph]) => (
+              <div key={key}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: C.inkSoft, letterSpacing: "0.04em" }}>{label.toUpperCase()}</label>
+                <input value={viaje[key]} onChange={(e) => setViaje({ ...viaje, [key]: e.target.value })} placeholder={ph}
+                  style={{ width: "100%", border: `1px solid ${C.line}`, borderRadius: 10, padding: "10px 12px", marginTop: 4, fontSize: 15, background: C.bg, color: C.ink, outline: "none" }} />
+              </div>
+            ))}
+            <div className="flex gap-3">
+              {[["Llegada", "inicio"], ["Regreso", "fin"]].map(([label, key]) => (
+                <div key={key} className="flex-1">
+                  <label style={{ fontSize: 12, fontWeight: 600, color: C.inkSoft, letterSpacing: "0.04em" }}>{label.toUpperCase()}</label>
+                  <input type="date" value={viaje[key]} onChange={(e) => setViaje({ ...viaje, [key]: e.target.value })}
+                    style={{ width: "100%", border: `1px solid ${C.line}`, borderRadius: 10, padding: "10px 12px", marginTop: 4, fontSize: 15, background: C.bg, color: C.ink, outline: "none" }} />
+                </div>
+              ))}
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: C.inkSoft, letterSpacing: "0.04em" }}>QUÉ TE GUSTA (opcional, afina las recomendaciones)</label>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {GUSTOS.map((g) => {
+                  const on = viaje.gustos.includes(g);
+                  return (
+                    <button key={g} onClick={() => toggleGusto(g)}
+                      style={{ fontSize: 13, padding: "6px 12px", borderRadius: 999, border: `1px solid ${on ? C.teal : C.line}`, background: on ? C.tealSoft : C.card, color: on ? C.teal : C.inkSoft, fontWeight: on ? 600 : 400, cursor: "pointer" }}>
+                      {g}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <button onClick={async () => {
+                if (!listo) return;
+                try {
+                  const data = await api.post("/trips", {
+                    ciudad: viaje.ciudad, hotel: viaje.hotel,
+                    inicio: viaje.inicio, fin: viaje.fin,
+                    vuelo_ida: viaje.vueloIda, vuelo_regreso: viaje.vueloRegreso,
+                    pais: viaje.pais, gustos: viaje.gustos,
+                  });
+                  setTripId(data.trip_id);
+                  setChat([{ rol: "companion", texto: data.greeting }]);
+                  setFase("agente");
+                } catch (e) {
+                  alert("No pude conectar con el backend. ¿Está corriendo uvicorn?");
+                }
+              }} disabled={!listo}
+              style={{ width: "100%", background: listo ? C.teal : C.line, color: listo ? "#fff" : C.inkSoft, border: "none", borderRadius: 12, padding: "14px 0", fontSize: 16, fontWeight: 700, cursor: listo ? "pointer" : "default", marginTop: 4 }}>
+              Activar mi Companion
+            </button>
+            <p style={{ fontSize: 12, color: C.inkSoft, textAlign: "center" }}>Ubicación inteligente: menos del 2% de batería al día. Nada de GPS continuo.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─────────── AGENTE ACTIVO ───────────
+  return (
+    <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "ui-sans-serif, system-ui, sans-serif", color: C.ink }} className="p-4 md:p-6">
+      <div style={{ maxWidth: 1080, margin: "0 auto" }}>
+        <div className="flex items-baseline justify-between flex-wrap gap-2 mb-5">
+          <div>
+            <div style={{ color: C.teal, letterSpacing: "0.18em", fontSize: 11, fontWeight: 600 }}>VOYRA · COMPANION ACTIVO</div>
+            <h1 style={{ fontSize: 22, fontWeight: 700 }}>{viaje.ciudad} · {viaje.hotel}</h1>
+          </div>
+          <div style={{ fontSize: 12, color: C.inkSoft, textAlign: "right" }}>
+            <div>Push hoy: <span style={{ fontWeight: 700, color: pushUsados >= PRESUPUESTO_DIARIO ? C.coral : C.ink }}>{pushUsados}/{PRESUPUESTO_DIARIO}</span> · Autonomía: <span style={{ fontWeight: 700 }}>avisar + sugerir</span></div>
+            <div style={{ marginTop: 2 }}>
+              <span style={{ color: C.teal }}>● backend:</span> <span style={{ fontFamily: "monospace", fontSize: 11 }}>{API}</span>
+              {tripId && <span style={{ marginLeft: 8 }}>· trip: <span style={{ fontFamily: "monospace" }}>{tripId}</span></span>}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-5">
+          {/* ── TELÉFONO ── */}
+          <div style={{ background: C.ink, borderRadius: 28, padding: 10 }}>
+            <div style={{ background: C.card, borderRadius: 20, height: 560, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+              <div style={{ padding: "12px 16px", borderBottom: `1px solid ${C.line}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontWeight: 700, fontSize: 14 }}>Tu Companion</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <button onClick={() => { setVozActiva(!vozActiva); if (vozActiva) window.speechSynthesis && window.speechSynthesis.cancel(); }}
+                    title="Leer respuestas en voz alta"
+                    style={{ fontSize: 11, fontWeight: 600, border: `1px solid ${vozActiva ? C.teal : C.line}`, background: vozActiva ? C.tealSoft : "transparent", color: vozActiva ? C.teal : C.inkSoft, borderRadius: 999, padding: "3px 10px", cursor: "pointer" }}>
+                    🔊 voz {vozActiva ? "ON" : "OFF"}
+                  </button>
+                  <span style={{ fontSize: 11, color: C.teal, fontWeight: 600 }}>● en {viaje.ciudad}</span>
+                </div>
+              </div>
+              <div ref={phoneRef} style={{ flex: 1, overflowY: "auto", padding: 14 }} className="space-y-3">
+                {notifs.length === 0 && feed.length === 0 && chat.length === 0 && (
+                  <div style={{ color: C.inkSoft, fontSize: 14, textAlign: "center", marginTop: 40, padding: "0 20px" }}>
+                    Estoy despierto y vigilando tu viaje. Dispara una señal desde el panel del servidor, o pregúntame lo que quieras.
+                  </div>
+                )}
+                {notifs.map((n) => (
+                  <div key={n.id} style={{ background: n.operativo ? C.coralSoft : C.tealSoft, border: `1px solid ${n.operativo ? C.coral : C.teal}22`, borderRadius: 14, padding: 12 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: n.operativo ? C.coral : C.teal, letterSpacing: "0.06em" }}>{n.operativo ? "ALERTA DE VIAJE" : "TU COMPANION"}</div>
+                    <div style={{ fontWeight: 700, fontSize: 14, marginTop: 3 }}>{n.titulo}</div>
+                    <div style={{ fontSize: 13.5, color: C.ink, marginTop: 3, lineHeight: 1.45 }}>{n.mensaje}</div>
+                    {((n.accion && n.accion !== "null") || n.mapsLink) && (
+                      <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        {n.accion && n.accion !== "null" && (
+                          <button onClick={() => enviar(n.accion, `[Tocó el botón "${n.accion}" en esta notificación] ${n.titulo}: ${n.mensaje}`)}
+                            style={{ background: n.operativo ? C.coral : C.teal, color: "#fff", border: "none", borderRadius: 999, padding: "7px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                            {n.accion}
+                          </button>
+                        )}
+                        {n.mapsLink && (
+                          <a href={n.mapsLink} target="_blank" rel="noopener noreferrer"
+                            style={{ background: "transparent", color: n.operativo ? C.coral : C.teal, border: `1px solid ${n.operativo ? C.coral : C.teal}`, borderRadius: 999, padding: "7px 14px", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
+                            📍 Cómo llegar{distLabel(n.distancia_km)}
+                          </a>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {feed.length > 0 && (
+                  <div style={{ border: `1px dashed ${C.line}`, borderRadius: 14, padding: 12 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.inkSoft, letterSpacing: "0.06em" }}>PARA TI — recomendaciones sin push</div>
+                    {feed.map((f) => (
+                      <div key={f.id} style={{ marginTop: 6 }}>
+                        <div>
+                          <span style={{ fontWeight: 600, fontSize: 13 }}>{f.titulo}</span>
+                          <span style={{ fontSize: 13, color: C.inkSoft }}> — {f.mensaje}</span>
+                        </div>
+                        {f.mapsLink && (
+                          <a href={f.mapsLink} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: C.teal, fontWeight: 600, textDecoration: "none" }}>
+                            📍 Cómo llegar{distLabel(f.distancia_km)} →
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {chat.map((m, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: m.rol === "user" ? "flex-end" : "flex-start" }}>
+                    <div style={{ maxWidth: "82%", background: m.rol === "user" ? C.ink : C.bg, color: m.rol === "user" ? "#fff" : C.ink, borderRadius: 14, padding: "9px 13px", fontSize: 13.5, lineHeight: 1.45, whiteSpace: "pre-wrap" }}>
+                      {m.texto}
+                    </div>
+                  </div>
+                ))}
+                {pensando && <div style={{ fontSize: 13, color: C.inkSoft }}>El Companion está pensando…</div>}
+              </div>
+              <div style={{ padding: "8px 12px 0", display: "flex", gap: 6, flexWrap: "wrap", borderTop: `1px solid ${C.line}` }}>
+                {[
+                  { q: "Estoy perdido", urgente: true },
+                  { q: "Emergencia médica", urgente: true },
+                  { q: "Perdí mis documentos", urgente: true },
+                  { q: "Restaurantes cerca", urgente: false },
+                ].map(({ q, urgente }) => (
+                  <button key={q} onClick={() => enviar(q)} disabled={pensando}
+                    style={{ fontSize: 12, padding: "5px 11px", borderRadius: 999, border: `1px solid ${urgente ? C.coral : C.line}`, background: urgente ? C.coralSoft : C.bg, color: urgente ? C.coral : C.inkSoft, fontWeight: 600, cursor: "pointer" }}>
+                    {q}
+                  </button>
+                ))}
+              </div>
+              <div style={{ padding: 12, display: "flex", gap: 6, alignItems: "center" }}>
+                <input ref={fileRef} type="file" accept=".txt,text/plain" style={{ display: "none" }}
+                  onChange={(e) => { subirDoc(e.target.files[0]); e.target.value = ""; }} />
+                <button onClick={() => fileRef.current && fileRef.current.click()} disabled={subiendo} title="Subir confirmación de reserva (.txt)"
+                  style={{ border: `1px solid ${C.line}`, background: C.bg, borderRadius: 999, width: 38, height: 38, fontSize: 16, cursor: "pointer", flexShrink: 0 }}>
+                  {subiendo ? "…" : "📎"}
+                </button>
+                <button onClick={toggleMic} title="Hablarle al Companion"
+                  style={{ border: `1px solid ${escuchando ? C.coral : C.line}`, background: escuchando ? C.coralSoft : C.bg, borderRadius: 999, width: 38, height: 38, fontSize: 16, cursor: "pointer", flexShrink: 0 }}>
+                  {escuchando ? "⏺" : "🎙"}
+                </button>
+                <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && enviar()}
+                  placeholder={escuchando ? "Escuchando… habla ahora" : "Escríbeme o tócame el micrófono"}
+                  style={{ flex: 1, minWidth: 0, border: `1px solid ${escuchando ? C.coral : C.line}`, borderRadius: 999, padding: "10px 14px", fontSize: 13.5, outline: "none", background: C.bg, color: C.ink }} />
+                <button onClick={() => enviar()} style={{ background: C.teal, color: "#fff", border: "none", borderRadius: 999, padding: "0 16px", height: 38, fontWeight: 700, fontSize: 14, cursor: "pointer", flexShrink: 0 }}>→</button>
+              </div>
+            </div>
+          </div>
+
+          {/* ── SERVIDOR ── */}
+          <div className="space-y-4">
+            <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 16, padding: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.inkSoft, letterSpacing: "0.1em" }}>UBICACIÓN DEL USUARIO — señal de geofence / ubicación significativa</div>
+
+              <div style={{ marginTop: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                <div style={{ fontSize: 13 }}>
+                  {gpsEstado === "ok" && <span><b>📍 {zonaActual}</b> <span style={{ color: C.inkSoft, fontSize: 12 }}>· GPS real</span></span>}
+                  {gpsEstado === "buscando" && <span style={{ color: C.inkSoft }}>📍 Buscando tu ubicación…</span>}
+                  {gpsEstado === "denegado" && <span style={{ color: C.inkSoft }}>📍 Sin permiso de GPS — usando zona manual</span>}
+                  {gpsEstado === "no_soportado" && <span style={{ color: C.inkSoft }}>📍 GPS no disponible aquí (¿HTTP en vez de HTTPS?)</span>}
+                  {gpsEstado === "error" && <span style={{ color: C.inkSoft }}>📍 No se pudo obtener el GPS</span>}
+                  {(gpsEstado === "manual" || gpsEstado === "inactivo") && <span><b>📍 {zonaActual}</b> <span style={{ color: C.inkSoft, fontSize: 12 }}>· manual</span></span>}
+                </div>
+                <button onClick={actualizarGPS} disabled={gpsEstado === "buscando" || !tripId}
+                  style={{ border: `1px solid ${C.line}`, borderRadius: 8, padding: "4px 10px", fontSize: 12, background: C.bg, color: C.ink, cursor: "pointer", whiteSpace: "nowrap" }}>
+                  🔄 Usar GPS
+                </button>
+              </div>
+
+              <select value={ubicacion}
+                onChange={async (e) => {
+                  const zona = e.target.value;
+                  setUbicacion(zona);
+                  setZonaActual(zona);
+                  setGpsEstado("manual");
+                  addLog({ senal: `Ubicación significativa: ${zona}`, fuente: "OS del teléfono (bajo consumo)", filtro: "Actualiza el Trip Context — sin AI, costo cero", score: null, decision: "silencio" });
+                  if (tripId) {
+                    try { await api.post(`/trips/${tripId}/location`, { zona, disparar_geofence: false }); } catch {}
+                  }
+                }}
+                style={{ width: "100%", marginTop: 8, border: `1px solid ${C.line}`, borderRadius: 10, padding: "10px 12px", fontSize: 14, background: C.bg, color: C.ink, outline: "none" }}>
+                {ZONAS.map((z) => <option key={z} value={z}>{z}</option>)}
+              </select>
+              <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 6 }}>Si el GPS no funciona o no le das permiso, elige tu zona manualmente aquí.</div>
+              <button onClick={buscarCerca} disabled={cargandoCerca || !tripId}
+                style={{ width: "100%", textAlign: "left", border: `1px solid ${C.teal}55`, borderRadius: 12, padding: "10px 12px", background: C.tealSoft, cursor: "pointer", marginTop: 10 }}>
+                <div style={{ fontWeight: 600, fontSize: 13, color: C.teal }}>{cargandoCerca ? "Buscando…" : "📍 Qué hay cerca de mí ahora"}</div>
+                <div style={{ fontSize: 11, color: C.inkSoft, marginTop: 2 }}>Curación por distancia real desde tu zona, con link de Maps · /nearby</div>
+              </button>
+            </div>
+
+            <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 16, padding: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.inkSoft, letterSpacing: "0.1em" }}>SERVIDOR · WATCHERS — dispara una señal</div>
+              <button onClick={checkInNocturno} disabled={pensando}
+                style={{ width: "100%", textAlign: "left", border: `1px solid ${C.teal}55`, borderRadius: 12, padding: "10px 12px", background: C.tealSoft, cursor: "pointer", marginTop: 10 }}>
+                <div style={{ fontWeight: 600, fontSize: 13, color: C.teal }}>{pensando ? "Generando check-in…" : "🌙 Check-in nocturno — pregunta los planes de mañana"}</div>
+                <div style={{ fontSize: 11, color: C.inkSoft, marginTop: 2 }}>Cron 8pm hora local · construye el contexto del día siguiente</div>
+              </button>
+              <button onClick={escanearDestino} disabled={escaneando}
+                style={{ width: "100%", textAlign: "left", border: `1px solid ${C.amber}55`, borderRadius: 12, padding: "10px 12px", background: C.amberSoft, cursor: "pointer", marginTop: 10 }}>
+                <div style={{ fontWeight: 600, fontSize: 13, color: C.amber }}>{escaneando ? "Escaneando…" : "🔎 Escanear destino — noticias y tendencias"}</div>
+                <div style={{ fontSize: 11, color: C.inkSoft, marginTop: 2 }}>News watcher + Destination Scanner (Tavily) · /scan</div>
+              </button>
+              <div className="grid grid-cols-2 gap-2 mt-3">
+                {SENALES.map((s) => (
+                  <button key={s.id} onClick={() => evaluar(s)} disabled={!!evaluando}
+                    style={{ textAlign: "left", border: `1px solid ${C.line}`, borderRadius: 12, padding: "10px 12px", background: evaluando === s.id ? C.amberSoft : C.bg, cursor: evaluando ? "default" : "pointer", opacity: evaluando && evaluando !== s.id ? 0.5 : 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{evaluando === s.id ? "Evaluando…" : s.nombre}</div>
+                    <div style={{ fontSize: 11, color: C.inkSoft, marginTop: 2 }}>{s.fuente}{s.operativo ? " · operativo" : ""}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 16, padding: 16, maxHeight: 360, overflowY: "auto" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.inkSoft, letterSpacing: "0.1em" }}>MOTOR DE RELEVANCIA — log de decisiones</div>
+              {log.length === 0 && <div style={{ fontSize: 13, color: C.inkSoft, marginTop: 10 }}>Aquí verás cómo decide el agente: filtro → score → push, feed o silencio.</div>}
+              <div className="space-y-3 mt-3" style={{ fontFamily: "ui-monospace, monospace" }}>
+                {log.map((e, i) => (
+                  <div key={i} style={{ borderLeft: `3px solid ${e.decision === "push" ? C.teal : e.decision === "feed" ? C.amber : e.decision === "error" ? C.coral : C.line}`, paddingLeft: 10 }}>
+                    <div style={{ fontSize: 11, color: C.inkSoft }}>{e.t} · {e.fuente}</div>
+                    <div style={{ fontSize: 12.5, fontWeight: 600 }}>{e.senal}</div>
+                    <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 2 }}>{e.filtro}</div>
+                    {e.score !== null && e.score !== undefined && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+                        <div style={{ flex: 1, height: 5, background: C.line, borderRadius: 999, maxWidth: 140 }}>
+                          <div style={{ width: `${e.score}%`, height: 5, borderRadius: 999, background: e.score >= 70 ? C.teal : e.score >= 40 ? C.amber : C.inkSoft }} />
+                        </div>
+                        <span style={{ fontSize: 12, fontWeight: 700 }}>score {e.score}</span>
+                      </div>
+                    )}
+                    {e.razon && <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 2 }}>{e.razon}</div>}
+                    <div style={{ fontSize: 12, fontWeight: 700, marginTop: 2, color: e.decision === "push" ? C.teal : e.decision === "feed" ? C.amber : e.decision === "error" ? C.coral : C.inkSoft }}>
+                      → {e.decision === "push" ? "PUSH al usuario" : e.decision === "feed" ? "Feed in-app (sin push)" : e.decision === "error" ? "Error" : "Silencio"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {docs.length > 0 && (
+              <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 16, padding: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.inkSoft, letterSpacing: "0.1em" }}>TRIP CONTEXT — documentos del usuario</div>
+                <div className="space-y-2 mt-2">
+                  {docs.map((d, i) => (
+                    <div key={i} style={{ fontSize: 12.5, borderLeft: `3px solid ${C.teal}`, paddingLeft: 10 }}>
+                      <span style={{ fontWeight: 700 }}>{d.tipo}</span> · {d.nombre}
+                      <div style={{ color: C.inkSoft, marginTop: 1 }}>{d.resumen}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <button onClick={() => { setFase("setup"); setTripId(null); setNotifs([]); setFeed([]); setLog([]); setChat([]); setPushUsados(0); setCategoriasHoy([]); setUbicacion("En el hotel"); setDocs([]); setVozActiva(false); setCargandoCerca(false); setEscaneando(false); }}
+              style={{ fontSize: 13, color: C.inkSoft, background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
+              Reiniciar con otro viaje
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<VoyraCompanion />);
+</script>
+</body>
+</html>
