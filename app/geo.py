@@ -33,16 +33,14 @@ def suggest_mode(distance_km: float | None) -> str:
     return "driving"
 
 
-def maps_link(destination: str, mode: str = "walking") -> str:
-    """Deep link de Google Maps: abre la app/web con la ruta ya armada hacia `destination`.
+def maps_link(lat: float, lng: float, mode: str = "walking") -> str:
+    """Deep link de Google Maps con coordenadas exactas del lugar curado.
 
-    `destination` puede ser "lat,lng" O el nombre del lugar (ej. "El Chato, Bogotá, Colombia").
-    Para negocios/lugares conocidos, el NOMBRE es más preciso que coordenadas de zona —
-    Google Maps usa su propio buscador para resolverlo a la dirección real. Las
-    coordenadas de zona (ZONE_COORDS) se usan solo para calcular distancias, no
-    para el link final.
+    Usamos lat/lng en vez del nombre porque la búsqueda por texto es ambigua:
+    "KOSH" resuelve a "Koshcampo SAS" (error real). Con coordenadas, Maps
+    siempre lleva al punto exacto de la curación, sin homonimias.
     """
-    return f"https://www.google.com/maps/dir/?api=1&destination={urllib.parse.quote(destination)}&travelmode={mode}"
+    return f"https://www.google.com/maps/dir/?api=1&destination={lat},{lng}&travelmode={mode}"
 
 
 # Referencias de zona por ciudad — misma granularidad que zona_actual del

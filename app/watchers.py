@@ -172,11 +172,10 @@ def nearby_recommendations(trip_id: str, limit: int = 3) -> dict:
         dist_txt = f", a ~{p['distancia_km']} km de tu ubicación actual ({zona})" if p["distancia_km"] is not None else ""
         payload = f"{p['name']} ({p['category']}, zona {p['zona']}){dist_txt}. {p['descripcion']}"
         modo = geo.suggest_mode(p["distancia_km"])
-        destino = f"{p['name']}, {p['city_display']}, Colombia"
         extra = {
             "place_name": p["name"],
             "distancia_km": p["distancia_km"],
-            "maps_link": geo.maps_link(destino, modo),
+            "maps_link": geo.maps_link(p["lat"], p["lng"], modo),
         }
         r = engine.ingest(trip_id, source=f"Curación de destino — {p['name']}",
                          category="recomendacion", operational=False, payload=payload, extra=extra)
