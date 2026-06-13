@@ -128,6 +128,7 @@ BOGOTA = [
     },
     {
         "city_display": "Bogotá", "name": "Colo Coffee", "category": "cafe", "zona": "Parque de la 93 (Chicó)",
+        "maps_query": "Colo Coffee Carrera 13 83-19 Bogotá Colombia",
         "lat": 4.6757, "lng": -74.0478,
         "descripcion": "Cafetería de especialidad amplia, con WiFi rápido — citada en rutas de café de especialidad de Bogotá (2026) como buen lugar para trabajar o pasar la tarde cerca de la Calle 93.",
         "confianza": "media_alta",
@@ -153,6 +154,7 @@ BOGOTA = [
     # ════════ BARES Y VIDA NOCTURNA ════════
     {
         "city_display": "Bogotá", "name": "KOSH", "category": "bar", "zona": "Zona T",
+        "maps_query": "KØSH Rooftop Av. Calle 82 #11-40 Bogotá Colombia",
         "lat": 4.6685, "lng": -74.0535,
         "descripcion": "Rooftop bar frente al Centro Comercial Andino con vista panorámica a la Zona T. Cócteles de autor y ambiente nocturno — punto de referencia para salir de fiesta en la zona.",
         "confianza": "alta",
@@ -171,7 +173,6 @@ BOGOTA = [
     },
     {
         "city_display": "Bogotá", "name": "Zona T / Zona Rosa (vida nocturna)", "category": "atraccion", "zona": "Zona T",
-        "maps_query": "Zona T Zona Rosa, Bogotá, Colombia",
         "lat": 4.6678, "lng": -74.0528,
         "descripcion": "Calles peatonales con la mayor oferta de bares y discotecas de la ciudad, entre las carreras 11-15 y calles 82-86.",
         "confianza": "alta",
@@ -191,14 +192,12 @@ BOGOTA = [
     },
     {
         "city_display": "Bogotá", "name": "Plaza de Bolívar", "category": "atraccion", "zona": "La Candelaria",
-        "maps_query": "Plaza de Bolívar, Bogotá, Colombia",
         "lat": 4.5981, "lng": -74.0760,
         "descripcion": "Corazón político e histórico de Bogotá: Catedral Primada, Capitolio Nacional y Palacio de Justicia alrededor. Punto de partida natural del centro histórico.",
         "confianza": "muy_alta",
     },
     {
         "city_display": "Bogotá", "name": "Chorro de Quevedo", "category": "atraccion", "zona": "La Candelaria",
-        "maps_query": "Chorro de Quevedo, Bogotá, Colombia",
         "lat": 4.5970, "lng": -74.0699,
         "descripcion": "Plazoleta donde la tradición ubica la fundación de Bogotá. Ambiente bohemio, cuenteros, chicha y arte urbano — parada clásica del recorrido por La Candelaria.",
         "confianza": "alta",
@@ -212,7 +211,6 @@ BOGOTA = [
     # ════════ MIRADORES Y NATURALEZA ════════
     {
         "city_display": "Bogotá", "name": "Cerro de Monserrate", "category": "atraccion", "zona": "La Candelaria / Cerros",
-        "maps_query": "Cerro de Monserrate, Bogotá, Colombia",
         "lat": 4.6058, "lng": -74.0557,
         "descripcion": "Teleférico/funicular con vista panorámica de toda la ciudad. Mencionado en todas las guías como punto de partida del día 1.",
         "confianza": "muy_alta",
@@ -225,21 +223,18 @@ BOGOTA = [
     },
     {
         "city_display": "Bogotá", "name": "Jardín Botánico José Celestino Mutis", "category": "parque", "zona": "Salitre",
-        "maps_query": "Jardín Botánico José Celestino Mutis, Bogotá, Colombia",
         "lat": 4.6685, "lng": -74.0995,
         "descripcion": "El jardín botánico de Bogotá: lago, colección de plantas exóticas, palmetum y réplica de bosque de robles. Plan tranquilo de medio día, ideal con buen clima.",
         "confianza": "alta",
     },
     {
         "city_display": "Bogotá", "name": "Parque Metropolitano Simón Bolívar", "category": "parque", "zona": "Salitre",
-        "maps_query": "Parque Simón Bolívar, Bogotá, Colombia",
         "lat": 4.6580, "lng": -74.0930,
         "descripcion": "El gran pulmón verde de Bogotá — lago, ciclorrutas y eventos masivos. Para caminar, hacer picnic o ejercicio al aire libre.",
         "confianza": "alta",
     },
     {
         "city_display": "Bogotá", "name": "Parque de la 93", "category": "parque", "zona": "Parque de la 93 (Chicó)",
-        "maps_query": "Parque de la 93, Bogotá, Colombia",
         "lat": 4.6766, "lng": -74.0487,
         "descripcion": "Parque urbano rodeado de restaurantes, cafés y terrazas. Ideal para un plan tranquilo al aire libre o tarde de fotos; suele tener actividades los fines de semana.",
         "confianza": "muy_alta",
@@ -247,14 +242,12 @@ BOGOTA = [
     # ════════ MERCADOS Y EXPERIENCIAS LOCALES ════════
     {
         "city_display": "Bogotá", "name": "Mercado de pulgas de Usaquén", "category": "mercado", "zona": "Usaquén",
-        "maps_query": "Mercado de pulgas de Usaquén, Bogotá, Colombia",
         "lat": 4.6952, "lng": -74.0312,
         "descripcion": "Mercado de antigüedades y artesanías, especialmente recomendado los domingos. Barrio tradicional y caminable.",
         "confianza": "alta",
     },
     {
         "city_display": "Bogotá", "name": "Plaza de Mercado de Paloquemao", "category": "mercado", "zona": "Paloquemao",
-        "maps_query": "Plaza de Mercado de Paloquemao, Bogotá, Colombia",
         "lat": 4.6155, "lng": -74.0850,
         "descripcion": "La plaza de mercado más famosa de Bogotá: frutas exóticas colombianas, flores, hierbas y desayuno local entre puestos. Mejor temprano en la mañana. Experiencia gastronómica imperdible.",
         "confianza": "alta",
@@ -262,7 +255,6 @@ BOGOTA = [
     # ════════ EXCURSIONES (fuera de la ciudad) ════════
     {
         "city_display": "Bogotá", "name": "Catedral de Sal de Zipaquirá", "category": "atraccion", "zona": "Zipaquirá",
-        "maps_query": "Catedral de Sal de Zipaquirá, Colombia",
         "lat": 5.0211, "lng": -73.9909,
         "descripcion": "Catedral subterránea excavada en una mina de sal. Día completo, fuera de la ciudad — no es un plan 'cerca', es una excursión.",
         "confianza": "alta",
