@@ -4,7 +4,53 @@ Este texto es el prefijo cacheado en producción (prompt caching): todo lo que e
 agente sabe del viaje en < 4K tokens. Incluye datos del setup, ubicación actual,
 documentos extraídos y planes contados por el usuario.
 """
-from . import db
+from . import db, geo
+
+
+def _lugares_block(trip: dict) -> str:
+    """Inyecta los lugares curados de la ciudad en el system prompt.
+
+    Ordena por distancia desde la zona_actual del usuario (si hay GPS usa
+    las coordenadas reales; si no, el centroide de la zona). Incluye los
+    primeros 25 para no exceder el contexto. Esto es lo que le permite al
+    LLM hacer recomendaciones concretas SIN alucinar.
+    """
+    city = trip.get("ciudad", "")
+    places = db.places_for_city(city)
+    if not places:
+        return ""
+
+    # Ordenar por distancia si hay origen conocido
+    origin = None
+    if trip.get("lat_actual") is not None and trip.get("lng_actual") is not None:
+        origin = (trip["lat_actual"], trip["lng_actual"])
+    else:
+        zona = trip.get("zona_actual", "")
+        origin = geo.zone_coords(city, zona)
+
+    if origin:
+        places = sorted(
+            places,
+            key=lambda p: geo.haversine_km(origin[0], origin[1], p["lat"], p["lng"]),
+        )
+
+    # Top 30 — suficiente para responder bien sin saturar el contexto
+    top = places[:30]
+    lineas = []
+    for p in top:
+        dist = ""
+        if origin:
+            km = geo.haversine_km(origin[0], origin[1], p["lat"], p["lng"])
+            dist = f" (~{km:.1f} km)"
+        lineas.append(f"- {p['name']} [{p['category']}]{dist} · {p['zona']} · {p['descripcion']}")
+
+    return (
+        "\nLUGARES CURADOS DE VOYRA PARA " + city.upper() + " "
+        "(FUENTE ÚNICA Y EXCLUSIVA para recomendar restaurantes, cafés, bares, "
+        "atracciones, parques y excursiones — ordenados por cercanía al usuario):\n"
+        + "\n".join(lineas)
+        + "\n"
+    )
 
 
 def build(trip: dict, docs: list[dict] | None = None) -> str:
@@ -30,6 +76,8 @@ def build(trip: dict, docs: list[dict] | None = None) -> str:
             "tranquilizador: que no se sienta perdido.\n"
         )
 
+    lugares_block = _lugares_block(trip)
+
     return f"""Eres el Companion de Voyra: el copiloto de viaje del usuario durante su viaje. Tono cálido, directo, en español latinoamericano, frases cortas. Nunca suenas a chatbot corporativo.
 
 >>> UBICACIÓN ACTUAL DEL USUARIO AHORA MISMO: {trip.get('zona_actual', 'En el hotel')}, {trip['ciudad']} <
@@ -44,7 +92,9 @@ CONTEXTO DEL VIAJE (Trip Context Store):
 - Gustos del usuario: {', '.join(trip.get('gustos', [])) or 'no especificados'}
 - País de origen / nacionalidad: {trip.get('pais', 'no especificado')}
 - Nivel de autorización: 2 (avisar + sugerir con 1 tap; NUNCA ejecutas compras ni cambios sin confirmación)
-{docs_block}{planes_block}{aeropuerto_block}
+{docs_block}{planes_block}{aeropuerto_block}{lugares_block}
+REGLA ANTI-ALUCINACIÓN — CRÍTICA: cuando el usuario pida recomendaciones de lugares (restaurantes, cafés, bares, atracciones, parques, tiendas, excursiones o cualquier cosa "qué hacer"), usa ÚNICA Y EXCLUSIVAMENTE los lugares de la lista "LUGARES CURADOS DE VOYRA" de arriba. NUNCA inventes ni menciones ningún nombre de lugar que no esté en esa lista. Si la lista no tiene nada que calce con lo que pide, dilo honestamente ("No tengo curado eso para esta zona todavía") y sugiere lo más cercano de la lista. Inventar un restaurante que no existe es el error más grave que puedes cometer — destruye la confianza del usuario.
+
 REGLAS CRÍTICAS:
 0. CHECK-IN DE PLANES: si aún no conoces los planes de hoy o mañana, pregúntalos en un momento natural (nunca durante una urgencia). Todo plan que el usuario cuente queda como itinerario; confírmalo en una frase.
 1. UBICACIÓN — REGLA MÁS IMPORTANTE: cuando el usuario pida algo "cerca", "cerca de aquí", o pregunte qué hay alrededor, usa EXCLUSIVAMENTE la UBICACIÓN ACTUAL de arriba ({trip.get('zona_actual', 'En el hotel')}). IGNORA el hotel para estas respuestas — el hotel es irrelevante salvo que el usuario esté literalmente en él o pregunte por algo del hotel. NUNCA mezcles "estás cerca de X, pero como te alojas en Y, te recomiendo Z": eso confunde al usuario. Si está en el aeropuerto, recomienda SOLO cosas del aeropuerto o su zona inmediata. NUNCA digas que no tienes su ubicación.
