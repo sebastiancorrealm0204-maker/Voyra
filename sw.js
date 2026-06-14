@@ -5,7 +5,7 @@
  *  - API (/trips, /health, …)  → nunca se cachea. Los POST ni siquiera entran aquí.
  *  Sube el número de versión cada vez que cambies el shell para forzar refresco.
  */
-const VERSION = "voyra-v1";
+const VERSION = "voyra-v2";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 
