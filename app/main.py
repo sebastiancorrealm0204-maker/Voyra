@@ -203,7 +203,7 @@ def health():
     return {"status": "ok", "llm_mode": llm.MODE, "search_mode": search.MODE}
 
 
-# ── Frontend ──
+# ── Frontend / PWA ──
 @app.get("/")
 def frontend():
     """Sirve companion-agente.html desde la raíz del repo (mismo dominio que
@@ -211,3 +211,22 @@ def frontend():
     — el navegador exige contexto seguro (HTTPS o localhost); abrir el HTML
     como archivo local o desde otro dominio no cumple eso."""
     return FileResponse("companion-agente.html")
+
+
+@app.get("/manifest.webmanifest", include_in_schema=False)
+def pwa_manifest():
+    """Manifest de la PWA. Los íconos van embebidos como data-URI dentro del
+    archivo, así que no se necesita una carpeta de imágenes ni rutas extra."""
+    return FileResponse("manifest.webmanifest", media_type="application/manifest+json")
+
+
+@app.get("/sw.js", include_in_schema=False)
+def service_worker():
+    """Service worker servido desde la raíz para controlar todo el scope "/".
+    'Cache-Control: no-cache' hace que el navegador detecte nuevas versiones
+    del SW al recargar; 'Service-Worker-Allowed: /' fija el scope explícito."""
+    return FileResponse(
+        "sw.js",
+        media_type="application/javascript",
+        headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"},
+    )
