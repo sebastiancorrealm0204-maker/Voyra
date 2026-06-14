@@ -95,6 +95,68 @@ def test_api_end_to_end():
     assert client.get(f"/trips/{tid}/decisions").json()
 
 
+def test_modo_aeropuerto_se_activa_y_payload():
+    """Al llegar al aeropuerto, el trip entra en modo_aeropuerto y /airport
+    devuelve el timeline de llegada + transporte curado de El Dorado."""
+    from app.main import app
+    client = TestClient(app)
+    t = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "Hotel NH Teusaquillo",
+                                    "inicio": "2026-07-12", "fin": "2026-07-18"}).json()
+    tid = t["trip_id"]
+
+    # Llega al aeropuerto → modo aeropuerto + flag de recién llegado
+    loc = client.post(f"/trips/{tid}/location", json={"zona": "Aeropuerto", "disparar_geofence": False}).json()
+    assert loc["modo_aeropuerto"] is True
+    assert loc["acaba_de_llegar"] is True
+
+    # El payload de llegada trae pasos del timeline y opciones de transporte
+    a = client.get(f"/trips/{tid}/airport").json()
+    assert a["disponible"] is True
+    assert a["code"] == "BOG"
+    assert [p["id"] for p in a["pasos"]] == ["migracion", "equipaje", "aduana", "salida"]
+    assert a["pasos"][0]["estimado_min"][0] < a["pasos"][0]["estimado_min"][1]
+    # Hay un transporte oficial recomendado (taxi) y todos traen tip anti-estafa
+    assert any(x["id"] == "taxi_oficial" and x["recomendado"] for x in a["transporte"])
+    assert all(x.get("tip") for x in a["transporte"])
+
+
+def test_modo_aeropuerto_se_apaga_al_salir():
+    """Al moverse a una zona normal, el modo aeropuerto se apaga."""
+    from app.main import app
+    client = TestClient(app)
+    t = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H",
+                                    "inicio": "2026-07-12", "fin": "2026-07-18"}).json()
+    tid = t["trip_id"]
+    client.post(f"/trips/{tid}/location", json={"zona": "Aeropuerto"})
+    salida = client.post(f"/trips/{tid}/location", json={"zona": "Usaquén"}).json()
+    assert salida["modo_aeropuerto"] is False
+    assert salida["acaba_de_llegar"] is False
+
+
+def test_airport_gps_activa_modo():
+    """Con coordenadas reales de El Dorado, el modo aeropuerto se activa solo."""
+    from app.main import app
+    client = TestClient(app)
+    t = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H",
+                                    "inicio": "2026-07-12", "fin": "2026-07-18"}).json()
+    tid = t["trip_id"]
+    loc = client.post(f"/trips/{tid}/location",
+                      json={"lat": 4.7016, "lng": -74.1469, "zona": "En el hotel"}).json()
+    assert loc["zona_actual"] == "Aeropuerto"
+    assert loc["modo_aeropuerto"] is True
+
+
+def test_airport_ciudad_sin_curacion():
+    """Una ciudad sin aeropuerto curado responde 'no disponible', sin romper."""
+    from app.main import app
+    client = TestClient(app)
+    t = client.post("/trips", json={"ciudad": "Cartagena", "hotel": "H",
+                                    "inicio": "2026-07-12", "fin": "2026-07-18"}).json()
+    tid = t["trip_id"]
+    a = client.get(f"/trips/{tid}/airport").json()
+    assert a["disponible"] is False
+
+
 def test_scan_mock_mode_no_crash():
     """Sin TAVILY_API_KEY, /scan corre en modo mock: 0 resultados, no rompe nada."""
     from app.main import app
@@ -135,9 +197,10 @@ def test_nearby_recommendations_bogota():
     for x in con_notif:
         assert x["notification"]["maps_link"].startswith("https://www.google.com/maps/dir/?api=1&destination=")
 
-    # El más lejano debería ser Zipaquirá (fuera de la ciudad, ~50km)
+    # /nearby devuelve solo los más cercanos (top-N), rankeados por distancia real
+    # ascendente. Verificamos ese orden, que es la garantía del endpoint.
     distancias = [x["distancia_km"] for x in r["resultados"] if x["distancia_km"] is not None]
-    assert max(distancias) > 5  # algo bastante más lejos que el resto de Usaquén
+    assert distancias == sorted(distancias)  # del más cercano al más lejano
 
 
 def test_nearby_dedup_no_repeats():
@@ -149,9 +212,14 @@ def test_nearby_dedup_no_repeats():
     tid = t["trip_id"]
     client.post(f"/trips/{tid}/location", json={"zona": "Usaquén", "disparar_geofence": False})
 
+    # Total de lugares curados que el endpoint puede devolver para esta ciudad
+    # (se deriva del seed, así el test no se rompe cuando la curación crece).
+    total_curados = len(client.get("/destinations/Bogotá/places").json())
+
     vistos_total = set()
     agotado = False
-    for _ in range(6):
+    # Suficientes llamadas para agotar todos los lugares (3 por llamada) + margen.
+    for _ in range(total_curados + 2):
         r = client.post(f"/trips/{tid}/nearby").json()
         lugares = {x["lugar"] for x in r["resultados"]}
         assert lugares.isdisjoint(vistos_total)  # nunca repite uno ya visto
@@ -162,4 +230,4 @@ def test_nearby_dedup_no_repeats():
             break
 
     assert agotado
-    assert len(vistos_total) == 13  # cubrió los 13 lugares curados, sin repetir ninguno
+    assert len(vistos_total) == total_curados  # cubrió todos los curados, sin repetir ninguno

@@ -185,6 +185,135 @@ const Typing = () => (
   </div>
 );
 
+// Emoji por tipo de paso del timeline (mapea airport.steps[].icono).
+const STEP_EMOJI = { passport: "🛂", luggage: "🧳", customs: "📋", exit: "🚕" };
+const fmtRango = (r) => !r ? null : (r[0] === r[1] ? `~${r[0]} min` : `${r[0]}–${r[1]} min`);
+
+// ════════════════ MODO AEROPUERTO ════════════════
+// Pantalla completa que reemplaza la conversación cuando el usuario acaba de
+// aterrizar. Timeline de llegada paso a paso + transporte con tips anti-estafa.
+function AirportView({ data, pasoActivo, setPasoActivo, onChat, onSalir, ciudad }) {
+  const transporteSeg = { alta: C.aqua, media: C.orange, baja: C.coral };
+  return (
+    <div className="no-scrollbar" style={{ flex: 1, overflowY: "auto", background: C.bg }}>
+      {/* Héroe de bienvenida */}
+      <div style={{ background: `linear-gradient(160deg, ${C.orange} 0%, ${C.orangeDeep} 100%)`, color: "#fff", padding: "20px 18px 22px", borderBottomLeftRadius: 22, borderBottomRightRadius: 22 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", opacity: 0.9 }}>ACABAS DE LLEGAR ✈️</div>
+        <div style={{ fontSize: 22, fontWeight: 800, marginTop: 4, lineHeight: 1.15 }}>Bienvenido a {ciudad}</div>
+        <div style={{ fontSize: 14, marginTop: 6, opacity: 0.95, lineHeight: 1.45 }}>
+          Estás en {data.name}. Te guío paso a paso para salir tranquilo.
+        </div>
+        {data.tiempo_total_estimado_min > 0 && (
+          <div style={{ marginTop: 12, display: "inline-flex", alignItems: "center", gap: 7, background: "rgba(255,255,255,.18)", borderRadius: 999, padding: "6px 13px", fontSize: 13, fontWeight: 600 }}>
+            ⏱ ~{data.tiempo_total_estimado_min} min hasta la salida
+            <span style={{ fontSize: 11, opacity: 0.85, fontWeight: 500 }}>· {data.tiempos_modo === "en_vivo" ? "en vivo" : "estimado"}</span>
+          </div>
+        )}
+      </div>
+
+      <div style={{ padding: "18px 16px 24px" }}>
+        {/* TIMELINE DE LLEGADA */}
+        <div style={{ fontSize: 11.5, fontWeight: 700, color: C.inkSoft, letterSpacing: "0.07em", marginBottom: 12 }}>TU LLEGADA, PASO A PASO</div>
+        <div style={{ position: "relative" }}>
+          {data.pasos.map((p, i) => {
+            const abierto = i === pasoActivo;
+            const hecho = i < pasoActivo;
+            const ultimo = i === data.pasos.length - 1;
+            return (
+              <div key={p.id} style={{ display: "flex", gap: 12, position: "relative" }}>
+                {/* riel + nodo */}
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 999, background: hecho ? C.aqua : abierto ? C.orange : C.card, border: `2px solid ${hecho ? C.aqua : abierto ? C.orange : C.line}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, color: "#fff", transition: "all .2s" }}>
+                    {hecho ? "✓" : (STEP_EMOJI[p.icono] || "•")}
+                  </div>
+                  {!ultimo && <div style={{ width: 2, flex: 1, minHeight: abierto ? 8 : 18, background: hecho ? C.aqua : C.line, marginTop: 2, marginBottom: 2 }} />}
+                </div>
+                {/* contenido */}
+                <div style={{ flex: 1, paddingBottom: ultimo ? 0 : 16 }}>
+                  <button onClick={() => setPasoActivo(i)} style={{ width: "100%", textAlign: "left", border: "none", background: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                    <span style={{ fontWeight: 700, fontSize: 15.5, color: abierto ? C.ink : C.inkSoft }}>{p.titulo}</span>
+                    {fmtRango(p.estimado_min) && (
+                      <span style={{ fontSize: 12, fontWeight: 600, color: p.estimado_fuente === "en_vivo" ? C.aqua : C.inkSoft, background: p.estimado_fuente === "en_vivo" ? C.aquaSoft : C.card, border: `1px solid ${p.estimado_fuente === "en_vivo" ? C.aqua + "55" : C.line}`, borderRadius: 999, padding: "2px 9px", flexShrink: 0, whiteSpace: "nowrap" }}>
+                        {fmtRango(p.estimado_min)}
+                      </span>
+                    )}
+                  </button>
+                  {abierto && (
+                    <div className="rise" style={{ marginTop: 8, background: C.card, border: `1px solid ${C.line}`, borderRadius: 14, padding: "12px 13px" }}>
+                      <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.5 }}>{p.que_hacer}</div>
+                      {p.tips && p.tips.length > 0 && (
+                        <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 7 }}>
+                          {p.tips.map((t, k) => (
+                            <div key={k} style={{ display: "flex", gap: 7, fontSize: 13, color: C.inkSoft, lineHeight: 1.45 }}>
+                              <span style={{ color: C.orange, flexShrink: 0 }}>›</span>
+                              <span>{t}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {!ultimo && (
+                        <button onClick={() => setPasoActivo(i + 1)} style={{ marginTop: 11, background: C.orange, color: "#fff", border: "none", borderRadius: 999, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                          Listo, siguiente →
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* TRANSPORTE */}
+        <div style={{ fontSize: 11.5, fontWeight: 700, color: C.inkSoft, letterSpacing: "0.07em", margin: "22px 0 12px" }}>CÓMO SALIR DEL AEROPUERTO</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+          {data.transporte.map((t) => (
+            <div key={t.id} style={{ background: C.card, border: `1px solid ${t.recomendado ? C.aqua + "66" : C.line}`, borderRadius: 16, padding: "14px 14px", position: "relative" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                <div style={{ fontWeight: 700, fontSize: 15 }}>{t.nombre}</div>
+                {t.recomendado && <span style={{ fontSize: 10.5, fontWeight: 700, color: C.aqua, background: C.aquaSoft, borderRadius: 999, padding: "3px 9px", letterSpacing: "0.04em", flexShrink: 0 }}>RECOMENDADO</span>}
+              </div>
+              <div style={{ fontSize: 13.5, color: C.inkSoft, marginTop: 6, lineHeight: 1.5 }}>{t.como}</div>
+              {t.precio_aprox && (
+                <div style={{ fontSize: 13, color: C.ink, marginTop: 8, fontWeight: 600 }}>💰 {t.precio_aprox}</div>
+              )}
+              {t.tip && (
+                <div style={{ marginTop: 9, background: C.orangeSoft, borderRadius: 10, padding: "9px 11px", fontSize: 12.5, color: C.orangeDeep, lineHeight: 1.45, display: "flex", gap: 6 }}>
+                  <span style={{ flexShrink: 0 }}>💡</span><span>{t.tip}</span>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Aviso anti-estafa destacado */}
+        <div style={{ marginTop: 16, background: C.coralSoft, border: `1px solid ${C.coral}44`, borderLeft: `3px solid ${C.coral}`, borderRadius: 12, padding: "12px 13px" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.coral, letterSpacing: "0.06em" }}>⚠️ REGLA DE ORO AL LLEGAR</div>
+          <div style={{ fontSize: 13.5, color: C.ink, marginTop: 4, lineHeight: 1.5 }}>
+            Nunca aceptes transporte de alguien que te aborde dentro de la terminal. Son los <b>“gansos”</b> (taxis piratas) y son el riesgo #1. Camina siempre a las paradas oficiales.
+          </div>
+        </div>
+
+        {/* Acciones */}
+        <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 9 }}>
+          <button onClick={() => onChat("¿Cómo llego a mi hotel desde el aeropuerto?")} style={{ width: "100%", background: C.orange, color: "#fff", border: "none", borderRadius: 14, padding: "14px 0", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
+            🚕 Ayúdame a llegar a mi hotel
+          </button>
+          <button onClick={onSalir} style={{ width: "100%", background: "none", border: `1px solid ${C.line}`, color: C.inkSoft, borderRadius: 14, padding: "12px 0", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+            Ya salí del aeropuerto · seguir al chat
+          </button>
+        </div>
+
+        {data.live_times_url && (
+          <a href={data.live_times_url} target="_blank" rel="noopener noreferrer" style={{ display: "block", textAlign: "center", marginTop: 14, fontSize: 12.5, color: C.aqua, fontWeight: 600, textDecoration: "none" }}>
+            Ver tiempos de filas en vivo (sitio oficial) →
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function VoyraCompanion() {
   const [fase, setFase] = useState("setup");
   const [tripId, setTripId] = useState(null);
@@ -212,6 +341,12 @@ function VoyraCompanion() {
   const [log, setLog] = useState([]);        // solo dev
   const [sheet, setSheet] = useState(null);   // null|'menu'|'location'|'dev'
   const [paso, setPaso] = useState(1);         // paso del onboarding
+
+  // ── Modo aeropuerto: cuando el usuario acaba de aterrizar ──
+  const [modoAeropuerto, setModoAeropuerto] = useState(false);
+  const [airportData, setAirportData] = useState(null);
+  const [cargandoAirport, setCargandoAirport] = useState(false);
+  const [pasoActivo, setPasoActivo] = useState(0);   // índice del paso del timeline expandido
 
   const recRef = useRef(null);
   const fileRef = useRef(null);
@@ -257,7 +392,8 @@ function VoyraCompanion() {
           setZonaActual(data.zona_actual);
           setGpsEstado("ok");
           addLog({ senal: "Ubicación GPS actualizada", fuente: "GPS del navegador", filtro: `Zona detectada: ${data.zona_actual}`, score: null, decision: "silencio" });
-          if (announce) appendStream({ type: "system", texto: `Ahora cerca de ${data.zona_actual}` });
+          procesarUbicacion(data);
+          if (announce && !data.acaba_de_llegar) appendStream({ type: "system", texto: `Ahora cerca de ${data.zona_actual}` });
         } catch (e) {
           setGpsEstado("error");
           addLog({ senal: "Ubicación GPS", fuente: "GPS del navegador", filtro: "Error al contactar el backend", score: null, decision: "error", razon: e.message });
@@ -286,7 +422,7 @@ function VoyraCompanion() {
   const cambiarZona = async (zona) => {
     setUbicacion(zona); setZonaActual(zona); setGpsEstado("manual");
     addLog({ senal: `Ubicación significativa: ${zona}`, fuente: "OS del teléfono", filtro: "Actualiza Trip Context — sin AI, costo cero", score: null, decision: "silencio" });
-    if (tripId) { try { await api.post(`/trips/${tripId}/location`, { zona, disparar_geofence: false }); } catch {} }
+    if (tripId) { try { const data = await api.post(`/trips/${tripId}/location`, { zona, disparar_geofence: false }); procesarUbicacion(data); } catch {} }
   };
 
   // ── Subida de confirmaciones (.txt) → Trip Context ──
@@ -324,6 +460,41 @@ function VoyraCompanion() {
       appendStream({ type: "companion", texto: "Se me cruzaron los cables un segundo. ¿Me lo repites?" });
     }
     setPensando(false);
+  };
+
+  // ── Modo aeropuerto: trae el timeline de llegada del backend ──
+  const cargarAeropuerto = async (anunciarLlegada = false) => {
+    if (!tripId) return;
+    setCargandoAirport(true);
+    try {
+      const data = await api.get(`/trips/${tripId}/airport`);
+      if (data.disponible) {
+        setAirportData(data);
+        setModoAeropuerto(true);
+        setPasoActivo(0);
+        addLog({ senal: "Llegada al aeropuerto detectada", fuente: "GPS / geofence", filtro: `Modo aeropuerto: ${data.name} (${data.tiempos_modo})`, score: null, decision: "push" });
+        if (anunciarLlegada) appendStream({ type: "system", texto: `Bienvenido a ${data.city} ✈️ Te guío para salir del aeropuerto.` });
+      } else {
+        // ciudad sin curación: no forzamos el modo, seguimos normal
+        setModoAeropuerto(false);
+      }
+    } catch (e) {
+      setModoAeropuerto(false);
+    }
+    setCargandoAirport(false);
+  };
+
+  const salirModoAeropuerto = () => setModoAeropuerto(false);
+
+  // Procesa la respuesta de /location: prende el modo aeropuerto al aterrizar.
+  const procesarUbicacion = (data) => {
+    if (data.acaba_de_llegar) {
+      cargarAeropuerto(true);
+    } else if (data.modo_aeropuerto && !airportData) {
+      cargarAeropuerto(false);
+    } else if (!data.modo_aeropuerto) {
+      setModoAeropuerto(false);
+    }
   };
 
   // ── "Qué hay cerca de mí" → /nearby (curación por distancia real) ──
@@ -435,6 +606,7 @@ function VoyraCompanion() {
     setSheet(null); setFase("setup"); setPaso(1); setTripId(null); setStream([]); seqRef.current = 0;
     setLog([]); setPushUsados(0); setUbicacion("En el hotel"); setZonaActual("En el hotel");
     setGpsEstado("inactivo"); setDocs([]); setVozActiva(false); setCargandoCerca(false); setEscaneando(false);
+    setModoAeropuerto(false); setAirportData(null); setPasoActivo(0);
   };
 
   // ════════════════ ONBOARDING ════════════════
@@ -608,7 +780,17 @@ function VoyraCompanion() {
         </button>
       </div>
 
-      {/* ── CONVERSACIÓN ── */}
+      {/* ── CONVERSACIÓN · o MODO AEROPUERTO ── */}
+      {modoAeropuerto && airportData ? (
+        <AirportView
+          data={airportData}
+          ciudad={viaje.ciudad}
+          pasoActivo={pasoActivo}
+          setPasoActivo={setPasoActivo}
+          onChat={(q) => { setModoAeropuerto(false); enviar(q); }}
+          onSalir={salirModoAeropuerto}
+        />
+      ) : (
       <div ref={scrollRef} className="no-scrollbar" style={{ flex: 1, overflowY: "auto", padding: "16px 14px", display: "flex", flexDirection: "column", gap: 12 }}>
         {stream.length === 0 && (
           <div style={{ color: C.inkSoft, fontSize: 14, textAlign: "center", margin: "auto", padding: "0 24px", lineHeight: 1.5 }}>
@@ -707,8 +889,10 @@ function VoyraCompanion() {
           </div>
         )}
       </div>
+      )}
 
       {/* ── COMPOSER ── */}
+      {!modoAeropuerto && (
       <div style={{ flexShrink: 0, background: C.card, borderTop: `1px solid ${C.line}`, paddingBottom: "env(safe-area-inset-bottom)" }}>
         <div className="no-scrollbar" style={{ display: "flex", gap: 7, overflowX: "auto", padding: "10px 12px 2px" }}>
           {QUICK.map((a) => (
@@ -730,6 +914,7 @@ function VoyraCompanion() {
           <button onClick={() => enviar()} style={{ background: C.teal, color: "#fff", border: "none", borderRadius: 999, width: 40, height: 40, fontWeight: 700, fontSize: 18, cursor: "pointer", flexShrink: 0 }}>↑</button>
         </div>
       </div>
+      )}
 
       {/* ── SHEETS ── */}
       {sheet && <div onClick={() => setSheet(null)} style={{ position: "absolute", inset: 0, background: "rgba(23,36,47,.38)", zIndex: 40 }} />}

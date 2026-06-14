@@ -7,7 +7,7 @@
 - news_alert: News watcher (Google News + X + TikTok/IG) → señal operativa de seguridad.
 - check_in: cron 8pm que pregunta/confirma los planes de mañana.
 """
-from . import context, db, engine, geo, llm, search
+from . import airport, context, db, engine, geo, llm, search
 
 
 def duffel_webhook(trip_id: str, payload: dict) -> dict:
@@ -44,13 +44,34 @@ def update_location(trip_id: str, zona: str, disparar_geofence: bool = False,
     patch["zona_actual"] = zona
     db.update_trip(trip_id, patch)
 
-    result = {"trip_id": trip_id, "zona_actual": zona, "geofence_event": None}
+    # ── Detección de "acabo de aterrizar" ──
+    # Si la zona actual significa aeropuerto y la ciudad tiene curación de
+    # aeropuerto, marcamos el trip en modo_aeropuerto. El frontend usa este
+    # flag para cambiar TODA la interfaz al timeline de llegada. Solo lo
+    # marcamos al ENTRAR (transición), para no repetir el saludo cada ping.
+    en_aeropuerto = airport.is_airport_zone(zona) and airport.airport_for_city(trip["ciudad"]) is not None
+    ya_estaba = bool(trip.get("modo_aeropuerto"))
+    if en_aeropuerto != ya_estaba:
+        db.update_trip(trip_id, {"modo_aeropuerto": en_aeropuerto})
+
+    result = {"trip_id": trip_id, "zona_actual": zona, "geofence_event": None,
+              "modo_aeropuerto": en_aeropuerto, "acaba_de_llegar": en_aeropuerto and not ya_estaba}
     if disparar_geofence:
         result["geofence_event"] = engine.ingest(
             trip_id, source="Geofencing del OS", category="zona", operational=False,
             payload=f"El usuario acaba de entrar caminando a la zona '{zona}'.",
         )
     return result
+
+
+def airport_arrival(trip_id: str) -> dict:
+    """Devuelve el timeline de llegada + transporte para el aeropuerto del destino.
+
+    Es lo que pinta el 'modo aeropuerto' del frontend. Combina la curación
+    (app/airport.py) con tiempos en vivo si hay búsqueda configurada.
+    """
+    trip = db.get_trip(trip_id)
+    return airport.arrival_payload(trip)
 
 
 def scanner_finding(trip_id: str, hallazgo: str) -> dict:

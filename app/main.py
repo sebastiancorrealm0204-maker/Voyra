@@ -142,6 +142,16 @@ def nearby(tid: str):
     return watchers.nearby_recommendations(tid)
 
 
+@app.get("/trips/{tid}/airport")
+def airport_arrival(tid: str):
+    """Modo aeropuerto: timeline de llegada (migración → equipaje → salida) +
+    opciones de transporte con tips anti-estafa, curado por aeropuerto y con
+    tiempos en vivo si hay búsqueda configurada."""
+    if not db.get_trip(tid):
+        raise HTTPException(404, "trip no existe")
+    return watchers.airport_arrival(tid)
+
+
 @app.get("/destinations/{city}/places")
 def destination_places(city: str):
     """Inspecciona la base curada para una ciudad (debug / verificación)."""
