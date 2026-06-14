@@ -545,6 +545,22 @@ function VoyraCompanion() {
     setGpsEstado("inactivo"); setDocs([]); setVozActiva(false); setCargandoCerca(false); setEscaneando(false);
   };
 
+  // Días del viaje para el calendario de Planes (de 'inicio' a 'fin').
+  // IMPORTANTE: debe ir ANTES de cualquier `return` condicional para que el
+  // orden de hooks sea idéntico en todos los renders (setup y agente).
+  const diasViaje = React.useMemo(() => {
+    const out = [];
+    try {
+      const ini = new Date(viaje.inicio + "T12:00:00");
+      const fin = new Date(viaje.fin + "T12:00:00");
+      for (let d = new Date(ini); d <= fin; d.setDate(d.getDate() + 1)) {
+        const dd = new Date(d);
+        out.push({ date: dd, iso: dd.toISOString().slice(0, 10), planes: [] });
+      }
+    } catch (e) {}
+    return out;
+  }, [viaje.inicio, viaje.fin]);
+
   // ════════════════ ONBOARDING ════════════════
   if (fase === "setup") {
     const paso1ok = viaje.ciudad.trim() && viaje.hotel.trim() && viaje.inicio && viaje.fin;
@@ -664,20 +680,6 @@ function VoyraCompanion() {
   }
 
   // ════════════════ COMPANION ACTIVO ════════════════
-  // Días del viaje para el calendario de Planes (de 'inicio' a 'fin').
-  const diasViaje = React.useMemo(() => {
-    const out = [];
-    try {
-      const ini = new Date(viaje.inicio + "T12:00:00");
-      const fin = new Date(viaje.fin + "T12:00:00");
-      for (let d = new Date(ini); d <= fin; d.setDate(d.getDate() + 1)) {
-        const dd = new Date(d);
-        out.push({ date: dd, iso: dd.toISOString().slice(0, 10), planes: [] });
-      }
-    } catch (e) {}
-    return out;
-  }, [viaje.inicio, viaje.fin]);
-
   const gpsChip = {
     ok: { txt: `${zonaActual}`, sub: "GPS", color: C.teal },
     buscando: { txt: "Ubicándote…", sub: "", color: C.inkSoft },
