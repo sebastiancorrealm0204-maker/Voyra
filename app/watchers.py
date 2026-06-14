@@ -94,6 +94,7 @@ def check_in(trip_id: str) -> dict:
     )})
     texto = llm.chat(context.build(trip), history)
     db.insert("messages", {"trip_id": trip_id, "role": "companion", "content": texto})
+    _push_checkin(trip_id, "Tu Companion 🌙", texto)
     return {"message": texto}
 
 
@@ -110,7 +111,19 @@ def check_in_matutino(trip_id: str) -> dict:
     )})
     texto = llm.chat(context.build(trip), history)
     db.insert("messages", {"trip_id": trip_id, "role": "companion", "content": texto})
+    _push_checkin(trip_id, "Tu Companion ☀️", texto)
     return {"message": texto}
+
+
+def _push_checkin(trip_id: str, title: str, texto: str) -> None:
+    """Manda el check-in al celular como push (si hay VAPID). Recorta el cuerpo
+    para que quepa bien en la notificación. Nunca rompe el flujo."""
+    try:
+        from . import push
+        cuerpo = texto if len(texto) <= 140 else texto[:137].rstrip() + "…"
+        push.send_to_trip(trip_id, title, cuerpo, data={"kind": "checkin"})
+    except Exception:
+        pass
 
 
 def recordatorio_vuelo_regreso(trip_id: str) -> dict:

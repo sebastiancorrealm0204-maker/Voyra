@@ -98,6 +98,39 @@ def test_api_end_to_end():
     assert client.get(f"/trips/{tid}/decisions").json()
 
 
+def test_push_disabled_sin_vapid():
+    """Sin claves VAPID, el push está deshabilitado pero la app no rompe."""
+    from app import push
+    # En el entorno de test no hay VAPID configurado
+    assert push.enabled() is False
+    from app.main import app
+    client = TestClient(app)
+    pk = client.get("/push/public-key").json()
+    assert pk["enabled"] is False
+
+
+def test_push_subscribe_guarda_y_borra():
+    """Suscribir guarda la suscripción; desuscribir la borra."""
+    from app.main import app
+    client = TestClient(app)
+    tid = db.create_trip({"ciudad": "Bogotá", "hotel": "H", "inicio": "2026-07-12", "fin": "2026-07-18"})
+    sub = {"endpoint": "https://push.example.com/abc123", "keys": {"p256dh": "x", "auth": "y"}}
+    r = client.post(f"/trips/{tid}/push/subscribe", json={"subscription": sub}).json()
+    assert r["ok"] is True
+    assert len(db.list_push_subscriptions(tid)) == 1
+    client.post(f"/trips/{tid}/push/unsubscribe", json={"subscription": sub})
+    assert len(db.list_push_subscriptions(tid)) == 0
+
+
+def test_push_subscribe_no_duplica():
+    """Suscribir el mismo endpoint dos veces no crea duplicados (upsert)."""
+    tid = db.create_trip({"ciudad": "Bogotá", "hotel": "H", "inicio": "2026-07-12", "fin": "2026-07-18"})
+    sub = '{"endpoint":"https://push.example.com/same","keys":{"p256dh":"x","auth":"y"}}'
+    db.upsert_push_subscription(tid, "https://push.example.com/same", sub)
+    db.upsert_push_subscription(tid, "https://push.example.com/same", sub)
+    assert len(db.list_push_subscriptions(tid)) == 1
+
+
 def test_hora_local_usa_timezone_destino():
     """La hora local sale del timezone del destino, no de la hora UTC del servidor."""
     from app import timeutil

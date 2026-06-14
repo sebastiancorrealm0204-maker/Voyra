@@ -90,7 +90,17 @@ def ingest(trip_id: str, source: str, category: str, operational: bool, payload:
         notification = {"id": nid, "kind": decision, "title": r["titulo"], "body": r["mensaje"], "action": r.get("accion")}
         if extra:
             notification.update(extra)
-        # Producción: aquí se despacha el push real (FCM/APNs). MVP: queda persistido y consultable.
+        # Despacho del push REAL al celular: solo para decisiones 'push' (las 'feed'
+        # se quedan en el feed in-app). Web Push (VAPID). Si no hay claves VAPID
+        # configuradas, push.send_to_trip no hace nada y la notificación igual
+        # quedó persistida y consultable. El envío nunca debe romper el ingest.
+        if decision == "push":
+            try:
+                from . import push
+                push.send_to_trip(trip_id, r["titulo"], r["mensaje"],
+                                  data={"notification_id": nid, "category": category, "action": r.get("accion")})
+            except Exception:
+                pass
 
     return {"decision_id": did, "filter": "pass", "score": score, "reason": r.get("razon"),
             "decision": decision, "notification": notification}

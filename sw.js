@@ -5,7 +5,7 @@
  *  - API (/trips, /health, …)  → nunca se cachea. Los POST ni siquiera entran aquí.
  *  Sube el número de versión cada vez que cambies el shell para forzar refresco.
  */
-const VERSION = "voyra-v2";
+const VERSION = "voyra-v3";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 
@@ -86,6 +86,38 @@ self.addEventListener("fetch", (event) => {
         })
         .catch(() => cached);
       return cached || network;
+    })
+  );
+});
+
+// ── Web Push (VAPID) ──────────────────────────────────────────────────────
+// Recibe la notificación enviada por el backend y la muestra. El payload es
+// JSON: { title, body, data }.
+self.addEventListener("push", (event) => {
+  let payload = { title: "Voyra", body: "", data: {} };
+  try { if (event.data) payload = { ...payload, ...event.data.json() }; }
+  catch (e) { if (event.data) payload.body = event.data.text(); }
+
+  const options = {
+    body: payload.body,
+    icon: "/manifest-icon-192.png",   // cae al ícono del manifest si no existe
+    badge: "/manifest-icon-192.png",
+    data: payload.data || {},
+    tag: (payload.data && payload.data.kind) || "voyra",
+    renotify: true,
+  };
+  event.waitUntil(self.registration.showNotification(payload.title || "Voyra", options));
+});
+
+// Al tocar la notificación: enfoca la app si ya está abierta, o la abre.
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((wins) => {
+      for (const w of wins) {
+        if (w.url.includes(self.location.origin) && "focus" in w) return w.focus();
+      }
+      if (clients.openWindow) return clients.openWindow("/");
     })
   );
 });

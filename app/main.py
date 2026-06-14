@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from . import context, db, engine, llm, scheduler, search, seed_data, watchers
+from . import context, db, engine, llm, push, scheduler, search, seed_data, watchers
 
 app = FastAPI(title="Voyra Companion", version="0.1.0")
 
@@ -76,6 +76,10 @@ class FeedbackIn(BaseModel):
 
 class PlanIn(BaseModel):
     plan: str
+
+
+class PushSubIn(BaseModel):
+    subscription: dict   # {endpoint, keys:{p256dh, auth}} que da el navegador
 
 
 # ── Trips ──
@@ -146,6 +150,41 @@ def scheduler_tick():
     """Dispara un ciclo del scheduler manualmente (dev/debug). En producción
     corre solo cada pocos minutos. Respeta el dedup: no repite lo ya enviado hoy."""
     return scheduler.tick()
+
+
+# ── Web Push (VAPID) ──
+@app.get("/push/public-key")
+def push_public_key():
+    """Clave pública VAPID que el frontend necesita para suscribirse.
+    Si no hay claves configuradas, enabled=False y el front no ofrece push."""
+    return {"enabled": push.enabled(), "public_key": push.public_key()}
+
+
+@app.post("/trips/{tid}/push/subscribe")
+def push_subscribe(tid: str, body: PushSubIn):
+    """Guarda la suscripción push del navegador para este viaje."""
+    if not db.get_trip(tid):
+        raise HTTPException(404, "trip no existe")
+    push.save_subscription(tid, body.subscription)
+    return {"ok": True}
+
+
+@app.post("/trips/{tid}/push/unsubscribe")
+def push_unsubscribe(tid: str, body: PushSubIn):
+    """Elimina una suscripción (cuando el usuario desactiva las notificaciones)."""
+    endpoint = body.subscription.get("endpoint")
+    if endpoint:
+        push.delete_subscription(endpoint)
+    return {"ok": True}
+
+
+@app.post("/trips/{tid}/push/test")
+def push_test(tid: str):
+    """Manda una notificación de prueba a los dispositivos suscritos del viaje."""
+    if not db.get_trip(tid):
+        raise HTTPException(404, "trip no existe")
+    return push.send_to_trip(tid, "Voyra 🛟", "¡Las notificaciones funcionan! Te avisaré de lo que importe.",
+                             data={"kind": "test"})
 
 
 @app.post("/trips/{tid}/scan")
@@ -232,7 +271,8 @@ def decisions(tid: str):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "llm_mode": llm.MODE, "search_mode": search.MODE}
+    return {"status": "ok", "llm_mode": llm.MODE, "search_mode": search.MODE,
+            "push_enabled": push.enabled()}
 
 
 # ── Frontend / PWA ──

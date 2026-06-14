@@ -75,6 +75,54 @@ const api = {
 
 const DEBUG = new URLSearchParams(window.location.search).has("debug");
 
+// ── Web Push (VAPID) ──
+// Convierte la clave pública VAPID (base64url) al formato que pide el navegador.
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = window.atob(base64);
+  const arr = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
+
+const pushSupported = () =>
+  "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+
+// Suscribe el navegador y manda la suscripción al backend. Devuelve true si quedó suscrito.
+async function activarPush(tripId) {
+  if (!pushSupported() || !tripId) return false;
+  try {
+    const { enabled, public_key } = await api.get("/push/public-key");
+    if (!enabled || !public_key) return false;            // backend sin VAPID
+    const permiso = await Notification.requestPermission();
+    if (permiso !== "granted") return false;
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(public_key),
+      });
+    }
+    await api.post(`/trips/${tripId}/push/subscribe`, { subscription: sub.toJSON() });
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+async function desactivarPush(tripId) {
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (sub) {
+      await api.post(`/trips/${tripId}/push/unsubscribe`, { subscription: sub.toJSON() });
+      await sub.unsubscribe();
+    }
+  } catch (e) {}
+}
+
 const C = {
   bg: "#FAF3E8", card: "#FFFFFF",
   ink: "#2C2117", inkSoft: "#927A5E",
@@ -297,6 +345,8 @@ function VoyraCompanion() {
   const [docsOpen, setDocsOpen] = useState(false);
   const [guiaVista, setGuiaVista] = useState(false);  // mini-guía de bienvenida
   const [coords, setCoords] = useState(null);          // {lat,lng} GPS para SOS/mapa
+  const [pushOn, setPushOn] = useState(false);          // notificaciones push activas
+  const [pushDisponible, setPushDisponible] = useState(false);  // backend tiene VAPID + navegador soporta
 
   const recRef = useRef(null);
   const fileRef = useRef(null);
@@ -561,6 +611,20 @@ function VoyraCompanion() {
     return out;
   }, [viaje.inicio, viaje.fin]);
 
+  // Notificaciones push: activar/desactivar
+  const togglePush = async () => {
+    if (pushOn) {
+      await desactivarPush(tripId);
+      setPushOn(false);
+    } else {
+      const ok = await activarPush(tripId);
+      setPushOn(ok);
+      if (!ok && Notification.permission === "denied") {
+        appendStream({ type: "system", texto: "Las notificaciones están bloqueadas. Actívalas en los ajustes de tu navegador." });
+      }
+    }
+  };
+
   // ════════════════ ONBOARDING ════════════════
   if (fase === "setup") {
     const paso1ok = viaje.ciudad.trim() && viaje.hotel.trim() && viaje.inicio && viaje.fin;
@@ -579,6 +643,19 @@ function VoyraCompanion() {
         setTab("inicio");
         setGuiaVista(true);
         setFase("agente");
+        // ¿El navegador soporta push y el backend tiene VAPID? Para ofrecerlo.
+        (async () => {
+          try {
+            if (!pushSupported()) return;
+            const pk = await api.get("/push/public-key");
+            if (pk.enabled) {
+              setPushDisponible(true);
+              const reg = await navigator.serviceWorker.ready;
+              const sub = await reg.pushManager.getSubscription();
+              setPushOn(!!sub && Notification.permission === "granted");
+            }
+          } catch (e) {}
+        })();
       } catch (e) {
         alert("No pude conectar con tu Companion. Revisa que el backend esté arriba.");
       }
@@ -738,6 +815,7 @@ function VoyraCompanion() {
       {tab === "inicio" && (
         <HomeView
           viaje={viaje} zonaActual={zonaActual} airport={airport} diasViaje={diasViaje}
+          pushDisponible={pushDisponible} pushOn={pushOn} onActivarPush={togglePush}
           onChat={() => setTab("chat")}
           onCerca={() => { setTab("chat"); buscarCerca(); }}
           onAirport={() => { airport && airport.disponible ? setAirportOpen(true) : cargarAeropuerto(false); }}
@@ -757,6 +835,7 @@ function VoyraCompanion() {
       {tab === "mas" && (
         <MasView
           viaje={viaje} docs={docs} vozActiva={vozActiva} debug={DEBUG}
+          pushDisponible={pushDisponible} pushOn={pushOn} onTogglePush={togglePush}
           onToggleVoz={() => { setVozActiva(!vozActiva); if (vozActiva && window.speechSynthesis) window.speechSynthesis.cancel(); }}
           onUbicacion={() => setSheet("location")}
           onInfo={() => setInfoOpen(true)}
@@ -1026,7 +1105,7 @@ function HomeCard({ icon, titulo, children, accent, onClick, cta }) {
 }
 
 // ── INICIO (home/dashboard) ──
-function HomeView({ viaje, zonaActual, airport, diasViaje, onChat, onCerca, onAirport, onPlanes, onSOS, onTraductor, onInfo }) {
+function HomeView({ viaje, zonaActual, airport, diasViaje, pushDisponible, pushOn, onActivarPush, onChat, onCerca, onAirport, onPlanes, onSOS, onTraductor, onInfo }) {
   const hoy = new Date();
   const horaSaludo = hoy.getHours();
   const saludo = horaSaludo < 12 ? "Buenos días" : horaSaludo < 19 ? "Buenas tardes" : "Buenas noches";
@@ -1043,6 +1122,18 @@ function HomeView({ viaje, zonaActual, airport, diasViaje, onChat, onCerca, onAi
           💬 Pregúntame lo que sea
         </button>
       </div>
+
+      {/* aviso para activar notificaciones (solo si está disponible y aún no activado) */}
+      {pushDisponible && !pushOn && (
+        <div onClick={onActivarPush} style={{ background: C.aquaSoft, border: `1px solid ${C.aqua}55`, borderRadius: 16, padding: "13px 14px", cursor: "pointer", display: "flex", alignItems: "center", gap: 11 }}>
+          <span style={{ fontSize: 22 }}>🔔</span>
+          <span style={{ flex: 1 }}>
+            <span style={{ fontWeight: 800, fontSize: 14, display: "block", color: C.aqua }}>Activa las notificaciones</span>
+            <span style={{ fontSize: 12.5, color: C.inkSoft, lineHeight: 1.4 }}>Para avisarte de tu vuelo, el clima y lo que pasa cerca, aunque tengas la app cerrada.</span>
+          </span>
+          <span style={{ background: C.aqua, color: "#fff", borderRadius: 999, padding: "7px 13px", fontSize: 12.5, fontWeight: 700, flexShrink: 0 }}>Activar</span>
+        </div>
+      )}
 
       {/* guía aeropuerto, si aplica */}
       {airport && airport.disponible && (
@@ -1135,7 +1226,7 @@ function PlanesView({ viaje, diasViaje, onChat }) {
 }
 
 // ── MÁS (info útil, documentos, ajustes) ──
-function MasView({ viaje, docs, vozActiva, onToggleVoz, onUbicacion, onInfo, onDocs, onSOS, onTraductor, onReiniciar, onDev, debug }) {
+function MasView({ viaje, docs, vozActiva, onToggleVoz, onUbicacion, onInfo, onDocs, onSOS, onTraductor, onReiniciar, onDev, debug, pushDisponible, pushOn, onTogglePush }) {
   const Item = ({ icon, label, sub, onClick, danger }) => (
     <button onClick={onClick} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "14px 14px", background: C.card, border: `1px solid ${C.line}`, borderRadius: 14, cursor: "pointer", textAlign: "left" }}>
       <span style={{ fontSize: 19, width: 24, textAlign: "center", flexShrink: 0 }}>{icon}</span>
@@ -1160,6 +1251,7 @@ function MasView({ viaje, docs, vozActiva, onToggleVoz, onUbicacion, onInfo, onD
       <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
         <Item icon="📄" label="Mis documentos" sub={docs.length ? `${docs.length} confirmación(es) guardada(s)` : "Vuelos, hotel, reservas"} onClick={onDocs} />
         <Item icon="🧭" label="Mi ubicación / GPS" sub="Cambiar zona o reactivar GPS" onClick={onUbicacion} />
+        {pushDisponible && <Item icon={pushOn ? "🔔" : "🔕"} label={`Notificaciones: ${pushOn ? "activadas" : "desactivadas"}`} sub={pushOn ? "Te aviso aunque la app esté cerrada" : "Actívalas para no perderte nada"} onClick={onTogglePush} />}
         <Item icon={vozActiva ? "🔊" : "🔈"} label={`Leer en voz alta: ${vozActiva ? "activado" : "desactivado"}`} onClick={onToggleVoz} />
       </div>
 

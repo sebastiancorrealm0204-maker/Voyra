@@ -99,6 +99,12 @@ CREATE TABLE IF NOT EXISTS proactive_log (
   created_at REAL NOT NULL,
   UNIQUE(trip_id, kind, local_date)
 );
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  endpoint TEXT PRIMARY KEY,    -- único por dispositivo/navegador
+  trip_id TEXT NOT NULL,
+  subscription TEXT NOT NULL,   -- JSON completo {endpoint, keys:{p256dh, auth}}
+  created_at REAL NOT NULL
+);
 """
 
 
@@ -285,3 +291,25 @@ def mark_proactive_sent(trip_id: str, kind: str, local_date: str) -> bool:
         return True
     except sqlite3.IntegrityError:
         return False
+
+
+# ── Suscripciones Web Push (VAPID) ──
+def upsert_push_subscription(trip_id: str, endpoint: str, subscription_json: str) -> None:
+    """Guarda o actualiza una suscripción push por endpoint (único por dispositivo)."""
+    with conn() as c:
+        c.execute(
+            "INSERT INTO push_subscriptions (endpoint, trip_id, subscription, created_at) VALUES (?,?,?,?) "
+            "ON CONFLICT(endpoint) DO UPDATE SET trip_id=excluded.trip_id, subscription=excluded.subscription",
+            (endpoint, trip_id, subscription_json, now()),
+        )
+
+
+def list_push_subscriptions(trip_id: str) -> list[dict]:
+    with conn() as c:
+        rs = c.execute("SELECT endpoint, subscription FROM push_subscriptions WHERE trip_id=?", (trip_id,)).fetchall()
+    return [{"endpoint": r["endpoint"], "subscription": r["subscription"]} for r in rs]
+
+
+def delete_push_subscription(endpoint: str) -> None:
+    with conn() as c:
+        c.execute("DELETE FROM push_subscriptions WHERE endpoint=?", (endpoint,))

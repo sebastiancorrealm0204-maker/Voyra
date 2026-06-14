@@ -12,3 +12,5 @@ __pycache__/
 # Virtual environment
 venv/
 .venv/
+echo "private_key.pem" >> .gitignore
+echo "public_key.pem" >> .gitignore
