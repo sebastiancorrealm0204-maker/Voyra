@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS destination_places (
   lng REAL NOT NULL,
   descripcion TEXT NOT NULL,
   confianza TEXT NOT NULL,        -- muy_alta | alta | media_alta | media
+  maps_query TEXT,                -- nombre buscable para landmarks (deep link a Maps); NULL = usar lat,lng
   created_at REAL NOT NULL
 );
 CREATE TABLE IF NOT EXISTS place_recommendations (
@@ -113,6 +114,9 @@ def init_db():
         cols = {r["name"] for r in c.execute("PRAGMA table_info(notifications)").fetchall()}
         if "extra" not in cols:
             c.execute("ALTER TABLE notifications ADD COLUMN extra TEXT")
+        dp_cols = {r["name"] for r in c.execute("PRAGMA table_info(destination_places)").fetchall()}
+        if "maps_query" not in dp_cols:
+            c.execute("ALTER TABLE destination_places ADD COLUMN maps_query TEXT")
 
 
 def new_id() -> str:
@@ -223,10 +227,10 @@ def seed_destination_places(places: list[dict]):
             return
         for p in places:
             c.execute(
-                "INSERT INTO destination_places (id, city, city_display, name, category, zona, lat, lng, descripcion, confianza, created_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO destination_places (id, city, city_display, name, category, zona, lat, lng, descripcion, confianza, maps_query, created_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                 (new_id(), norm_city(p["city_display"]), p["city_display"], p["name"], p["category"],
-                 p["zona"], p["lat"], p["lng"], p["descripcion"], p["confianza"], now()),
+                 p["zona"], p["lat"], p["lng"], p["descripcion"], p["confianza"], p.get("maps_query"), now()),
             )
 
 
