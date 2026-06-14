@@ -192,8 +192,15 @@ const fmtRango = (r) => !r ? null : (r[0] === r[1] ? `~${r[0]} min` : `${r[0]}�
 // ════════════════ MODO AEROPUERTO ════════════════
 // Pantalla completa que reemplaza la conversación cuando el usuario acaba de
 // aterrizar. Timeline de llegada paso a paso + transporte con tips anti-estafa.
-function AirportView({ data, pasoActivo, setPasoActivo, onChat, onAbrirChat, onSalir, ciudad }) {
+function AirportView({ data, onChat, onAbrirChat, onSalir, ciudad }) {
   const transporteSeg = { alta: C.aqua, media: C.orange, baja: C.coral };
+  // Acordeón libre: el usuario abre/cierra cualquier paso cuando quiera, y
+  // marca los que ya completó por su cuenta. Por defecto arranca con el primer
+  // paso abierto para orientar, pero nada lo obliga a seguir un orden.
+  const [abiertos, setAbiertos] = React.useState(() => new Set([0]));
+  const [hechos, setHechos] = React.useState(() => new Set());
+  const toggleAbierto = (i) => setAbiertos((s) => { const n = new Set(s); n.has(i) ? n.delete(i) : n.add(i); return n; });
+  const toggleHecho = (i) => setHechos((s) => { const n = new Set(s); n.has(i) ? n.delete(i) : n.add(i); return n; });
   return (
     <div className="no-scrollbar" style={{ flex: 1, overflowY: "auto", background: C.bg }}>
       {/* Héroe de bienvenida */}
@@ -216,22 +223,26 @@ function AirportView({ data, pasoActivo, setPasoActivo, onChat, onAbrirChat, onS
         <div style={{ fontSize: 11.5, fontWeight: 700, color: C.inkSoft, letterSpacing: "0.07em", marginBottom: 12 }}>TU LLEGADA, PASO A PASO</div>
         <div style={{ position: "relative" }}>
           {data.pasos.map((p, i) => {
-            const abierto = i === pasoActivo;
-            const hecho = i < pasoActivo;
+            const abierto = abiertos.has(i);
+            const hecho = hechos.has(i);
             const ultimo = i === data.pasos.length - 1;
             return (
               <div key={p.id} style={{ display: "flex", gap: 12, position: "relative" }}>
-                {/* riel + nodo */}
+                {/* riel + nodo (toca el círculo para marcar hecho) */}
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 999, background: hecho ? C.aqua : abierto ? C.orange : C.card, border: `2px solid ${hecho ? C.aqua : abierto ? C.orange : C.line}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, color: "#fff", transition: "all .2s" }}>
+                  <button onClick={() => toggleHecho(i)} title={hecho ? "Marcar como pendiente" : "Marcar como hecho"}
+                    style={{ width: 36, height: 36, borderRadius: 999, background: hecho ? C.aqua : C.card, border: `2px solid ${hecho ? C.aqua : abierto ? C.orange : C.line}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, color: hecho ? "#fff" : C.ink, cursor: "pointer", padding: 0, transition: "all .2s" }}>
                     {hecho ? "✓" : (STEP_EMOJI[p.icono] || "•")}
-                  </div>
+                  </button>
                   {!ultimo && <div style={{ width: 2, flex: 1, minHeight: abierto ? 8 : 18, background: hecho ? C.aqua : C.line, marginTop: 2, marginBottom: 2 }} />}
                 </div>
                 {/* contenido */}
                 <div style={{ flex: 1, paddingBottom: ultimo ? 0 : 16 }}>
-                  <button onClick={() => setPasoActivo(i)} style={{ width: "100%", textAlign: "left", border: "none", background: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                    <span style={{ fontWeight: 700, fontSize: 15.5, color: abierto ? C.ink : C.inkSoft }}>{p.titulo}</span>
+                  <button onClick={() => toggleAbierto(i)} style={{ width: "100%", textAlign: "left", border: "none", background: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                    <span style={{ fontWeight: 700, fontSize: 15.5, color: hecho ? C.inkSoft : C.ink, textDecoration: hecho ? "line-through" : "none", display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ color: C.inkSoft, fontSize: 12, transition: "transform .2s", transform: abierto ? "rotate(0deg)" : "rotate(-90deg)" }}>▾</span>
+                      {p.titulo}
+                    </span>
                     {fmtRango(p.estimado_min) && (
                       <span style={{ fontSize: 12, fontWeight: 600, color: p.estimado_fuente === "en_vivo" ? C.aqua : C.inkSoft, background: p.estimado_fuente === "en_vivo" ? C.aquaSoft : C.card, border: `1px solid ${p.estimado_fuente === "en_vivo" ? C.aqua + "55" : C.line}`, borderRadius: 999, padding: "2px 9px", flexShrink: 0, whiteSpace: "nowrap" }}>
                         {fmtRango(p.estimado_min)}
@@ -251,11 +262,10 @@ function AirportView({ data, pasoActivo, setPasoActivo, onChat, onAbrirChat, onS
                           ))}
                         </div>
                       )}
-                      {!ultimo && (
-                        <button onClick={() => setPasoActivo(i + 1)} style={{ marginTop: 11, background: C.orange, color: "#fff", border: "none", borderRadius: 999, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-                          Listo, siguiente →
-                        </button>
-                      )}
+                      <button onClick={() => toggleHecho(i)}
+                        style={{ marginTop: 11, background: hecho ? C.aquaSoft : C.orange, color: hecho ? C.aqua : "#fff", border: hecho ? `1px solid ${C.aqua}66` : "none", borderRadius: 999, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                        {hecho ? "✓ Hecho" : "Marcar como hecho"}
+                      </button>
                     </div>
                   )}
                 </div>
@@ -414,7 +424,6 @@ function VoyraCompanion() {
   const [modoAeropuerto, setModoAeropuerto] = useState(false);
   const [airportData, setAirportData] = useState(null);
   const [cargandoAirport, setCargandoAirport] = useState(false);
-  const [pasoActivo, setPasoActivo] = useState(0);   // índice del paso del timeline expandido
   const [chatAeropuerto, setChatAeropuerto] = useState(false);  // panel de chat encima del modo aeropuerto
 
   const recRef = useRef(null);
@@ -540,7 +549,6 @@ function VoyraCompanion() {
       if (data.disponible) {
         setAirportData(data);
         setModoAeropuerto(true);
-        setPasoActivo(0);
         addLog({ senal: "Llegada al aeropuerto detectada", fuente: "GPS / geofence", filtro: `Modo aeropuerto: ${data.name} (${data.tiempos_modo})`, score: null, decision: "push" });
         if (anunciarLlegada) appendStream({ type: "system", texto: `Bienvenido a ${data.city} ✈️ Te guío para salir del aeropuerto.` });
       } else {
@@ -675,7 +683,7 @@ function VoyraCompanion() {
     setSheet(null); setFase("setup"); setPaso(1); setTripId(null); setStream([]); seqRef.current = 0;
     setLog([]); setPushUsados(0); setUbicacion("En el hotel"); setZonaActual("En el hotel");
     setGpsEstado("inactivo"); setDocs([]); setVozActiva(false); setCargandoCerca(false); setEscaneando(false);
-    setModoAeropuerto(false); setAirportData(null); setPasoActivo(0); setChatAeropuerto(false);
+    setModoAeropuerto(false); setAirportData(null); setChatAeropuerto(false);
   };
 
   // ════════════════ ONBOARDING ════════════════
@@ -854,8 +862,6 @@ function VoyraCompanion() {
         <AirportView
           data={airportData}
           ciudad={viaje.ciudad}
-          pasoActivo={pasoActivo}
-          setPasoActivo={setPasoActivo}
           onChat={(q) => { setChatAeropuerto(true); enviar(q); }}
           onAbrirChat={() => setChatAeropuerto(true)}
           onSalir={salirModoAeropuerto}
