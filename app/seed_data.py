@@ -153,11 +153,11 @@ BOGOTA = [
     },
     # ════════ BARES Y VIDA NOCTURNA ════════
     {
-        "city_display": "Bogotá", "name": "KOSH", "category": "bar", "zona": "Zona T",
-        "maps_query": "KØSH Rooftop Av. Calle 82 #11-40 Bogotá Colombia",
-        "lat": 4.6685, "lng": -74.0535,
-        "descripcion": "Rooftop bar frente al Centro Comercial Andino con vista panorámica a la Zona T. Cócteles de autor y ambiente nocturno — punto de referencia para salir de fiesta en la zona.",
-        "confianza": "alta",
+        "city_display": "Bogotá", "name": "Andrés DC", "category": "bar", "zona": "Zona T",
+        "maps_query": "Andrés DC Calle 82 12-21 Bogotá Colombia",
+        "lat": 4.6682, "lng": -74.0531,
+        "descripcion": "La sede urbana del mítico Andrés Carne de Res, en plena Zona Rosa. Cuatro pisos de restaurante, bar y pista de baile — uno de los planes nocturnos más emblemáticos de Bogotá.",
+        "confianza": "muy_alta",
     },
     {
         "city_display": "Bogotá", "name": "Clandestino (Gallery Club)", "category": "bar", "zona": "Zona T",
