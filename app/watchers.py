@@ -97,6 +97,51 @@ def check_in(trip_id: str) -> dict:
     return {"message": texto}
 
 
+def check_in_matutino(trip_id: str) -> dict:
+    """Check-in de la mañana (~8am hora local): saluda, comenta el plan/clima del
+    día y da un tip concreto para arrancar. Es conversación, no alerta operativa."""
+    trip = db.get_trip(trip_id)
+    history = [{"role": m["role"], "content": m["content"]} for m in db.rows("messages", trip_id)]
+    history.append({"role": "user", "content": (
+        "[SEÑAL DEL SISTEMA — no es el usuario]: Es la mañana (~8am). Haz tu check-in matutino: "
+        "máximo 3 frases cálidas. Si conoces los planes de HOY, confírmalos y da un tip concreto para "
+        "arrancar bien (a qué hora salir, qué llevar, clima si lo sabes). Si no conoces los planes de hoy, "
+        "pregúntalos en una frase amable. No repitas lo que ya dijiste anoche."
+    )})
+    texto = llm.chat(context.build(trip), history)
+    db.insert("messages", {"trip_id": trip_id, "role": "companion", "content": texto})
+    return {"message": texto}
+
+
+def recordatorio_vuelo_regreso(trip_id: str) -> dict:
+    """Aviso operativo el día del regreso: recuerda el vuelo y qué hacer.
+    Operacional → ignora presupuesto y quiet hours, siempre llega como push."""
+    trip = db.get_trip(trip_id)
+    vuelo = trip.get("vuelo_regreso") or "tu vuelo de regreso"
+    payload = (
+        f"Hoy es el día del regreso del usuario. Vuelo: {vuelo}. Recuérdale con calma: "
+        f"llegar al aeropuerto con tiempo (en El Dorado, 3h antes para internacional, 2h nacional), "
+        f"tener pasaporte/documentos a mano, y ofrécele ayuda para organizar el traslado al aeropuerto "
+        f"desde donde se aloja ({trip.get('hotel','su hotel')})."
+    )
+    return engine.ingest(trip_id, source="Itinerary watcher (día de regreso)",
+                         category="vuelo", operational=True, payload=payload)
+
+
+def aviso_hora_de_salir(trip_id: str, plan: str, minutos_antes: int = 60) -> dict:
+    """'Es hora de salir' antes de una actividad reservada. Operacional → push.
+
+    En esta versión el scheduler le pasa el texto del plan; cuando el itinerario
+    tenga horas estructuradas, el propio scheduler calculará el disparo por hora."""
+    payload = (
+        f"Se acerca una actividad del usuario: '{plan}'. Faltan ~{minutos_antes} minutos. "
+        f"Recuérdaselo en tono cálido, dile que es buen momento para ir saliendo y, si sabes la zona, "
+        f"sugiere cómo llegar desde su ubicación actual."
+    )
+    return engine.ingest(trip_id, source="Itinerary watcher (hora de salir)",
+                         category="itinerario", operational=True, payload=payload)
+
+
 def scan_destination(trip_id: str) -> dict:
     """News watcher + Destination Scanner reales, vía Tavily.
 

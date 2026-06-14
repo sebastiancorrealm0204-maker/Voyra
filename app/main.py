@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from . import context, db, engine, llm, search, seed_data, watchers
+from . import context, db, engine, llm, scheduler, search, seed_data, watchers
 
 app = FastAPI(title="Voyra Companion", version="0.1.0")
 
@@ -26,6 +26,13 @@ app.add_middleware(
 
 db.init_db()
 db.seed_destination_places(seed_data.all_seeds())
+
+
+@app.on_event("startup")
+def _arrancar_scheduler():
+    """Arranca el scheduler proactivo (check-ins por hora local del destino).
+    Si APScheduler no está instalado, la app sigue normal sin modo proactivo."""
+    scheduler.start()
 
 
 # ── Schemas ──
@@ -124,6 +131,21 @@ def checkin(tid: str):
     if not db.get_trip(tid):
         raise HTTPException(404, "trip no existe")
     return watchers.check_in(tid)
+
+
+@app.post("/trips/{tid}/checkin-matutino")
+def checkin_matutino(tid: str):
+    """Check-in matutino. En producción lo dispara el scheduler ~8am hora local."""
+    if not db.get_trip(tid):
+        raise HTTPException(404, "trip no existe")
+    return watchers.check_in_matutino(tid)
+
+
+@app.post("/scheduler/tick")
+def scheduler_tick():
+    """Dispara un ciclo del scheduler manualmente (dev/debug). En producción
+    corre solo cada pocos minutos. Respeta el dedup: no repite lo ya enviado hoy."""
+    return scheduler.tick()
 
 
 @app.post("/trips/{tid}/scan")

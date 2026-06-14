@@ -8,21 +8,19 @@ Cada decisión se guarda en `decisions` con su razón: ese log ES el dataset de
 entrenamiento futuro del scorer propio (principio acordado: guardar todo desde
 el día uno como si fuéramos a entrenar mañana).
 """
-from datetime import datetime
 import json
 
-from . import context, db, llm
+from . import context, db, llm, timeutil
 
 PRESUPUESTO_DIARIO = 4
 MAX_POR_CATEGORIA_DIA = 2
-QUIET_START, QUIET_END = 22.5, 7.0  # 10:30pm – 7:00am hora local
+QUIET_START, QUIET_END = 22.5, 7.0  # 10:30pm – 7:00am hora local del destino
 CATEGORIAS_BLOQUEADAS = {"promo_no_solicitada", "marketing"}
 
 
 def _hora_local(trip: dict) -> float:
-    # MVP: hora del servidor. Producción: timezone del destino en el Trip Context.
-    n = datetime.now()
-    return n.hour + n.minute / 60
+    # Hora real del destino (timezone IANA por ciudad), no la hora UTC del servidor.
+    return timeutil.hour_float(trip)
 
 
 def _filtro(trip: dict, category: str, operational: bool) -> str:

@@ -11,11 +11,14 @@ from app import db, engine, seed_data
 
 @pytest.fixture(autouse=True)
 def fresh_db(tmp_path):
+    from app import scheduler
     db.DB_PATH = str(tmp_path / "test.db")
     db.init_db()
     db.seed_destination_places(seed_data.all_seeds())
     engine.QUIET_START, engine.QUIET_END = 24.0, 0.0  # desactivar quiet hours en tests
+    _mat, _noc = scheduler.MATUTINO, scheduler.NOCTURNO  # guardar para restaurar
     yield
+    scheduler.MATUTINO, scheduler.NOCTURNO = _mat, _noc
 
 
 @pytest.fixture
@@ -93,6 +96,61 @@ def test_api_end_to_end():
     assert doc["tipo"]
     assert client.get(f"/trips/{tid}/notifications").json()
     assert client.get(f"/trips/{tid}/decisions").json()
+
+
+def test_hora_local_usa_timezone_destino():
+    """La hora local sale del timezone del destino, no de la hora UTC del servidor."""
+    from app import timeutil
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    h = timeutil.hour_float({"ciudad": "Bogotá"})
+    esperado = datetime.now(ZoneInfo("America/Bogota"))
+    assert abs(h - (esperado.hour + esperado.minute / 60)) < 0.05
+
+
+def test_scheduler_dispara_matutino_una_vez():
+    """El scheduler dispara el check-in matutino una sola vez por día local (dedup)."""
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+    from app import scheduler
+    hoy = datetime.now(ZoneInfo("America/Bogota")).date()
+    tid = db.create_trip({"ciudad": "Bogotá", "hotel": "H",
+                          "inicio": hoy.isoformat(), "fin": (hoy + timedelta(days=3)).isoformat()})
+    scheduler.MATUTINO, scheduler.NOCTURNO = (0.0, 24.0), (0.0, 0.0)
+    r1 = scheduler.tick()
+    assert "matutino" in [k for (k, t) in r1["disparos"] if t == tid]
+    r2 = scheduler.tick()
+    assert "matutino" not in [k for (k, t) in r2["disparos"] if t == tid]
+
+
+def test_scheduler_vuelo_regreso_dia_fin():
+    """El día 'fin' del viaje, con vuelo de regreso, se dispara el recordatorio (push operativo)."""
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+    from app import scheduler
+    hoy = datetime.now(ZoneInfo("America/Bogota")).date()
+    tid = db.create_trip({"ciudad": "Bogotá", "hotel": "H",
+                          "inicio": (hoy - timedelta(days=4)).isoformat(), "fin": hoy.isoformat(),
+                          "vuelo_regreso": "AV9533 14:20"})
+    scheduler.MATUTINO, scheduler.NOCTURNO = (0.0, 24.0), (0.0, 0.0)
+    r = scheduler.tick()
+    assert "vuelo_regreso" in [k for (k, t) in r["disparos"] if t == tid]
+    notifs = db.rows("notifications", tid)
+    assert any(n["category"] == "vuelo" and n["kind"] == "push" for n in notifs)
+
+
+def test_scheduler_ignora_viaje_no_activo():
+    """Un viaje que ya terminó no dispara nada."""
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+    from app import scheduler
+    hoy = datetime.now(ZoneInfo("America/Bogota")).date()
+    tid = db.create_trip({"ciudad": "Bogotá", "hotel": "H",
+                          "inicio": (hoy - timedelta(days=10)).isoformat(),
+                          "fin": (hoy - timedelta(days=3)).isoformat()})
+    scheduler.MATUTINO, scheduler.NOCTURNO = (0.0, 24.0), (0.0, 24.0)
+    r = scheduler.tick()
+    assert not any(t == tid for (k, t) in r["disparos"])
 
 
 def test_modo_aeropuerto_se_activa_y_payload():

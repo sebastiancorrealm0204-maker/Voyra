@@ -91,6 +91,14 @@ CREATE TABLE IF NOT EXISTS messages (
   content TEXT NOT NULL,
   created_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS proactive_log (
+  id TEXT PRIMARY KEY,
+  trip_id TEXT NOT NULL,
+  kind TEXT NOT NULL,           -- matutino | nocturno | vuelo_regreso | hora_salir:<plan>
+  local_date TEXT NOT NULL,     -- YYYY-MM-DD en hora del destino (dedup por día local)
+  created_at REAL NOT NULL,
+  UNIQUE(trip_id, kind, local_date)
+);
 """
 
 
@@ -118,7 +126,6 @@ def init_db():
         if "maps_query" not in dp_cols:
             c.execute("ALTER TABLE destination_places ADD COLUMN maps_query TEXT")
 
-
 def new_id() -> str:
     return uuid.uuid4().hex[:12]
 
@@ -140,6 +147,13 @@ def get_trip(tid: str) -> dict | None:
     with conn() as c:
         r = c.execute("SELECT * FROM trips WHERE id=?", (tid,)).fetchone()
     return {"id": r["id"], **json.loads(r["data"])} if r else None
+
+
+def list_trips() -> list[dict]:
+    """Todos los viajes. Lo usa el scheduler para recorrer trips activos."""
+    with conn() as c:
+        rs = c.execute("SELECT * FROM trips ORDER BY created_at ASC").fetchall()
+    return [{"id": r["id"], **json.loads(r["data"])} for r in rs]
 
 
 def update_trip(tid: str, patch: dict):
@@ -247,3 +261,27 @@ def recently_recommended(trip_id: str, hours: float = 24) -> set[str]:
 
 def mark_recommended(trip_id: str, place_name: str):
     insert("place_recommendations", {"trip_id": trip_id, "place_name": place_name})
+
+
+# ── Dedup del scheduler proactivo: cada evento se dispara una vez por día local ──
+def proactive_already_sent(trip_id: str, kind: str, local_date: str) -> bool:
+    with conn() as c:
+        r = c.execute(
+            "SELECT 1 FROM proactive_log WHERE trip_id=? AND kind=? AND local_date=?",
+            (trip_id, kind, local_date),
+        ).fetchone()
+    return r is not None
+
+
+def mark_proactive_sent(trip_id: str, kind: str, local_date: str) -> bool:
+    """Registra que se envió. Devuelve True si fue el primero (insertó), False si ya existía.
+    El UNIQUE(trip_id, kind, local_date) hace esto atómico aun con corridas solapadas."""
+    try:
+        with conn() as c:
+            c.execute(
+                "INSERT INTO proactive_log (id, trip_id, kind, local_date, created_at) VALUES (?,?,?,?,?)",
+                (new_id(), trip_id, kind, local_date, now()),
+            )
+        return True
+    except sqlite3.IntegrityError:
+        return False
