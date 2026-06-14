@@ -192,7 +192,7 @@ const fmtRango = (r) => !r ? null : (r[0] === r[1] ? `~${r[0]} min` : `${r[0]}�
 // ════════════════ MODO AEROPUERTO ════════════════
 // Pantalla completa que reemplaza la conversación cuando el usuario acaba de
 // aterrizar. Timeline de llegada paso a paso + transporte con tips anti-estafa.
-function AirportView({ data, pasoActivo, setPasoActivo, onChat, onSalir, ciudad }) {
+function AirportView({ data, pasoActivo, setPasoActivo, onChat, onAbrirChat, onSalir, ciudad }) {
   const transporteSeg = { alta: C.aqua, media: C.orange, baja: C.coral };
   return (
     <div className="no-scrollbar" style={{ flex: 1, overflowY: "auto", background: C.bg }}>
@@ -299,6 +299,9 @@ function AirportView({ data, pasoActivo, setPasoActivo, onChat, onSalir, ciudad 
           <button onClick={() => onChat("¿Cómo llego a mi hotel desde el aeropuerto?")} style={{ width: "100%", background: C.orange, color: "#fff", border: "none", borderRadius: 14, padding: "14px 0", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
             🚕 Ayúdame a llegar a mi hotel
           </button>
+          <button onClick={onAbrirChat} style={{ width: "100%", background: C.card, border: `1px solid ${C.orange}66`, color: C.orangeDeep, borderRadius: 14, padding: "13px 0", fontSize: 14.5, fontWeight: 700, cursor: "pointer" }}>
+            💬 Pregúntale algo a tu Companion
+          </button>
           <button onClick={onSalir} style={{ width: "100%", background: "none", border: `1px solid ${C.line}`, color: C.inkSoft, borderRadius: 14, padding: "12px 0", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
             Ya salí del aeropuerto · seguir al chat
           </button>
@@ -313,6 +316,71 @@ function AirportView({ data, pasoActivo, setPasoActivo, onChat, onSalir, ciudad 
     </div>
   );
 }
+
+// Panel de chat que se desliza ENCIMA del modo aeropuerto. Al cerrarlo, el
+// usuario vuelve al timeline de llegada sin perder nada. Reutiliza el mismo
+// stream y enviar() del Companion.
+function ChatOverlay({ stream, onEnviar, onCerrar, pensando, input, setInput }) {
+  const ref = React.useRef(null);
+  React.useEffect(() => { if (ref.current) ref.current.scrollTop = ref.current.scrollHeight; }, [stream, pensando]);
+  // Solo mostramos mensajes de conversación (user/companion) en el overlay.
+  const msgs = stream.filter((m) => m.type === "user" || m.type === "companion" || m.type === "system");
+  return (
+    <div className="rise" style={{ position: "absolute", inset: 0, zIndex: 50, display: "flex", flexDirection: "column", background: C.bg }}>
+      {/* cabecera del panel */}
+      <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "12px 14px", background: C.card, borderBottom: `1px solid ${C.line}` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+          <Mark size={28} />
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 15, lineHeight: 1 }}>Tu Companion</div>
+            <div style={{ fontSize: 11.5, color: C.orange, fontWeight: 600, marginTop: 2 }}>✈️ en el aeropuerto</div>
+          </div>
+        </div>
+        <button onClick={onCerrar} style={{ border: `1px solid ${C.line}`, background: C.bg, color: C.ink, borderRadius: 999, padding: "7px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>
+          ‹ Volver a mi llegada
+        </button>
+      </div>
+
+      {/* conversación */}
+      <div ref={ref} className="no-scrollbar" style={{ flex: 1, overflowY: "auto", padding: "16px 14px", display: "flex", flexDirection: "column", gap: 12 }}>
+        {msgs.length === 0 && (
+          <div style={{ color: C.inkSoft, fontSize: 14, textAlign: "center", margin: "auto", padding: "0 24px", lineHeight: 1.5 }}>
+            Pregúntame lo que sea sobre tu llegada: taxis, cómo llegar a tu hotel, qué hacer primero…
+          </div>
+        )}
+        {msgs.map((m) => {
+          if (m.type === "user")
+            return <div key={m.seq} className="rise" style={{ alignSelf: "flex-end", maxWidth: "82%", background: C.ink, color: "#fff", borderRadius: "16px 16px 4px 16px", padding: "9px 13px", fontSize: 14.5, lineHeight: 1.45, whiteSpace: "pre-wrap" }}>{m.texto}</div>;
+          if (m.type === "system")
+            return <div key={m.seq} className="rise" style={{ alignSelf: "center", fontSize: 12, color: C.inkSoft, background: C.card, border: `1px solid ${C.line}`, borderRadius: 999, padding: "4px 12px" }}>📍 {m.texto}</div>;
+          return (
+            <div key={m.seq} className="rise" style={{ alignSelf: "flex-start", display: "flex", gap: 8, maxWidth: "90%" }}>
+              <div style={{ flexShrink: 0, marginTop: 2 }}><Mark size={26} /></div>
+              <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: "16px 16px 16px 4px", padding: "10px 13px", fontSize: 14.5, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{m.texto}</div>
+            </div>
+          );
+        })}
+        {pensando && (
+          <div style={{ alignSelf: "flex-start", display: "flex", gap: 8, alignItems: "center" }}>
+            <div style={{ flexShrink: 0 }}><Mark size={26} /></div>
+            <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: "16px 16px 16px 4px", padding: "10px 13px" }}><Typing /></div>
+          </div>
+        )}
+      </div>
+
+      {/* composer */}
+      <div style={{ flexShrink: 0, background: C.card, borderTop: `1px solid ${C.line}`, paddingBottom: "env(safe-area-inset-bottom)" }}>
+        <div style={{ padding: "10px 12px 12px", display: "flex", gap: 7, alignItems: "center" }}>
+          <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && onEnviar()}
+            placeholder="Escríbele a tu Companion"
+            style={{ flex: 1, minWidth: 0, border: `1px solid ${C.line}`, borderRadius: 999, padding: "11px 15px", fontSize: 15, outline: "none", background: C.bg, color: C.ink }} />
+          <button onClick={() => onEnviar()} style={{ background: C.orange, color: "#fff", border: "none", borderRadius: 999, width: 40, height: 40, fontWeight: 700, fontSize: 18, cursor: "pointer", flexShrink: 0 }}>↑</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 function VoyraCompanion() {
   const [fase, setFase] = useState("setup");
@@ -347,6 +415,7 @@ function VoyraCompanion() {
   const [airportData, setAirportData] = useState(null);
   const [cargandoAirport, setCargandoAirport] = useState(false);
   const [pasoActivo, setPasoActivo] = useState(0);   // índice del paso del timeline expandido
+  const [chatAeropuerto, setChatAeropuerto] = useState(false);  // panel de chat encima del modo aeropuerto
 
   const recRef = useRef(null);
   const fileRef = useRef(null);
@@ -606,7 +675,7 @@ function VoyraCompanion() {
     setSheet(null); setFase("setup"); setPaso(1); setTripId(null); setStream([]); seqRef.current = 0;
     setLog([]); setPushUsados(0); setUbicacion("En el hotel"); setZonaActual("En el hotel");
     setGpsEstado("inactivo"); setDocs([]); setVozActiva(false); setCargandoCerca(false); setEscaneando(false);
-    setModoAeropuerto(false); setAirportData(null); setPasoActivo(0);
+    setModoAeropuerto(false); setAirportData(null); setPasoActivo(0); setChatAeropuerto(false);
   };
 
   // ════════════════ ONBOARDING ════════════════
@@ -787,7 +856,8 @@ function VoyraCompanion() {
           ciudad={viaje.ciudad}
           pasoActivo={pasoActivo}
           setPasoActivo={setPasoActivo}
-          onChat={(q) => { setModoAeropuerto(false); enviar(q); }}
+          onChat={(q) => { setChatAeropuerto(true); enviar(q); }}
+          onAbrirChat={() => setChatAeropuerto(true)}
           onSalir={salirModoAeropuerto}
         />
       ) : (
@@ -914,6 +984,18 @@ function VoyraCompanion() {
           <button onClick={() => enviar()} style={{ background: C.teal, color: "#fff", border: "none", borderRadius: 999, width: 40, height: 40, fontWeight: 700, fontSize: 18, cursor: "pointer", flexShrink: 0 }}>↑</button>
         </div>
       </div>
+      )}
+
+      {/* ── CHAT ENCIMA DEL MODO AEROPUERTO ── */}
+      {modoAeropuerto && airportData && chatAeropuerto && (
+        <ChatOverlay
+          stream={stream}
+          input={input}
+          setInput={setInput}
+          pensando={pensando}
+          onEnviar={() => enviar()}
+          onCerrar={() => setChatAeropuerto(false)}
+        />
       )}
 
       {/* ── SHEETS ── */}
