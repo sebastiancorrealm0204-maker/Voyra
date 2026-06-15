@@ -286,7 +286,7 @@ def test_nearby_recommendations_bogota():
     con_notif = [x for x in r["resultados"] if x["notification"]]
     assert con_notif
     for x in con_notif:
-        assert x["notification"]["maps_link"].startswith("https://www.google.com/maps/dir/?api=1&destination=")
+        assert x["notification"]["maps_link"].startswith("https://maps.google.com/?q=")
 
     # /nearby devuelve solo los más cercanos (top-N), rankeados por distancia real
     # ascendente. Verificamos ese orden, que es la garantía del endpoint.

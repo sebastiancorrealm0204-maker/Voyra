@@ -4,6 +4,7 @@ Correr:  uvicorn app.main:app --reload
 Docs:    http://localhost:8000/docs
 """
 import json
+import urllib.parse
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -195,31 +196,31 @@ def plan_maps_link(tid: str, plan_id: str,
     # Coordenadas del destino desde la curación
     city = trip.get("ciudad", "")
     dest_lat, dest_lng = None, None
-    maps_query = None
-    lugar = (plan.get("lugar") or plan.get("titulo") or "").strip().lower()
+    lugar_nombre = plan.get("lugar") or plan.get("titulo") or ""
+    lugar_lower = lugar_nombre.strip().lower()
     for p in db.places_for_city(city):
-        if lugar in p["name"].lower() or p["name"].lower() in lugar:
+        if lugar_lower in p["name"].lower() or p["name"].lower() in lugar_lower:
             dest_lat, dest_lng = p["lat"], p["lng"]
-            maps_query = p.get("maps_query")
             break
-
-    # Fallback: si no está en la curación, busca por nombre en Maps
-    if dest_lat is None:
-        nombre = plan.get("lugar") or plan.get("titulo") or ""
-        maps_query = f"{nombre} {city}"
 
     # Origen: parámetros de query > GPS guardado en trip > None
     olat = orig_lat or trip.get("lat_actual")
     olng = orig_lng or trip.get("lng_actual")
-    mode = geo.suggest_mode(
-        geo.haversine_km(olat, olng, dest_lat, dest_lng)
-        if (olat and dest_lat) else None
-    )
-    link = geo.maps_link_from_to(olat, olng, dest_lat or 0, dest_lng or 0,
-                                  mode=mode, maps_query=maps_query if dest_lat is None else None)
 
     dist_km = round(geo.haversine_km(olat, olng, dest_lat, dest_lng), 2) \
         if (olat and dest_lat) else None
+    mode = geo.suggest_mode(dist_km)
+
+    if dest_lat:
+        # Lugar en curación: usamos coordenadas exactas — sin ambigüedad
+        link = geo.maps_link_from_to(olat, olng, dest_lat, dest_lng, mode=mode)
+    else:
+        # Lugar no curado: buscamos por nombre en Maps
+        fallback_query = f"{lugar_nombre} {city}".strip()
+        link = geo.maps_link_from_to(olat, olng, 0, 0, mode=mode,
+                                      maps_query=fallback_query) if not (olat and olng) else \
+               f"https://maps.google.com/?q={urllib.parse.quote(fallback_query)}"
+
     minutos = geo.travel_minutes(dist_km, city) if dist_km else None
 
     return {"maps_link": link, "mode": mode,

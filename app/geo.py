@@ -37,19 +37,44 @@ def maps_link(lat: float, lng: float, mode: str = "walking",
              maps_query: str | None = None) -> str:
     """Deep link de Google Maps hacia el lugar curado.
 
-    Dos estrategias según el tipo de lugar:
-    - Restaurantes/bares/cafés (maps_query=None): usa lat,lng exacto del lugar.
-      Evita ambigüedades de nombre ("KOSH" → "Koshcampo SAS").
-    - Parques/zonas/plazas/landmarks (maps_query=str): usa el nombre buscable.
-      Google Maps tiene el pin oficial de "Parque de la 93" o "Cerro de
-      Monserrate" y lleva a la entrada principal — mejor que un punto en el
-      centro del parque. Para estos lugares el nombre ES más preciso que coords.
+    Usa el formato que funciona tanto en navegador como abriendo la app nativa
+    en iOS y Android. El parámetro api=1 es solo para la JS API embebida y
+    causa "unsupported link" en móvil — no se usa aquí.
     """
-    import urllib.parse
     if maps_query:
+        q = urllib.parse.quote(maps_query)
+        return f"https://maps.google.com/?q={q}"
+    return f"https://maps.google.com/?q={lat},{lng}"
+
+
+def maps_link_from_to(
+    orig_lat: float | None, orig_lng: float | None,
+    dest_lat: float, dest_lng: float,
+    mode: str = "driving",
+    maps_query: str | None = None,
+) -> str:
+    """Deep link con ORIGEN y DESTINO explícitos (ruta completa).
+
+    - Con origen: abre Google Maps en modo navegación con la ruta ya calculada.
+    - Sin origen: abre Maps mostrando el destino para que el usuario inicie la ruta.
+
+    El formato /dir/origen/destino funciona en navegador y abre la app nativa
+    en Android e iOS (si está instalada), sin el problema del api=1.
+    """
+    # Destino: preferimos lat,lng exacto (más preciso) sobre el nombre
+    if dest_lat and dest_lng:
+        dest = f"{dest_lat},{dest_lng}"
+    elif maps_query:
         dest = urllib.parse.quote(maps_query)
-        return f"https://www.google.com/maps/dir/?api=1&destination={dest}&travelmode={mode}"
-    return f"https://www.google.com/maps/dir/?api=1&destination={lat},{lng}&travelmode={mode}"
+    else:
+        dest = urllib.parse.quote(maps_query or "")
+
+    if orig_lat is not None and orig_lng is not None:
+        orig = f"{orig_lat},{orig_lng}"
+        return f"https://www.google.com/maps/dir/{orig}/{dest}"
+
+    # Sin origen: abrir el lugar directamente (Maps detecta ubicación actual)
+    return f"https://maps.google.com/?q={dest}&zoom=16"
 
 
 # Referencias de zona por ciudad — misma granularidad que zona_actual del
@@ -105,23 +130,6 @@ def travel_minutes(dist_km: float | None, city: str = "") -> int:
     return max(10, round(minutos))
 
 
-def maps_link_from_to(
-    orig_lat: float | None, orig_lng: float | None,
-    dest_lat: float, dest_lng: float,
-    mode: str = "driving",
-    maps_query: str | None = None,
-) -> str:
-    """Deep link con ORIGEN y DESTINO explícitos (ruta completa en Maps).
-    Si no hay origen, devuelve link al destino solo."""
-    dest = urllib.parse.quote(maps_query) if maps_query else f"{dest_lat},{dest_lng}"
-    if orig_lat is not None and orig_lng is not None:
-        return (
-            f"https://www.google.com/maps/dir/?api=1"
-            f"&origin={orig_lat},{orig_lng}"
-            f"&destination={dest}"
-            f"&travelmode={mode}"
-        )
-    return f"https://www.google.com/maps/dir/?api=1&destination={dest}&travelmode={mode}"
 
 
 def zone_coords(city: str, zona: str) -> tuple[float, float] | None:
