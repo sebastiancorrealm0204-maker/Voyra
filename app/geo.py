@@ -79,6 +79,51 @@ ZONE_COORDS: dict[str, dict[str, tuple[float, float]]] = {
 }
 
 
+
+
+def travel_minutes(dist_km: float | None, city: str = "") -> int:
+    """Estima minutos de viaje dado distancia en km.
+
+    Bogotá tiene tráfico pesado, así que los factores son conservadores:
+    - A pie  (<1.5 km):  ~15 min/km  (promedio caminando con semáforos)
+    - Taxi/Uber/carro:   ~4 km/h efectivos en Bogotá hora pico → 15 min/km
+      (suena lento pero la velocidad promedio real en hora pico en Bogotá
+       ronda 20-25 km/h; con la espera del taxi se va a ~4 km efectivos/h)
+    - Mínimo: 10 min (tiempo de bajar, esperar taxi, etc.)
+
+    Para otras ciudades usamos factores más optimistas (menos tráfico).
+    """
+    if dist_km is None:
+        return 45  # sin info, margen conservador
+    ciudad_baja = (city or "").lower()
+    if dist_km < 1.5:
+        minutos = dist_km * 15  # caminando
+    elif "bogot" in ciudad_baja:
+        minutos = dist_km * 15  # tráfico pesado bogotano
+    else:
+        minutos = dist_km * 8   # ciudades más fluidas
+    return max(10, round(minutos))
+
+
+def maps_link_from_to(
+    orig_lat: float | None, orig_lng: float | None,
+    dest_lat: float, dest_lng: float,
+    mode: str = "driving",
+    maps_query: str | None = None,
+) -> str:
+    """Deep link con ORIGEN y DESTINO explícitos (ruta completa en Maps).
+    Si no hay origen, devuelve link al destino solo."""
+    dest = urllib.parse.quote(maps_query) if maps_query else f"{dest_lat},{dest_lng}"
+    if orig_lat is not None and orig_lng is not None:
+        return (
+            f"https://www.google.com/maps/dir/?api=1"
+            f"&origin={orig_lat},{orig_lng}"
+            f"&destination={dest}"
+            f"&travelmode={mode}"
+        )
+    return f"https://www.google.com/maps/dir/?api=1&destination={dest}&travelmode={mode}"
+
+
 def zone_coords(city: str, zona: str) -> tuple[float, float] | None:
     """Coordenadas de referencia para una zona. None si la ciudad o la zona no están mapeadas."""
     ciudad = ZONE_COORDS.get(norm_city(city))

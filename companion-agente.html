@@ -1150,7 +1150,7 @@ function VoyraCompanion() {
 
       {/* ── PLANES (calendario) ── */}
       {tab === "planes" && (
-        <PlanesView viaje={viaje} diasViaje={diasViaje} planesSinDia={planesSinDia} onChat={() => setTab("chat")} onSubir={() => fileRef.current && fileRef.current.click()} onBorrar={borrarPlan} subiendo={subiendo} />
+        <PlanesView viaje={viaje} diasViaje={diasViaje} planesSinDia={planesSinDia} onChat={() => setTab("chat")} onSubir={() => fileRef.current && fileRef.current.click()} onBorrar={borrarPlan} subiendo={subiendo} tripId={tripId} coords={coords} />
       )}
 
       {/* ── MÁS ── */}
@@ -1519,87 +1519,176 @@ const TIPO_PLAN = {
   otro:        { icon: "calendar", color: C.inkSoft,label: "Plan" },
 };
 
-function PlanCard({ p, onBorrar }) {
+function PlanCard({ p, tripId, coords, onBorrar }) {
   const meta = TIPO_PLAN[p.tipo] || TIPO_PLAN.otro;
+  const [loadingMaps, setLoadingMaps] = React.useState(false);
+
+  const abrirMapa = async () => {
+    setLoadingMaps(true);
+    try {
+      const params = new URLSearchParams();
+      if (coords) { params.set("orig_lat", coords.lat); params.set("orig_lng", coords.lng); }
+      const data = await api.get(`/trips/${tripId}/plans/${p.id}/maps?${params}`);
+      window.open(data.maps_link, "_blank");
+    } catch (e) {
+      // fallback: búsqueda directa por nombre
+      const q = encodeURIComponent((p.lugar || p.titulo || "") + " Bogotá");
+      window.open(`https://www.google.com/maps/search/?q=${q}`, "_blank");
+    }
+    setLoadingMaps(false);
+  };
+
   return (
-    <div style={{ display: "flex", gap: 10, alignItems: "flex-start", background: C.bg, border: `1px solid ${C.line}`, borderRadius: 12, padding: "10px 11px" }}>
-      <div style={{ width: 30, height: 30, borderRadius: 9, background: C.card, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
-        <Icon name={meta.icon} size={16} color={meta.color} />
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
-          {p.hora && <span style={{ fontSize: 13, fontWeight: 800, color: meta.color, flexShrink: 0 }}>{p.hora}</span>}
-          <span style={{ fontSize: 13.5, fontWeight: 700, color: C.ink, lineHeight: 1.3, wordBreak: "break-word" }}>{p.titulo}</span>
+    <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden" }}>
+      {/* cabecera del plan */}
+      <div style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "11px 12px" }}>
+        <div style={{ width: 32, height: 32, borderRadius: 10, background: meta.color + "22", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
+          <Icon name={meta.icon} size={17} color={meta.color} />
         </div>
-        {p.lugar && <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 2 }}>📍 {p.lugar}</div>}
-        {p.detalle && <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 2, lineHeight: 1.4 }}>{p.detalle}</div>}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 7, flexWrap: "wrap" }}>
+            {p.hora && <span style={{ fontSize: 14, fontWeight: 900, color: meta.color, flexShrink: 0, letterSpacing: "-0.01em" }}>{p.hora}</span>}
+            <span style={{ fontSize: 14, fontWeight: 700, color: C.ink, lineHeight: 1.3, wordBreak: "break-word" }}>{p.titulo}</span>
+          </div>
+          {p.lugar && (
+            <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}>
+              <Icon name="pin" size={11} color={C.inkSoft} />
+              {p.lugar}
+            </div>
+          )}
+          {p.detalle && (
+            <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 4, lineHeight: 1.5, background: C.card, borderRadius: 8, padding: "6px 8px", marginRight: 4 }}>
+              {p.detalle}
+            </div>
+          )}
+        </div>
+        {onBorrar && (
+          <button onClick={() => onBorrar(p.id)} style={{ background: "none", border: "none", color: C.inkSoft, cursor: "pointer", fontSize: 18, lineHeight: 1, padding: "0 2px", flexShrink: 0 }}>×</button>
+        )}
       </div>
-      {onBorrar && (
-        <button onClick={() => onBorrar(p.id)} title="Quitar" style={{ background: "none", border: "none", color: C.inkSoft, cursor: "pointer", fontSize: 17, lineHeight: 1, padding: "2px 4px", flexShrink: 0 }}>×</button>
+      {/* botón cómo llegar */}
+      {tripId && (
+        <button onClick={abrirMapa} disabled={loadingMaps}
+          style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "9px 12px", background: C.aquaSoft, border: "none", borderTop: `1px solid ${C.line}`, color: C.aqua, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+          <Icon name="compass" size={15} color={C.aqua} />
+          {loadingMaps ? "Calculando ruta…" : "Cómo llegar"}
+        </button>
       )}
     </div>
   );
 }
 
-// ── PLANES (calendario del viaje) ──
-function PlanesView({ viaje, diasViaje, planesSinDia, onChat, onSubir, onBorrar, subiendo }) {
-  const fmtDia = (d) => d.toLocaleDateString("es-CO", { weekday: "short" }).replace(".", "");
+// ── PLANES (calendario acordeón) ──
+function PlanesView({ viaje, diasViaje, planesSinDia, onChat, onSubir, onBorrar, subiendo, tripId, coords }) {
   const hoyISO = new Date().toISOString().slice(0, 10);
   const totalPlanes = (diasViaje || []).reduce((n, d) => n + (d.planes ? d.planes.length : 0), 0) + (planesSinDia || []).length;
+  // Acordeón: hoy abierto por defecto, el resto cerrado
+  const [abierto, setAbierto] = React.useState(() => {
+    const s = {}; (diasViaje || []).forEach((d) => { s[d.iso] = d.iso === hoyISO; }); return s;
+  });
+  // Sincronizar cuando diasViaje cambia (nuevos días aparecen)
+  React.useEffect(() => {
+    setAbierto((prev) => {
+      const s = { ...prev };
+      (diasViaje || []).forEach((d) => { if (!(d.iso in s)) s[d.iso] = d.iso === hoyISO; });
+      return s;
+    });
+  }, [diasViaje]);
+
+  const toggle = (iso) => setAbierto((s) => ({ ...s, [iso]: !s[iso] }));
+
+  const fmtDiaCompleto = (d) => d.toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "short" });
+
   return (
-    <div className="no-scrollbar" style={{ flex: 1, overflowY: "auto", padding: "16px 14px", paddingBottom: 20 }}>
-      <div style={{ fontSize: 19, fontWeight: 800, letterSpacing: "-0.02em" }}>Tu viaje día por día</div>
-      <div style={{ fontSize: 13, color: C.inkSoft, marginTop: 3 }}>{viaje.ciudad} · {(diasViaje || []).length} días · {totalPlanes} {totalPlanes === 1 ? "plan" : "planes"}</div>
-
-      {/* CTA protagonista: subir reservas para llenar el itinerario */}
-      <button onClick={onSubir} disabled={subiendo} style={{ marginTop: 14, width: "100%", background: C.orange, color: "#fff", border: "none", borderRadius: 14, padding: "13px 14px", fontSize: 14, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, boxShadow: `0 6px 18px ${C.orange}33` }}>
-        <Icon name="doc" size={18} color="#fff" /> {subiendo ? "Leyendo tu reserva…" : "Subir una reserva (vuelo, hotel, tour…)"}
-      </button>
-      <div style={{ fontSize: 12, color: C.inkSoft, textAlign: "center", marginTop: 7, lineHeight: 1.45 }}>
-        Sube el PDF, foto o captura y yo lo desgloso en el día correcto.
+    <div className="no-scrollbar" style={{ flex: 1, overflowY: "auto", padding: "16px 14px", paddingBottom: 24 }}>
+      {/* header */}
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+        <div style={{ fontSize: 19, fontWeight: 800, letterSpacing: "-0.02em" }}>Tu itinerario</div>
+        <div style={{ fontSize: 12, color: C.inkSoft }}>{totalPlanes} {totalPlanes === 1 ? "plan" : "planes"}</div>
       </div>
+      <div style={{ fontSize: 13, color: C.inkSoft, marginTop: 2 }}>{viaje.ciudad} · {(diasViaje || []).length} días</div>
 
-      <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+      {/* subir reservas */}
+      <button onClick={onSubir} disabled={subiendo}
+        style={{ marginTop: 14, width: "100%", background: C.orange, color: "#fff", border: "none", borderRadius: 14, padding: "12px 14px", fontSize: 14, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: `0 4px 14px ${C.orange}33` }}>
+        <Icon name="doc" size={17} color="#fff" />
+        {subiendo ? "Leyendo tu reserva…" : "Subir reserva (vuelo, hotel, tour…)"}
+      </button>
+
+      {/* días en acordeón */}
+      <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
         {(diasViaje || []).map((d, i) => {
           const esHoy = d.iso === hoyISO;
-          const tienePlanes = d.planes && d.planes.length;
+          const open  = !!abierto[d.iso];
+          const n     = d.planes ? d.planes.length : 0;
+          const etiqueta = i === 0 ? "Llegada" : i === (diasViaje.length - 1) ? "Regreso" : `Día ${i + 1}`;
+
           return (
-            <div key={d.iso} style={{ display: "flex", gap: 12 }}>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 46, flexShrink: 0 }}>
-                <div style={{ fontSize: 11, color: esHoy ? C.orange : C.inkSoft, fontWeight: 700, textTransform: "uppercase" }}>{fmtDia(d.date)}</div>
-                <div style={{ width: 38, height: 38, borderRadius: 999, background: esHoy ? C.orange : C.card, color: esHoy ? "#fff" : C.ink, border: `1.5px solid ${esHoy ? C.orange : C.line}`, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 15, marginTop: 3 }}>{d.date.getDate()}</div>
-              </div>
-              <div style={{ flex: 1, background: C.card, border: `1px solid ${esHoy ? C.orange + "55" : C.line}`, borderRadius: 14, padding: "11px 13px", minHeight: 44 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: esHoy ? C.orange : C.inkSoft }}>
-                  {i === 0 ? "Llegada" : i === (diasViaje.length - 1) ? "Regreso" : `Día ${i + 1}`}{esHoy ? " · hoy" : ""}
+            <div key={d.iso} style={{ borderRadius: 16, overflow: "hidden", border: `1px solid ${esHoy ? C.orange + "66" : C.line}`, background: C.card }}>
+
+              {/* cabecera del día — tap para abrir/cerrar */}
+              <button onClick={() => toggle(d.iso)}
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "13px 14px", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
+
+                {/* número del día */}
+                <div style={{ width: 42, height: 42, borderRadius: 12, background: esHoy ? C.orange : C.bg, border: `1.5px solid ${esHoy ? C.orange : C.line}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: esHoy ? "rgba(255,255,255,.8)" : C.inkSoft, textTransform: "uppercase", lineHeight: 1 }}>
+                    {d.date.toLocaleDateString("es-CO", { month: "short" }).replace(".", "").toUpperCase()}
+                  </div>
+                  <div style={{ fontSize: 17, fontWeight: 900, color: esHoy ? "#fff" : C.ink, lineHeight: 1.1 }}>{d.date.getDate()}</div>
                 </div>
-                {tienePlanes
-                  ? <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 7 }}>
-                      {d.planes.map((p) => <PlanCard key={p.id} p={p} onBorrar={onBorrar} />)}
-                    </div>
-                  : <div style={{ marginTop: 6, fontSize: 13, color: C.inkSoft, fontStyle: "italic" }}>Sin planes aún</div>}
-              </div>
+
+                {/* info del día */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 14, fontWeight: 800, color: esHoy ? C.orange : C.ink }}>{etiqueta}</span>
+                    {esHoy && <span style={{ fontSize: 11, background: C.orange, color: "#fff", borderRadius: 999, padding: "2px 7px", fontWeight: 700 }}>HOY</span>}
+                  </div>
+                  <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 1 }}>
+                    {fmtDiaCompleto(d.date)}
+                    {n > 0 && <span style={{ color: esHoy ? C.orange : C.aqua, fontWeight: 700 }}> · {n} {n === 1 ? "plan" : "planes"}</span>}
+                    {n === 0 && " · sin planes"}
+                  </div>
+                </div>
+
+                {/* flecha */}
+                <div style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)", transition: "transform .2s", flexShrink: 0 }}>
+                  <Icon name="exit" size={18} color={C.inkSoft} style={{ transform: "rotate(90deg)" }} />
+                </div>
+              </button>
+
+              {/* contenido expandido */}
+              {open && (
+                <div style={{ padding: "0 12px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
+                  {n === 0
+                    ? <div style={{ fontSize: 13, color: C.inkSoft, fontStyle: "italic", padding: "4px 2px" }}>
+                        Sin planes para este día. {esHoy ? "¿Qué hacemos hoy?" : "Agrega uno desde el chat o sube una reserva."}
+                      </div>
+                    : d.planes.map((p) => (
+                        <PlanCard key={p.id} p={p} tripId={tripId} coords={coords} onBorrar={onBorrar} />
+                      ))
+                  }
+                </div>
+              )}
             </div>
           );
         })}
       </div>
 
-      {/* Planes sin fecha o fuera del rango: no se pierden */}
+      {/* por agendar */}
       {planesSinDia && planesSinDia.length > 0 && (
         <div style={{ marginTop: 18 }}>
-          <div style={{ fontSize: 11.5, fontWeight: 700, color: C.inkSoft, letterSpacing: "0.07em", margin: "0 2px 9px" }}>POR AGENDAR (sin fecha clara)</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-            {planesSinDia.map((p) => <PlanCard key={p.id} p={p} onBorrar={onBorrar} />)}
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.inkSoft, letterSpacing: "0.08em", margin: "0 2px 9px" }}>POR AGENDAR · sin fecha clara</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {planesSinDia.map((p) => <PlanCard key={p.id} p={p} tripId={tripId} coords={coords} onBorrar={onBorrar} />)}
           </div>
         </div>
       )}
 
-      <button onClick={onChat} style={{ marginTop: 18, width: "100%", background: C.orangeSoft, border: `1px solid ${C.orange}55`, color: C.orangeDeep, borderRadius: 14, padding: "13px 0", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+      <button onClick={onChat}
+        style={{ marginTop: 18, width: "100%", background: C.orangeSoft, border: `1px solid ${C.orange}55`, color: C.orangeDeep, borderRadius: 14, padding: "13px 0", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
         💬 Contarle un plan al Companion
       </button>
-      <div style={{ fontSize: 12, color: C.inkSoft, textAlign: "center", marginTop: 10, lineHeight: 1.45 }}>
-        Cuéntale un plan en el chat o sube una reserva y aparecerá aquí, en su día y hora.
-      </div>
     </div>
   );
 }

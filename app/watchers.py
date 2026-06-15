@@ -141,18 +141,16 @@ def recordatorio_vuelo_regreso(trip_id: str) -> dict:
                          category="vuelo", operational=True, payload=payload)
 
 
-def aviso_hora_de_salir(trip_id: str, plan: str, minutos_antes: int = 60) -> dict:
-    """'Es hora de salir' antes de una actividad reservada. Operacional → push.
-
-    En esta versión el scheduler le pasa el texto del plan; cuando el itinerario
-    tenga horas estructuradas, el propio scheduler calculará el disparo por hora."""
-    payload = (
+def aviso_hora_de_salir(trip_id: str, plan: str, minutos_antes: int = 60,
+                        extra_msg: str = "") -> dict:
+    """'Es hora de salir' antes de una actividad reservada. Operacional → push."""
+    msg = extra_msg or (
         f"Se acerca una actividad del usuario: '{plan}'. Faltan ~{minutos_antes} minutos. "
         f"Recuérdaselo en tono cálido, dile que es buen momento para ir saliendo y, si sabes la zona, "
         f"sugiere cómo llegar desde su ubicación actual."
     )
     return engine.ingest(trip_id, source="Itinerary watcher (hora de salir)",
-                         category="itinerario", operational=True, payload=payload)
+                         category="itinerario", operational=True, payload=msg)
 
 
 def scan_destination(trip_id: str) -> dict:
