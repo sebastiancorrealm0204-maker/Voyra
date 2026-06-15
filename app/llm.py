@@ -67,6 +67,25 @@ SCORING_PROVIDER = os.environ.get("SCORING_PROVIDER") or _default_cheap()
 CHAT_PROVIDER = os.environ.get("CHAT_PROVIDER") or _default_chat()
 EXTRACT_PROVIDER = os.environ.get("EXTRACT_PROVIDER") or _default_cheap()
 
+# Modelo de visión por proveedor (para leer imágenes de reservas). Configurable
+# por env. Groq ofrece un modelo de visión en su free tier; por eso, por defecto,
+# la extracción de imágenes usa Groq aunque el resto vaya a otro proveedor.
+VISION_MODELS = {
+    "groq": os.environ.get("GROQ_VISION_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct"),
+    "anthropic": os.environ.get("ANTHROPIC_VISION_MODEL", "claude-haiku-4-5"),
+    "deepseek": os.environ.get("DEEPSEEK_VISION_MODEL", ""),  # DeepSeek no tiene visión estable
+}
+
+
+def _vision_provider() -> str:
+    """Proveedor para leer imágenes: el primero disponible que tenga visión.
+    Groq primero (gratis), luego Anthropic. DeepSeek no aplica."""
+    for p in ("groq", "anthropic"):
+        if PROVIDERS[p]["key"] and VISION_MODELS.get(p):
+            return p
+    return "mock"
+
+
 MODE = "mock" if not _available() else f"scoring={SCORING_PROVIDER}, chat={CHAT_PROVIDER}, extract={EXTRACT_PROVIDER}"
 
 
@@ -79,7 +98,7 @@ def _call(provider: str, system: str, messages: list[dict], max_tokens: int = 80
                      "content-type": "application/json"},
             json={"model": cfg["model"], "max_tokens": max_tokens, "system": system,
                   "messages": messages},
-            timeout=60,
+            timeout=90,
         )
         resp.raise_for_status()
         return "".join(b.get("text", "") for b in resp.json()["content"] if b.get("type") == "text")
@@ -89,10 +108,57 @@ def _call(provider: str, system: str, messages: list[dict], max_tokens: int = 80
         headers={"Authorization": f"Bearer {cfg['key']}", "Content-Type": "application/json"},
         json={"model": cfg["model"], "max_tokens": max_tokens,
               "messages": [{"role": "system", "content": system}] + messages},
-        timeout=60,
+        timeout=90,
     )
     resp.raise_for_status()
     return resp.json()["choices"][0]["message"]["content"]
+
+
+def _call_vision(provider: str, system: str, prompt: str, image_data_url: str,
+                 max_tokens: int = 800) -> str:
+    """Llamada multimodal: una imagen + texto. Solo proveedores estilo OpenAI con
+    modelo de visión (Groq llama-3.2/4 vision). El modelo de visión se toma de
+    {PROVIDER}_VISION_MODEL si está, si no se intenta con el modelo de chat."""
+    cfg = PROVIDERS[provider]
+    if cfg["style"] == "anthropic":
+        # data URL → bloque image base64 de Anthropic
+        media, b64 = _split_data_url(image_data_url)
+        resp = httpx.post(
+            cfg["url"],
+            headers={"x-api-key": cfg["key"], "anthropic-version": "2023-06-01",
+                     "content-type": "application/json"},
+            json={"model": VISION_MODELS.get(provider, cfg["model"]), "max_tokens": max_tokens,
+                  "system": system,
+                  "messages": [{"role": "user", "content": [
+                      {"type": "image", "source": {"type": "base64", "media_type": media, "data": b64}},
+                      {"type": "text", "text": prompt}]}]},
+            timeout=120,
+        )
+        resp.raise_for_status()
+        return "".join(b.get("text", "") for b in resp.json()["content"] if b.get("type") == "text")
+    resp = httpx.post(
+        cfg["url"],
+        headers={"Authorization": f"Bearer {cfg['key']}", "Content-Type": "application/json"},
+        json={"model": VISION_MODELS.get(provider, cfg["model"]), "max_tokens": max_tokens,
+              "messages": [
+                  {"role": "system", "content": system},
+                  {"role": "user", "content": [
+                      {"type": "text", "text": prompt},
+                      {"type": "image_url", "image_url": {"url": image_data_url}}]}]},
+        timeout=120,
+    )
+    resp.raise_for_status()
+    return resp.json()["choices"][0]["message"]["content"]
+
+
+def _split_data_url(data_url: str) -> tuple[str, str]:
+    """'data:image/png;base64,XXXX' → ('image/png', 'XXXX')."""
+    try:
+        head, b64 = data_url.split(",", 1)
+        media = head.split(":", 1)[1].split(";", 1)[0]
+        return media, b64
+    except (ValueError, IndexError):
+        return "image/jpeg", data_url
 
 
 def _parse_json(text: str) -> dict:
@@ -170,17 +236,127 @@ def chat(system: str, history: list[dict]) -> str:
     return _call(CHAT_PROVIDER, system, msgs, max_tokens=600)
 
 
-# ── Extracción de documentos (tarea barata → DeepSeek/Groq) ──
-def extract_document(text_content: str, filename: str) -> dict:
-    if EXTRACT_PROVIDER == "mock" or not _available():
-        return {"tipo": "actividad", "resumen": f"[demo] Extraído de {filename}: {text_content[:120]}",
-                "confirmacion": f"Leí tu documento {filename} y lo anoté en tu viaje ✓"}
-    prompt = (
-        f"Contenido de un documento de viaje del usuario ({filename}):\n---\n{text_content[:6000]}\n---\n"
-        "Extrae TODA la info útil (qué es, nombres, fechas, horas, direcciones, códigos, precios). "
-        'Responde SOLO JSON: {"tipo": "<hotel|vuelo|actividad|restaurante|otro>", '
-        '"resumen": "<2-4 frases con todos los datos concretos>", '
-        '"confirmacion": "<máx 2 frases cálidas confirmando qué entendiste>"}'
+# ── Extracción de documentos y planes (tarea barata → DeepSeek/Groq) ──
+def _trip_ctx_block(trip: dict | None) -> str:
+    """Da al extractor el rango de fechas y el 'hoy' para que pueda resolver
+    referencias relativas ('el viernes', 'mañana') a una fecha real YYYY-MM-DD."""
+    if not trip:
+        return ""
+    from . import timeutil
+    try:
+        hoy = timeutil.now_local(trip).strftime("%Y-%m-%d")
+    except Exception:
+        hoy = ""
+    return (
+        f"\nCONTEXTO DEL VIAJE (para resolver fechas relativas):\n"
+        f"- Ciudad: {trip.get('ciudad', '')}\n"
+        f"- El viaje va del {trip.get('inicio', '?')} al {trip.get('fin', '?')}\n"
+        f"- HOY es {hoy} (hora local del destino)\n"
+        "Si el texto dice 'mañana', 'el viernes', etc., conviértelo a una fecha "
+        "YYYY-MM-DD DENTRO del rango del viaje. Si no puedes determinar la fecha, deja fecha en null.\n"
     )
-    return _parse_json(_call(EXTRACT_PROVIDER, "Eres el parser de documentos de viaje de Voyra.",
-                             [{"role": "user", "content": prompt}]))
+
+
+_EXTRACT_SCHEMA = (
+    'Responde SOLO JSON válido sin markdown con esta forma EXACTA:\n'
+    '{\n'
+    '  "tipo": "<hotel|vuelo|actividad|restaurante|transporte|otro>",\n'
+    '  "resumen": "<2-4 frases con todos los datos concretos: nombres, códigos, direcciones, precios>",\n'
+    '  "confirmacion": "<máx 2 frases cálidas confirmando qué entendiste>",\n'
+    '  "planes": [\n'
+    '    {"fecha": "YYYY-MM-DD o null", "hora": "HH:MM o null", "titulo": "<corto>", '
+    '"tipo": "<vuelo|hotel|actividad|restaurante|transporte|otro>", '
+    '"detalle": "<datos útiles: código, dirección, terminal, etc.>", "lugar": "<nombre del lugar o null>"}\n'
+    '  ]\n'
+    '}\n'
+    'En "planes" pon UNA entrada por cada cosa con fecha/hora reservada (un vuelo = un plan con su fecha y hora; '
+    'una estadía de hotel = un plan el día del check-in; un tour = un plan; una cena = un plan). '
+    'Si el documento no contiene nada agendable, deja "planes" como lista vacía [].'
+)
+
+
+def _safe_extract(raw: str, filename: str) -> dict:
+    try:
+        out = _parse_json(raw)
+    except Exception:
+        return {"tipo": "otro", "resumen": f"Documento {filename} (no pude estructurarlo del todo).",
+                "confirmacion": f"Guardé {filename} en tu viaje ✓", "planes": []}
+    out.setdefault("tipo", "otro")
+    out.setdefault("resumen", f"Extraído de {filename}")
+    out.setdefault("confirmacion", f"Leí {filename} y lo anoté ✓")
+    out.setdefault("planes", [])
+    if not isinstance(out["planes"], list):
+        out["planes"] = []
+    return out
+
+
+def extract_document(text_content: str, filename: str, trip: dict | None = None) -> dict:
+    """Extrae datos + planes agendables de un documento de TEXTO (PDF→texto o .txt)."""
+    if EXTRACT_PROVIDER == "mock" or not _available():
+        return {"tipo": "actividad",
+                "resumen": f"[demo] Extraído de {filename}: {text_content[:120]}",
+                "confirmacion": f"Leí tu documento {filename} y lo anoté en tu viaje ✓",
+                "planes": [{"fecha": None, "hora": None, "titulo": f"[demo] {filename}",
+                            "tipo": "otro", "detalle": text_content[:80], "lugar": None}]}
+    prompt = (
+        f"Contenido de un documento de viaje del usuario ({filename}):\n---\n{text_content[:7000]}\n---\n"
+        f"{_trip_ctx_block(trip)}"
+        "Extrae TODA la info útil y los planes agendables. " + _EXTRACT_SCHEMA
+    )
+    raw = _call(EXTRACT_PROVIDER, "Eres el parser de documentos de viaje de Voyra.",
+                [{"role": "user", "content": prompt}], max_tokens=1000)
+    return _safe_extract(raw, filename)
+
+
+def extract_document_image(image_data_url: str, filename: str, trip: dict | None = None) -> dict:
+    """Igual que extract_document pero leyendo una IMAGEN (captura/foto de reserva)."""
+    vp = _vision_provider()
+    if vp == "mock":
+        return {"tipo": "otro",
+                "resumen": f"[demo] Imagen {filename} recibida (sin modelo de visión configurado).",
+                "confirmacion": f"Recibí tu imagen {filename} ✓",
+                "planes": []}
+    prompt = (
+        f"Esta imagen es una reserva/confirmación de viaje del usuario ({filename}). "
+        "Léela con cuidado (puede ser una captura de pantalla o foto de un correo/PDF). "
+        f"{_trip_ctx_block(trip)}"
+        "Extrae TODA la info útil y los planes agendables. " + _EXTRACT_SCHEMA
+    )
+    raw = _call_vision(vp, "Eres el parser de documentos de viaje de Voyra.",
+                       prompt, image_data_url, max_tokens=1000)
+    return _safe_extract(raw, filename)
+
+
+def extract_plans_from_chat(message: str, trip: dict | None = None) -> list[dict]:
+    """Detecta planes agendables en UN mensaje de chat del usuario.
+
+    Devuelve lista (posiblemente vacía) de planes SIN guardar. El endpoint decide
+    si preguntar al usuario antes de persistir. Solo extrae cosas con intención de
+    plan futuro ('el viernes tengo tour a las 9', 'reservé cena el sábado'),
+    NO preguntas ('¿qué hago el viernes?') ni charla general."""
+    if EXTRACT_PROVIDER == "mock" or not _available():
+        # Heurística mínima para el modo demo/test: si menciona hora + actividad.
+        low = message.lower()
+        if any(k in low for k in ("reserv", "tour", "tengo", "cena", "vuelo")) and any(
+                k in low for k in ("am", "pm", ":", "mañana", "hoy")):
+            return [{"fecha": None, "hora": None, "titulo": message[:50],
+                     "tipo": "otro", "detalle": "", "lugar": None}]
+        return []
+    prompt = (
+        f"Mensaje del usuario en el chat:\n\"{message}\"\n"
+        f"{_trip_ctx_block(trip)}"
+        "¿El usuario está contando un PLAN o RESERVA futura concreta (algo que va a hacer, "
+        "con o sin fecha/hora)? Si SÍ, extráelo. Si es una PREGUNTA, una duda, o charla general "
+        "SIN un plan concreto, devuelve lista vacía.\n"
+        'Responde SOLO JSON válido sin markdown: {"planes": [ '
+        '{"fecha": "YYYY-MM-DD o null", "hora": "HH:MM o null", "titulo": "<corto>", '
+        '"tipo": "<vuelo|hotel|actividad|restaurante|transporte|otro>", '
+        '"detalle": "<datos útiles o vacío>", "lugar": "<lugar o null>"} ] }'
+    )
+    try:
+        out = _parse_json(_call(EXTRACT_PROVIDER, "Eres el detector de planes de viaje de Voyra.",
+                                [{"role": "user", "content": prompt}], max_tokens=600))
+        planes = out.get("planes", [])
+        return planes if isinstance(planes, list) else []
+    except Exception:
+        return []

@@ -322,3 +322,66 @@ def test_nearby_dedup_no_repeats():
 
     assert agotado
     assert len(vistos_total) == total_curados  # cubrió todos los curados, sin repetir ninguno
+
+
+# ── Planes estructurados (sesión 7) ──
+def test_plans_normalizacion_y_orden():
+    from app import plans
+    crudos = ["cena suelta", {"titulo": "Tour", "fecha": "2026-07-13", "hora": "9am", "tipo": "actividad"}]
+    norm = plans.normalizar_lista(crudos)
+    assert norm[0]["titulo"] == "cena suelta" and norm[0]["fecha"] is None
+    assert norm[1]["hora"] == "09:00" and norm[1]["tipo"] == "actividad"
+    # orden: con fecha va después de... no, sin fecha va al final (9999)
+    ordenado = plans.ordenar(norm)
+    assert ordenado[0]["titulo"] == "Tour"  # tiene fecha real, va primero
+
+
+def test_plans_hora_pm():
+    from app import plans
+    assert plans._norm_hora("9pm") == "21:00"
+    assert plans._norm_hora("12am") == "00:00"
+    assert plans._norm_hora("21:30") == "21:30"
+    assert plans._norm_hora("basura") is None
+
+
+def test_plans_crud_api():
+    from app.main import app
+    client = TestClient(app)
+    tid = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H", "inicio": "2026-07-12",
+                                      "fin": "2026-07-18"}).json()["trip_id"]
+    # agregar plan estructurado
+    r = client.post(f"/trips/{tid}/plans", json={"titulo": "Monserrate", "fecha": "2026-07-14",
+                                                 "hora": "08:00", "tipo": "actividad"}).json()
+    assert len(r["planes"]) == 1
+    pid = r["planes"][0]["id"]
+    # listar agrupado por día
+    lst = client.get(f"/trips/{tid}/plans").json()
+    assert "2026-07-14" in lst["por_dia"]
+    # confirmar planes propuestos (desde chat/doc)
+    client.post(f"/trips/{tid}/plans/confirm", json={"planes": [
+        {"titulo": "Cena Andrés", "fecha": "2026-07-14", "hora": "20:00", "tipo": "restaurante"}]})
+    assert len(client.get(f"/trips/{tid}/plans").json()["planes"]) == 2
+    # borrar
+    client.delete(f"/trips/{tid}/plans/{pid}")
+    assert len(client.get(f"/trips/{tid}/plans").json()["planes"]) == 1
+
+
+def test_chat_devuelve_propuestas():
+    from app.main import app
+    client = TestClient(app)
+    tid = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H", "inicio": "2026-07-12",
+                                      "fin": "2026-07-18"}).json()["trip_id"]
+    r = client.post(f"/trips/{tid}/chat", json={"message": "mañana tengo tour a Monserrate 9am"}).json()
+    assert "planes_propuestos" in r
+    # en modo mock la heurística detecta el plan; no se guarda hasta confirmar
+    assert client.get(f"/trips/{tid}/plans").json()["planes"] == []
+
+
+def test_doc_devuelve_planes_propuestos():
+    from app.main import app
+    client = TestClient(app)
+    tid = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H", "inicio": "2026-07-12",
+                                      "fin": "2026-07-18"}).json()["trip_id"]
+    r = client.post(f"/trips/{tid}/documents", json={"filename": "vuelo.txt",
+                                                     "text_content": "Vuelo AV245 13 jul 8am"}).json()
+    assert "planes_propuestos" in r

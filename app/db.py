@@ -172,6 +172,39 @@ def update_trip(tid: str, patch: dict):
         c.execute("UPDATE trips SET data=? WHERE id=?", (json.dumps(t), tid))
 
 
+# ── Planes estructurados (ver plans.py para la forma canónica) ──
+def get_plans(tid: str) -> list[dict]:
+    """Devuelve los planes del viaje SIEMPRE normalizados. Migra de forma
+    transparente los planes en formato viejo (lista de strings) la primera vez
+    que se leen, persistiéndolos ya normalizados."""
+    from . import plans  # import local para evitar ciclo
+    t = get_trip(tid)
+    if not t:
+        raise KeyError(tid)
+    crudos = t.get("planes", []) or []
+    normalizados = plans.normalizar_lista(crudos)
+    # Si había strings viejos, persistimos la versión normalizada una vez.
+    if crudos and any(isinstance(p, str) for p in crudos):
+        update_trip(tid, {"planes": normalizados})
+    return normalizados
+
+
+def add_plans(tid: str, nuevos: list[dict], *, origen: str = "manual") -> list[dict]:
+    """Agrega uno o varios planes ya normalizados y devuelve la lista completa."""
+    from . import plans
+    actuales = get_plans(tid)
+    actuales += plans.normalizar_lista(nuevos, origen=origen)
+    update_trip(tid, {"planes": actuales})
+    return actuales
+
+
+def delete_plan(tid: str, plan_id: str) -> list[dict]:
+    actuales = get_plans(tid)
+    restantes = [p for p in actuales if p.get("id") != plan_id]
+    update_trip(tid, {"planes": restantes})
+    return restantes
+
+
 # ── Genéricos ──
 def insert(table: str, row: dict) -> str:
     rid = row.get("id") or new_id()

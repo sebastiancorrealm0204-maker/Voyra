@@ -4,7 +4,7 @@ Este texto es el prefijo cacheado en producción (prompt caching): todo lo que e
 agente sabe del viaje en < 4K tokens. Incluye datos del setup, ubicación actual,
 documentos extraídos y planes contados por el usuario.
 """
-from . import city_knowledge, db, geo, timeutil
+from . import city_knowledge, db, geo, plans, timeutil
 
 
 def _lugares_block(trip: dict) -> str:
@@ -61,8 +61,10 @@ def build(trip: dict, docs: list[dict] | None = None) -> str:
         docs_block = f"\nDOCUMENTOS Y FOTOS QUE EL USUARIO SUBIÓ (información verificada del itinerario):\n{listado}\n"
 
     planes_block = ""
-    if trip.get("planes"):
-        planes_block = "\nPLANES QUE EL USUARIO TE CONTÓ:\n" + "\n".join(f"- {p}" for p in trip["planes"]) + "\n"
+    planes_norm = plans.normalizar_lista(trip.get("planes", []))
+    if planes_norm:
+        planes_block = ("\nITINERARIO DEL USUARIO (planes ya agendados, ordenados por día y hora):\n"
+                        + plans.resumen_para_prompt(planes_norm) + "\n")
 
     aeropuerto_block = ""
     if trip.get("modo_aeropuerto"):

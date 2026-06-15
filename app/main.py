@@ -67,7 +67,9 @@ class ChatIn(BaseModel):
 
 class DocIn(BaseModel):
     filename: str
-    text_content: str  # MVP: texto del documento (OCR/parse en el cliente). Multimodal directo: fase 2.
+    text_content: str = ""           # texto del documento (.txt o ya extraído)
+    image_data_url: str = ""         # data:image/...;base64,... para fotos/capturas de reservas
+    pdf_data_url: str = ""           # data:application/pdf;base64,... — se extrae texto en backend
 
 
 class FeedbackIn(BaseModel):
@@ -75,7 +77,18 @@ class FeedbackIn(BaseModel):
 
 
 class PlanIn(BaseModel):
-    plan: str
+    plan: str | None = None          # compat: texto suelto (formato viejo)
+    fecha: str | None = None
+    hora: str | None = None
+    titulo: str | None = None
+    tipo: str | None = None
+    detalle: str | None = None
+    lugar: str | None = None
+
+
+class PlansConfirmIn(BaseModel):
+    """Confirma (guarda) un conjunto de planes que el chat propuso."""
+    planes: list[dict]
 
 
 class PushSubIn(BaseModel):
@@ -100,13 +113,43 @@ def get_trip(tid: str):
     return t
 
 
+@app.get("/trips/{tid}/plans")
+def list_plans(tid: str):
+    """Planes del viaje: lista plana ordenada + agrupados por día (para el calendario)."""
+    if not db.get_trip(tid):
+        raise HTTPException(404, "trip no existe")
+    from . import plans as plans_mod
+    planes = db.get_plans(tid)
+    return {"planes": plans_mod.ordenar(planes),
+            "por_dia": plans_mod.agrupar_por_dia(planes)}
+
+
 @app.post("/trips/{tid}/plans")
 def add_plan(tid: str, p: PlanIn):
-    t = db.get_trip(tid)
-    if not t:
+    if not db.get_trip(tid):
         raise HTTPException(404, "trip no existe")
-    db.update_trip(tid, {"planes": t.get("planes", []) + [p.plan]})
-    return {"planes": db.get_trip(tid)["planes"]}
+    # Compat: si llega 'plan' como texto suelto, se guarda como antes.
+    if p.plan and not (p.titulo or p.fecha):
+        nuevo = {"titulo": p.plan}
+    else:
+        nuevo = {"fecha": p.fecha, "hora": p.hora, "titulo": p.titulo or p.plan or "Plan",
+                 "tipo": p.tipo, "detalle": p.detalle, "lugar": p.lugar}
+    return {"planes": db.add_plans(tid, [nuevo], origen="manual")}
+
+
+@app.post("/trips/{tid}/plans/confirm")
+def confirm_plans(tid: str, body: PlansConfirmIn):
+    """Guarda los planes que el chat o un documento propuso (tras confirmación del usuario)."""
+    if not db.get_trip(tid):
+        raise HTTPException(404, "trip no existe")
+    return {"planes": db.add_plans(tid, body.planes, origen="chat")}
+
+
+@app.delete("/trips/{tid}/plans/{plan_id}")
+def remove_plan(tid: str, plan_id: str):
+    if not db.get_trip(tid):
+        raise HTTPException(404, "trip no existe")
+    return {"planes": db.delete_plan(tid, plan_id)}
 
 
 # ── Señales / watchers ──
@@ -229,17 +272,45 @@ def chat(tid: str, c: ChatIn):
     history = [{"role": m["role"], "content": m["content"]} for m in db.rows("messages", tid)]
     reply = llm.chat(context.build(trip), history)
     db.insert("messages", {"trip_id": tid, "role": "companion", "content": reply})
-    return {"reply": reply}
+    # Detectar planes en el mensaje del usuario SIN guardarlos: el frontend
+    # preguntará "¿lo anoto en tu calendario?" antes de persistir.
+    propuestas = []
+    # Los mensajes entre corchetes son taps de notificaciones, no planes.
+    if not c.message.strip().startswith("["):
+        from . import plans as plans_mod
+        propuestas = plans_mod.normalizar_lista(
+            llm.extract_plans_from_chat(c.message, trip), origen="chat")
+    return {"reply": reply, "planes_propuestos": propuestas}
 
 
 # ── Documentos ──
 @app.post("/trips/{tid}/documents")
 def upload_doc(tid: str, d: DocIn):
-    if not db.get_trip(tid):
+    trip = db.get_trip(tid)
+    if not trip:
         raise HTTPException(404, "trip no existe")
-    r = llm.extract_document(d.text_content, d.filename)
+    if d.pdf_data_url:
+        from . import docparse
+        texto = docparse.pdf_b64_to_text(d.pdf_data_url)
+        if texto:
+            r = llm.extract_document(texto, d.filename, trip)
+        else:
+            # PDF escaneado (sin texto): no hay capa de texto que leer.
+            r = {"tipo": "otro",
+                 "resumen": f"PDF {d.filename} recibido, pero no tiene texto legible (parece escaneado).",
+                 "confirmacion": f"Guardé {d.filename}. Si es una foto/escaneo, súbela como imagen para leerla mejor.",
+                 "planes": []}
+    elif d.image_data_url:
+        r = llm.extract_document_image(d.image_data_url, d.filename, trip)
+    else:
+        r = llm.extract_document(d.text_content, d.filename, trip)
     db.insert("documents", {"trip_id": tid, "filename": d.filename,
                             "doc_type": r["tipo"], "summary": r["resumen"]})
+    # Normaliza los planes detectados pero NO los guarda aún: el frontend
+    # muestra "encontré estos planes, ¿los agrego a tu calendario?".
+    from . import plans as plans_mod
+    propuestas = plans_mod.normalizar_lista(r.get("planes", []), origen="documento")
+    r["planes_propuestos"] = propuestas
     return r
 
 

@@ -71,6 +71,11 @@ const api = {
     if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
     return r.json();
   },
+  del: async (path) => {
+    const r = await fetch(`${API}${path}`, { method: "DELETE" });
+    if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+    return r.json();
+  },
 };
 
 const DEBUG = new URLSearchParams(window.location.search).has("debug");
@@ -372,6 +377,8 @@ function VoyraCompanion() {
   const [zonaActual, setZonaActual] = useState("En el hotel");
   const [gpsEstado, setGpsEstado] = useState("inactivo"); // inactivo|buscando|ok|denegado|no_soportado|error|manual
   const [docs, setDocs] = useState([]);
+  const [planes, setPlanes] = useState([]);              // planes estructurados del viaje
+  const [planesPropuestos, setPlanesPropuestos] = useState(null); // {fuente, planes:[...]} pendientes de confirmar
   const [escuchando, setEscuchando] = useState(false);
   const [vozActiva, setVozActiva] = useState(false);
   const [subiendo, setSubiendo] = useState(false);
@@ -492,21 +499,74 @@ function VoyraCompanion() {
     } catch (e) { /* silencioso: la llegada nunca debe romperse */ }
   };
 
-  // ── Subida de confirmaciones (.txt) → Trip Context ──
+  // ── Cargar planes estructurados del backend ──
+  const cargarPlanes = async (tid) => {
+    const id = tid || tripId;
+    if (!id) return;
+    try {
+      const data = await api.get(`/trips/${id}/plans`);
+      setPlanes(data.planes || []);
+    } catch (e) {}
+  };
+
+  // ── Confirmar (guardar) planes propuestos por el chat o un documento ──
+  const confirmarPlanes = async (lista) => {
+    if (!tripId || !lista || !lista.length) { setPlanesPropuestos(null); return; }
+    try {
+      const data = await api.post(`/trips/${tripId}/plans/confirm`, { planes: lista });
+      setPlanes(data.planes || []);
+      appendStream({ type: "companion", texto: lista.length === 1
+        ? `Listo, lo agregué a tu itinerario ✓` : `Listo, agregué ${lista.length} planes a tu itinerario ✓` });
+    } catch (e) {
+      appendStream({ type: "companion", texto: "No pude guardar el plan. ¿Lo intentamos de nuevo?" });
+    }
+    setPlanesPropuestos(null);
+  };
+
+  const borrarPlan = async (planId) => {
+    if (!tripId) return;
+    try {
+      const data = await api.del(`/trips/${tripId}/plans/${planId}`);
+      setPlanes(data.planes || []);
+    } catch (e) {}
+  };
+
+  // Lee un archivo como data URL (para PDF/imagen) o texto (para .txt).
+  const leerArchivo = (file, modo) => new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = () => rej(new Error("read failed"));
+    if (modo === "dataurl") r.readAsDataURL(file); else r.readAsText(file);
+  });
+
+  // ── Subida de reservas (.txt, PDF, imagen) → extrae datos + planes ──
   const subirDoc = async (file) => {
     if (!file || subiendo || !tripId) return;
-    const esTexto = file.type === "text/plain" || file.name.toLowerCase().endsWith(".txt");
-    if (!esTexto) { appendStream({ type: "companion", texto: "Por ahora puedo leer archivos de texto (.txt) — pega ahí el texto de tu confirmación. Fotos y PDFs llegan en la próxima versión." }); return; }
+    const nombre = file.name.toLowerCase();
+    const esPDF = file.type === "application/pdf" || nombre.endsWith(".pdf");
+    const esImg = file.type.startsWith("image/") || /\.(png|jpe?g|webp|heic|gif)$/.test(nombre);
+    const esTexto = file.type === "text/plain" || nombre.endsWith(".txt");
+    if (!esPDF && !esImg && !esTexto) {
+      appendStream({ type: "companion", texto: "Puedo leer PDF, imágenes (capturas/fotos) y texto (.txt). ¿Me subes la reserva en uno de esos formatos?" });
+      return;
+    }
     setSubiendo(true);
     appendStream({ type: "user", texto: `📎 ${file.name}` });
+    appendStream({ type: "companion", texto: "Déjame leer eso…" });
     try {
-      const text = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(new Error("read failed")); r.readAsText(file); }).catch(() => `[archivo binario: ${file.name}]`);
-      const data = await api.post(`/trips/${tripId}/documents`, { filename: file.name, text_content: text.slice(0, 6000) });
+      let body = { filename: file.name };
+      if (esPDF) body.pdf_data_url = await leerArchivo(file, "dataurl");
+      else if (esImg) body.image_data_url = await leerArchivo(file, "dataurl");
+      else body.text_content = (await leerArchivo(file, "text")).slice(0, 7000);
+      const data = await api.post(`/trips/${tripId}/documents`, body);
       setDocs((d) => [...d, { nombre: file.name, tipo: data.tipo, resumen: data.resumen }]);
       appendStream({ type: "companion", texto: data.confirmacion });
       addLog({ senal: `Documento: ${file.name}`, fuente: "Usuario", filtro: `✓ Extraído (tipo: ${data.tipo})`, score: null, decision: "silencio" });
+      // Si encontró planes agendables, ofrecer agregarlos al calendario.
+      const props = data.planes_propuestos || [];
+      if (props.length) setPlanesPropuestos({ fuente: "documento", planes: props });
     } catch (e) {
-      appendStream({ type: "companion", texto: "No pude leer ese archivo. ¿Probamos con el texto de la confirmación?" });
+      appendStream({ type: "companion", texto: "No pude leer ese archivo. ¿Probamos con otra foto o el texto de la confirmación?" });
     }
     setSubiendo(false);
   };
@@ -523,6 +583,9 @@ function VoyraCompanion() {
       const data = await api.post(`/trips/${tripId}/chat`, { message: msgApi });
       appendStream({ type: "companion", texto: data.reply });
       hablar(data.reply);
+      // Si detectó un plan en lo que el usuario contó, ofrecer agregarlo.
+      const props = data.planes_propuestos || [];
+      if (props.length) setPlanesPropuestos({ fuente: "chat", planes: props });
     } catch (e) {
       appendStream({ type: "companion", texto: "Se me cruzaron los cables un segundo. ¿Me lo repites?" });
     }
@@ -637,7 +700,7 @@ function VoyraCompanion() {
   const reiniciar = () => {
     setSheet(null); setFase("setup"); setPaso(1); setTripId(null); setStream([]); seqRef.current = 0;
     setLog([]); setPushUsados(0); setUbicacion("En el hotel"); setZonaActual("En el hotel");
-    setGpsEstado("inactivo"); setDocs([]); setVozActiva(false); setCargandoCerca(false); setEscaneando(false);
+    setGpsEstado("inactivo"); setDocs([]); setPlanes([]); setPlanesPropuestos(null); setVozActiva(false); setCargandoCerca(false); setEscaneando(false);
   };
 
   // Días del viaje para el calendario de Planes (de 'inicio' a 'fin').
@@ -648,13 +711,25 @@ function VoyraCompanion() {
     try {
       const ini = new Date(viaje.inicio + "T12:00:00");
       const fin = new Date(viaje.fin + "T12:00:00");
+      // Indexar planes por fecha (YYYY-MM-DD).
+      const porDia = {};
+      (planes || []).forEach((p) => {
+        if (p.fecha) (porDia[p.fecha] = porDia[p.fecha] || []).push(p);
+      });
       for (let d = new Date(ini); d <= fin; d.setDate(d.getDate() + 1)) {
         const dd = new Date(d);
-        out.push({ date: dd, iso: dd.toISOString().slice(0, 10), planes: [] });
+        const iso = `${dd.getFullYear()}-${String(dd.getMonth() + 1).padStart(2, "0")}-${String(dd.getDate()).padStart(2, "0")}`;
+        out.push({ date: dd, iso, planes: porDia[iso] || [] });
       }
     } catch (e) {}
     return out;
-  }, [viaje.inicio, viaje.fin]);
+  }, [viaje.inicio, viaje.fin, planes]);
+
+  // Planes con fecha fuera del rango o sin fecha → "por agendar" (no se pierden).
+  const planesSinDia = React.useMemo(() => {
+    const isos = new Set((diasViaje || []).map((d) => d.iso));
+    return (planes || []).filter((p) => !p.fecha || !isos.has(p.fecha));
+  }, [planes, diasViaje]);
 
   // Notificaciones push: activar/desactivar
   const togglePush = async () => {
@@ -685,6 +760,7 @@ function VoyraCompanion() {
         const data = await api.post("/trips", { ciudad: viaje.ciudad.trim(), hotel: viaje.hotel.trim(), inicio: viaje.inicio, fin: viaje.fin, vuelo_ida: viaje.vueloIda.trim(), vuelo_regreso: viaje.vueloRegreso.trim(), pais: viaje.pais.trim() || "Colombia", gustos: viaje.gustos });
         setTripId(data.trip_id);
         appendStream({ type: "companion", texto: data.greeting });
+        cargarPlanes(data.trip_id);
         setTab("inicio");
         setGuiaVista(true);
         setFase("agente");
@@ -754,12 +830,19 @@ function VoyraCompanion() {
           ) : (
             <div key="p2" className="rise" style={{ marginTop: 6 }}>
               <h1 style={{ fontSize: 24, fontWeight: 700, lineHeight: 1.2, letterSpacing: "-0.02em", textAlign: "center", margin: 0 }}>Un par de cosas más<br />y quedamos listos.</h1>
-              <p style={{ color: C.inkSoft, marginTop: 10, fontSize: 14.5, lineHeight: 1.5, textAlign: "center" }}>Todo esto es opcional — afina cómo te acompaño. Puedes saltarlo.</p>
+              <p style={{ color: C.inkSoft, marginTop: 10, fontSize: 14.5, lineHeight: 1.5, textAlign: "center" }}>Todo esto es opcional. ¿Tienes las reservas a mano? Mejor aún: <b style={{ color: C.ink }}>actívame y súbelas</b> (PDF, foto o captura) — yo extraigo vuelos, hotel y tours y armo tu itinerario solo.</p>
+
+              <div style={{ background: C.aquaSoft, border: `1px solid ${C.aqua}55`, borderRadius: 16, padding: "13px 15px", marginTop: 16, display: "flex", alignItems: "center", gap: 11 }}>
+                <Icon name="doc" size={20} color={C.aqua} />
+                <div style={{ fontSize: 12.5, color: C.inkSoft, lineHeight: 1.45 }}>
+                  Apenas entres, verás <b style={{ color: C.ink }}>“Sube tus reservas”</b> en el inicio. No tienes que escribir nada a mano.
+                </div>
+              </div>
 
               <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 20, padding: 18, marginTop: 20 }}>
                 <div className="space-y-4">
                   <div>
-                    <label style={{ fontSize: 11.5, fontWeight: 600, color: C.inkSoft, letterSpacing: "0.03em" }}>TUS VUELOS <span style={{ fontWeight: 400, textTransform: "none" }}>· solo el número, yo veo el resto</span></label>
+                    <label style={{ fontSize: 11.5, fontWeight: 600, color: C.inkSoft, letterSpacing: "0.03em" }}>TUS VUELOS <span style={{ fontWeight: 400, textTransform: "none" }}>· opcional, o súbelos después</span></label>
                     <div className="flex gap-3" style={{ marginTop: 5 }}>
                       <input value={viaje.vueloIda} onChange={(e) => setViaje({ ...viaje, vueloIda: e.target.value })} placeholder="Ida · AV245"
                         style={{ flex: 1, minWidth: 0, border: `1px solid ${C.line}`, borderRadius: 12, padding: "12px 14px", fontSize: 16, background: C.bg, color: C.ink, outline: "none", boxSizing: "border-box" }} />
@@ -865,6 +948,9 @@ function VoyraCompanion() {
           onCerca={() => { setTab("chat"); buscarCerca(); }}
           onAirport={() => { airport && airport.disponible ? setAirportOpen(true) : cargarAeropuerto(false); }}
           onPlanes={() => setTab("planes")}
+          onSubir={() => fileRef.current && fileRef.current.click()}
+          subiendo={subiendo}
+          numPlanes={(planes || []).length}
           onSOS={() => setSosOpen(true)}
           onTraductor={() => setTraductorOpen(true)}
           onInfo={() => setInfoOpen(true)}
@@ -873,7 +959,7 @@ function VoyraCompanion() {
 
       {/* ── PLANES (calendario) ── */}
       {tab === "planes" && (
-        <PlanesView viaje={viaje} diasViaje={diasViaje} onChat={() => setTab("chat")} />
+        <PlanesView viaje={viaje} diasViaje={diasViaje} planesSinDia={planesSinDia} onChat={() => setTab("chat")} onSubir={() => fileRef.current && fileRef.current.click()} onBorrar={borrarPlan} subiendo={subiendo} />
       )}
 
       {/* ── MÁS ── */}
@@ -1005,7 +1091,7 @@ function VoyraCompanion() {
           ))}
         </div>
         <div style={{ padding: "8px 12px 12px", display: "flex", gap: 7, alignItems: "center" }}>
-          <input ref={fileRef} type="file" accept=".txt,text/plain" style={{ display: "none" }} onChange={(e) => { subirDoc(e.target.files[0]); e.target.value = ""; }} />
+          <input ref={fileRef} type="file" accept=".txt,text/plain,application/pdf,.pdf,image/*" style={{ display: "none" }} onChange={(e) => { subirDoc(e.target.files[0]); e.target.value = ""; }} />
           <button onClick={() => fileRef.current && fileRef.current.click()} disabled={subiendo} title="Subir confirmación de reserva (.txt)"
             style={{ border: `1px solid ${C.line}`, background: C.bg, borderRadius: 999, width: 40, height: 40, fontSize: 17, cursor: "pointer", flexShrink: 0 }}>{subiendo ? "…" : "+"}</button>
           <button onClick={toggleMic} title="Hablarle al Companion"
@@ -1027,6 +1113,7 @@ function VoyraCompanion() {
       {infoOpen && <InfoView viaje={viaje} onClose={() => setInfoOpen(false)} />}
       {docsOpen && <DocsView viaje={viaje} docs={docs} subiendo={subiendo} onClose={() => setDocsOpen(false)} onSubir={() => fileRef.current && fileRef.current.click()} />}
       {guiaVista && <MiniGuia onClose={() => setGuiaVista(false)} />}
+      {planesPropuestos && <ConfirmarPlanesSheet data={planesPropuestos} onConfirmar={confirmarPlanes} onCancelar={() => setPlanesPropuestos(null)} />}
 
       {/* ── SHEETS ── */}
       {airportOpen && airport && airport.disponible && <AirportView data={airport} onClose={() => setAirportOpen(false)} />}
@@ -1153,7 +1240,7 @@ function HomeCard({ icon, titulo, children, accent, onClick, cta }) {
 }
 
 // ── INICIO (home/dashboard) ──
-function HomeView({ viaje, zonaActual, airport, diasViaje, pushDisponible, pushOn, onActivarPush, onChat, onCerca, onAirport, onPlanes, onSOS, onTraductor, onInfo }) {
+function HomeView({ viaje, zonaActual, airport, diasViaje, pushDisponible, pushOn, onActivarPush, onChat, onCerca, onAirport, onPlanes, onSubir, subiendo, numPlanes, onSOS, onTraductor, onInfo }) {
   const hoy = new Date();
   const horaSaludo = hoy.getHours();
   const saludo = horaSaludo < 12 ? "Buenos días" : horaSaludo < 19 ? "Buenas tardes" : "Buenas noches";
@@ -1183,6 +1270,20 @@ function HomeView({ viaje, zonaActual, airport, diasViaje, pushDisponible, pushO
       {/* Acción protagonista: hablar con el Companion */}
       <button onClick={onChat} style={{ width: "100%", background: C.orange, color: "#fff", border: "none", borderRadius: 16, padding: "16px 0", fontSize: 15.5, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, boxShadow: `0 8px 24px ${C.orange}33` }}>
         <Icon name="chat" size={20} color="#fff" /> Pregúntame lo que sea
+      </button>
+
+      {/* Sube tus reservas: el Companion arma tu itinerario solo */}
+      <button onClick={onSubir} disabled={subiendo} style={{ width: "100%", textAlign: "left", background: C.aquaSoft, border: `1px solid ${C.aqua}66`, borderRadius: 16, padding: "15px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 13 }}>
+        <div style={{ width: 42, height: 42, borderRadius: 12, background: C.aqua + "22", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <Icon name="doc" size={22} color={C.aqua} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14.5, fontWeight: 800, color: C.ink }}>{subiendo ? "Leyendo tu reserva…" : "Sube tus reservas"}</div>
+          <div style={{ fontSize: 12.5, color: C.inkSoft, marginTop: 2, lineHeight: 1.4 }}>
+            {numPlanes > 0 ? `${numPlanes} ${numPlanes === 1 ? "plan" : "planes"} en tu itinerario · sube más` : "Vuelos, hoteles, tours, cenas — armo tu itinerario"}
+          </div>
+        </div>
+        <Icon name="plane" size={18} color={C.aqua} />
       </button>
 
       {/* Notificaciones: solo si falta activarlas, discreto */}
@@ -1217,18 +1318,60 @@ function HomeView({ viaje, zonaActual, airport, diasViaje, pushDisponible, pushO
   );
 }
 
+// Mapea el tipo de plan a un ícono y color del sistema.
+const TIPO_PLAN = {
+  vuelo:       { icon: "plane",    color: C.orange, label: "Vuelo" },
+  hotel:       { icon: "home",     color: C.aqua,   label: "Hotel" },
+  actividad:   { icon: "compass",  color: C.orange, label: "Actividad" },
+  restaurante: { icon: "pin",      color: C.aqua,   label: "Comida" },
+  transporte:  { icon: "card",     color: C.inkSoft,label: "Transporte" },
+  otro:        { icon: "calendar", color: C.inkSoft,label: "Plan" },
+};
+
+function PlanCard({ p, onBorrar }) {
+  const meta = TIPO_PLAN[p.tipo] || TIPO_PLAN.otro;
+  return (
+    <div style={{ display: "flex", gap: 10, alignItems: "flex-start", background: C.bg, border: `1px solid ${C.line}`, borderRadius: 12, padding: "10px 11px" }}>
+      <div style={{ width: 30, height: 30, borderRadius: 9, background: C.card, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
+        <Icon name={meta.icon} size={16} color={meta.color} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
+          {p.hora && <span style={{ fontSize: 13, fontWeight: 800, color: meta.color, flexShrink: 0 }}>{p.hora}</span>}
+          <span style={{ fontSize: 13.5, fontWeight: 700, color: C.ink, lineHeight: 1.3, wordBreak: "break-word" }}>{p.titulo}</span>
+        </div>
+        {p.lugar && <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 2 }}>📍 {p.lugar}</div>}
+        {p.detalle && <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 2, lineHeight: 1.4 }}>{p.detalle}</div>}
+      </div>
+      {onBorrar && (
+        <button onClick={() => onBorrar(p.id)} title="Quitar" style={{ background: "none", border: "none", color: C.inkSoft, cursor: "pointer", fontSize: 17, lineHeight: 1, padding: "2px 4px", flexShrink: 0 }}>×</button>
+      )}
+    </div>
+  );
+}
+
 // ── PLANES (calendario del viaje) ──
-function PlanesView({ viaje, diasViaje, onChat }) {
+function PlanesView({ viaje, diasViaje, planesSinDia, onChat, onSubir, onBorrar, subiendo }) {
   const fmtDia = (d) => d.toLocaleDateString("es-CO", { weekday: "short" }).replace(".", "");
   const hoyISO = new Date().toISOString().slice(0, 10);
+  const totalPlanes = (diasViaje || []).reduce((n, d) => n + (d.planes ? d.planes.length : 0), 0) + (planesSinDia || []).length;
   return (
     <div className="no-scrollbar" style={{ flex: 1, overflowY: "auto", padding: "16px 14px", paddingBottom: 20 }}>
       <div style={{ fontSize: 19, fontWeight: 800, letterSpacing: "-0.02em" }}>Tu viaje día por día</div>
-      <div style={{ fontSize: 13, color: C.inkSoft, marginTop: 3 }}>{viaje.ciudad} · {(diasViaje || []).length} días</div>
+      <div style={{ fontSize: 13, color: C.inkSoft, marginTop: 3 }}>{viaje.ciudad} · {(diasViaje || []).length} días · {totalPlanes} {totalPlanes === 1 ? "plan" : "planes"}</div>
+
+      {/* CTA protagonista: subir reservas para llenar el itinerario */}
+      <button onClick={onSubir} disabled={subiendo} style={{ marginTop: 14, width: "100%", background: C.orange, color: "#fff", border: "none", borderRadius: 14, padding: "13px 14px", fontSize: 14, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, boxShadow: `0 6px 18px ${C.orange}33` }}>
+        <Icon name="doc" size={18} color="#fff" /> {subiendo ? "Leyendo tu reserva…" : "Subir una reserva (vuelo, hotel, tour…)"}
+      </button>
+      <div style={{ fontSize: 12, color: C.inkSoft, textAlign: "center", marginTop: 7, lineHeight: 1.45 }}>
+        Sube el PDF, foto o captura y yo lo desgloso en el día correcto.
+      </div>
 
       <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
         {(diasViaje || []).map((d, i) => {
           const esHoy = d.iso === hoyISO;
+          const tienePlanes = d.planes && d.planes.length;
           return (
             <div key={d.iso} style={{ display: "flex", gap: 12 }}>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 46, flexShrink: 0 }}>
@@ -1239,11 +1382,9 @@ function PlanesView({ viaje, diasViaje, onChat }) {
                 <div style={{ fontSize: 12, fontWeight: 700, color: esHoy ? C.orange : C.inkSoft }}>
                   {i === 0 ? "Llegada" : i === (diasViaje.length - 1) ? "Regreso" : `Día ${i + 1}`}{esHoy ? " · hoy" : ""}
                 </div>
-                {d.planes && d.planes.length
-                  ? <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 5 }}>
-                      {d.planes.map((p, k) => (
-                        <div key={k} style={{ fontSize: 13.5, color: C.ink, display: "flex", gap: 6, lineHeight: 1.4 }}><span style={{ color: C.orange }}>•</span><span>{p}</span></div>
-                      ))}
+                {tienePlanes
+                  ? <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 7 }}>
+                      {d.planes.map((p) => <PlanCard key={p.id} p={p} onBorrar={onBorrar} />)}
                     </div>
                   : <div style={{ marginTop: 6, fontSize: 13, color: C.inkSoft, fontStyle: "italic" }}>Sin planes aún</div>}
               </div>
@@ -1252,17 +1393,85 @@ function PlanesView({ viaje, diasViaje, onChat }) {
         })}
       </div>
 
+      {/* Planes sin fecha o fuera del rango: no se pierden */}
+      {planesSinDia && planesSinDia.length > 0 && (
+        <div style={{ marginTop: 18 }}>
+          <div style={{ fontSize: 11.5, fontWeight: 700, color: C.inkSoft, letterSpacing: "0.07em", margin: "0 2px 9px" }}>POR AGENDAR (sin fecha clara)</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+            {planesSinDia.map((p) => <PlanCard key={p.id} p={p} onBorrar={onBorrar} />)}
+          </div>
+        </div>
+      )}
+
       <button onClick={onChat} style={{ marginTop: 18, width: "100%", background: C.orangeSoft, border: `1px solid ${C.orange}55`, color: C.orangeDeep, borderRadius: 14, padding: "13px 0", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
         💬 Contarle un plan al Companion
       </button>
       <div style={{ fontSize: 12, color: C.inkSoft, textAlign: "center", marginTop: 10, lineHeight: 1.45 }}>
-        Cuéntale tus planes al Companion en el chat y aparecerán aquí, ordenados por día.
+        Cuéntale un plan en el chat o sube una reserva y aparecerá aquí, en su día y hora.
       </div>
     </div>
   );
 }
 
-// ── MÁS (info útil, documentos, ajustes) ──
+// ── Hoja de confirmación: "¿lo anoto en tu calendario?" ──
+function ConfirmarPlanesSheet({ data, onConfirmar, onCancelar }) {
+  const propuestos = data.planes || [];
+  const [sel, setSel] = React.useState(() => propuestos.map((_, i) => i));
+  const toggle = (i) => setSel((s) => s.includes(i) ? s.filter((x) => x !== i) : [...s, i]);
+  const elegidos = propuestos.filter((_, i) => sel.includes(i));
+  const fmtFecha = (f) => {
+    if (!f) return "Sin fecha";
+    try { return new Date(f + "T12:00:00").toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "short" }); }
+    catch (e) { return f; }
+  };
+  const titulo = data.fuente === "documento"
+    ? (propuestos.length === 1 ? "Encontré este plan en tu reserva" : `Encontré ${propuestos.length} planes en tu reserva`)
+    : (propuestos.length === 1 ? "¿Lo anoto en tu calendario?" : "¿Anoto estos planes?");
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 85, background: "rgba(0,0,0,.7)", display: "flex", alignItems: "flex-end" }} onClick={onCancelar}>
+      <div className="rise" onClick={(e) => e.stopPropagation()} style={{ width: "100%", background: C.card, borderRadius: "24px 24px 0 0", padding: "22px 20px calc(20px + env(safe-area-inset-bottom))", maxWidth: 480, margin: "0 auto", maxHeight: "82vh", overflowY: "auto" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 4 }}>
+          <Mark size={38} />
+          <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: "-0.02em", flex: 1 }}>{titulo}</div>
+        </div>
+        <div style={{ fontSize: 13, color: C.inkSoft, marginBottom: 14, lineHeight: 1.45 }}>
+          Toca para incluir o quitar. Solo guardo lo que elijas.
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+          {propuestos.map((p, i) => {
+            const on = sel.includes(i);
+            const meta = TIPO_PLAN[p.tipo] || TIPO_PLAN.otro;
+            return (
+              <button key={i} onClick={() => toggle(i)} style={{ textAlign: "left", display: "flex", gap: 11, alignItems: "flex-start", background: on ? C.orangeSoft : C.bg, border: `1.5px solid ${on ? C.orange : C.line}`, borderRadius: 13, padding: "12px 13px", cursor: "pointer" }}>
+                <div style={{ width: 22, height: 22, borderRadius: 7, background: on ? C.orange : "transparent", border: `1.5px solid ${on ? C.orange : C.line}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
+                  {on && <Icon name="check" size={14} color="#fff" />}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                    <Icon name={meta.icon} size={15} color={meta.color} />
+                    <span style={{ fontSize: 14, fontWeight: 700, color: C.ink, wordBreak: "break-word" }}>{p.titulo}</span>
+                  </div>
+                  <div style={{ fontSize: 12.5, color: C.inkSoft, marginTop: 3 }}>
+                    {fmtFecha(p.fecha)}{p.hora ? ` · ${p.hora}` : ""}{p.lugar ? ` · ${p.lugar}` : ""}
+                  </div>
+                  {p.detalle && <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 2, lineHeight: 1.4 }}>{p.detalle}</div>}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+          <button onClick={onCancelar} style={{ flex: 1, background: "none", border: `1px solid ${C.line}`, color: C.inkSoft, borderRadius: 14, padding: "14px 0", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>Ahora no</button>
+          <button onClick={() => onConfirmar(elegidos)} disabled={!elegidos.length} style={{ flex: 2, background: elegidos.length ? C.orange : C.line, color: elegidos.length ? "#fff" : C.inkSoft, border: "none", borderRadius: 14, padding: "14px 0", fontSize: 15, fontWeight: 800, cursor: elegidos.length ? "pointer" : "default" }}>
+            {elegidos.length > 1 ? `Agregar ${elegidos.length} al itinerario` : "Agregar a mi itinerario"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 function MasView({ viaje, docs, vozActiva, onToggleVoz, onUbicacion, onInfo, onDocs, onSOS, onTraductor, onReiniciar, onDev, debug, pushDisponible, pushOn, onTogglePush }) {
   const Item = ({ icon, label, sub, onClick, danger }) => (
     <button onClick={onClick} style={{ width: "100%", display: "flex", alignItems: "center", gap: 13, padding: "14px 14px", background: C.card, border: `1px solid ${C.line}`, borderRadius: 14, cursor: "pointer", textAlign: "left" }}>
