@@ -260,6 +260,117 @@ def norm_city(city: str) -> str:
     return s.strip().lower()
 
 
+def norm_place(name: str) -> str:
+    """Normaliza un nombre de lugar para matching robusto.
+
+    Quita tildes, pasa a minúsculas y elimina todo lo que no sea letra o
+    número (espacios, puntuación, etc.). Así 'El Cielo', 'ElCielo',
+    'El cielo' y 'el  cielo!' colapsan al mismo valor 'elcielo'.
+    """
+    s = unicodedata.normalize("NFKD", name or "").encode("ascii", "ignore").decode()
+    return "".join(ch for ch in s.lower() if ch.isalnum())
+
+
+# Palabras vacías que no aportan a la identidad del lugar (no usar para matching).
+# Incluye conectores, verbos de plan y categorías genéricas de lugar: dos sitios
+# distintos pueden compartir 'museo' o 'parque' sin ser el mismo lugar.
+_PLACE_STOPWORDS = {
+    # conectores / artículos / preposiciones
+    "el", "la", "los", "las", "de", "del", "en", "y", "a", "con", "para",
+    "un", "una", "al", "por",
+    # verbos / sustantivos de plan
+    "cena", "almuerzo", "desayuno", "comida", "visita", "visitar", "tour",
+    "paseo", "ir", "vamos", "plan", "reserva", "reservar", "entrada",
+    # ubicación genérica
+    "bogota", "bogotá", "colombia", "centro", "zona",
+    # categorías genéricas de lugar (no distinguen un sitio de otro)
+    "restaurante", "hotel", "bar", "cafe", "café", "coffee", "museo",
+    "parque", "plaza", "mercado", "teatro", "club", "mina", "sal",
+    "catedral", "iglesia", "cerro", "mirador", "tienda", "casa",
+    "senderismo", "nocturna", "vida", "roasters",
+}
+
+
+def place_tokens(name: str) -> set[str]:
+    """Tokens significativos de un nombre, normalizados y sin stopwords.
+
+    'Cena en ElCielo' -> {'elcielo'} ; 'El Cielo Bogotá' -> {'cielo'}.
+    Nota: 'ElCielo' (pegado) queda como un solo token, así que también se
+    añade la versión sin espacios del nombre completo para cruzarlo.
+    """
+    raw = unicodedata.normalize("NFKD", name or "").encode("ascii", "ignore").decode().lower()
+    palabras = "".join(ch if ch.isalnum() else " " for ch in raw).split()
+    toks = {w for w in palabras if w not in _PLACE_STOPWORDS and len(w) >= 3}
+    return toks
+
+
+def place_match_score(consulta: str, nombre_curado: str) -> float:
+    """Puntúa qué tan probable es que 'consulta' se refiera a 'nombre_curado'.
+
+    0.0 = sin relación. Valores mayores = match más fuerte. Pensado para
+    elegir el MEJOR lugar entre varios candidatos (no el primero que pase),
+    lo que evita falsos positivos por palabras compartidas genéricas.
+
+    Robusto a tildes, mayúsculas, espacios y palabras de relleno:
+    'el cielo', 'ElCielo', 'Cena en El Cielo' puntúan alto contra
+    'El Cielo Bogotá'.
+    """
+    a, b = norm_place(consulta), norm_place(nombre_curado)
+    if not a or not b:
+        return 0.0
+    # Igualdad exacta de la cadena completa normalizada -> match perfecto.
+    if a == b:
+        return 1.0
+
+    ta, tb = place_tokens(consulta), place_tokens(nombre_curado)
+    if not ta or not tb:
+        # Sin tokens distintivos (solo categorías genéricas); apóyate en
+        # contención de cadena completa, exigiendo solape sustancial.
+        if len(a) >= 5 and (a in b or b in a):
+            return 0.6
+        return 0.0
+
+    # Solape de tokens distintivos. Puntuamos por cobertura simétrica: cuánto
+    # de la consulta Y del nombre curado cubren los tokens comunes. Así, ante
+    # un token compartido ambiguo ('bolivar'), gana el candidato cuyo conjunto
+    # de tokens queda más completamente cubierto por la consulta.
+    comunes = ta & tb
+    if comunes:
+        cob_consulta = len(comunes) / len(ta)
+        cob_curado = len(comunes) / len(tb)
+        return 0.5 + 0.5 * (cob_consulta + cob_curado) / 2
+
+    # Token pegado del usuario que contiene exactamente un token distintivo
+    # del nombre curado: 'elcielo' contiene 'cielo'. Exige >=4 chars.
+    for x in ta:
+        for y in tb:
+            if len(y) >= 4 and y in x:
+                return 0.55
+            if len(x) >= 4 and x in y:
+                return 0.55
+    return 0.0
+
+
+def best_place_match(consulta: str, places: list[dict], minimo: float = 0.5) -> dict | None:
+    """Devuelve el lugar curado que mejor coincide con 'consulta', o None.
+
+    Recorre todos los candidatos y elige el de mayor puntuación, siempre que
+    supere el umbral. Así 'Cena en El Cielo' resuelve a 'El Cielo Bogotá' y no
+    al primer lugar que comparta una palabra genérica.
+    """
+    mejor, mejor_score = None, 0.0
+    for p in places:
+        s = place_match_score(consulta, p.get("name", ""))
+        if s > mejor_score:
+            mejor, mejor_score = p, s
+    return mejor if mejor_score >= minimo else None
+
+
+def place_matches(consulta: str, nombre_curado: str) -> bool:
+    """Compat: ¿coinciden estos dos nombres? Umbral por defecto 0.5."""
+    return place_match_score(consulta, nombre_curado) >= 0.5
+
+
 def places_for_city(city: str) -> list[dict]:
     with conn() as c:
         rs = c.execute(
@@ -270,21 +381,33 @@ def places_for_city(city: str) -> list[dict]:
 
 
 def seed_destination_places(places: list[dict]):
-    """Idempotente: si ya hay lugares para esa ciudad, no vuelve a insertar."""
+    """Reconcilia la curación: inserta los lugares que falten, sin duplicar.
+
+    Antes saltaba por completo si ya existía cualquier lugar de la ciudad, lo
+    que dejaba bases viejas con curaciones parciales (p. ej. 37 de 77 lugares).
+    Ahora compara por nombre normalizado e inserta solo los que faltan. Es
+    idempotente y seguro: solo toca destination_places, nunca trips ni planes.
+    """
     if not places:
         return
     city = norm_city(places[0]["city_display"])
     with conn() as c:
-        existing = c.execute("SELECT COUNT(*) n FROM destination_places WHERE city=?", (city,)).fetchone()["n"]
-        if existing:
-            return
+        existentes = {
+            norm_place(r["name"])
+            for r in c.execute(
+                "SELECT name FROM destination_places WHERE city=?", (city,)
+            ).fetchall()
+        }
         for p in places:
+            if norm_place(p["name"]) in existentes:
+                continue
             c.execute(
                 "INSERT INTO destination_places (id, city, city_display, name, category, zona, lat, lng, descripcion, confianza, maps_query, created_at) "
                 "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                 (new_id(), norm_city(p["city_display"]), p["city_display"], p["name"], p["category"],
                  p["zona"], p["lat"], p["lng"], p["descripcion"], p["confianza"], p.get("maps_query"), now()),
             )
+            existentes.add(norm_place(p["name"]))
 
 
 # ── Dedup de /nearby: no repetir los mismos lugares dentro de la ventana ──

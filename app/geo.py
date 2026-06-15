@@ -37,14 +37,15 @@ def maps_link(lat: float, lng: float, mode: str = "walking",
              maps_query: str | None = None) -> str:
     """Deep link de Google Maps hacia el lugar curado.
 
-    Usa el formato que funciona tanto en navegador como abriendo la app nativa
-    en iOS y Android. El parámetro api=1 es solo para la JS API embebida y
-    causa "unsupported link" en móvil — no se usa aquí.
+    Usa el formato oficial de Google Maps URLs (maps/search/?api=1&query=...),
+    que funciona en navegador y abre la app nativa en iOS y Android. Todos los
+    valores van URL-encoded para evitar el error "unsupported link".
     """
     if maps_query:
         q = urllib.parse.quote(maps_query)
-        return f"https://maps.google.com/?q={q}"
-    return f"https://maps.google.com/?q={lat},{lng}"
+    else:
+        q = urllib.parse.quote(f"{lat},{lng}")
+    return f"https://www.google.com/maps/search/?api=1&query={q}"
 
 
 def maps_link_from_to(
@@ -64,17 +65,22 @@ def maps_link_from_to(
     # Destino: preferimos lat,lng exacto (más preciso) sobre el nombre
     if dest_lat and dest_lng:
         dest = f"{dest_lat},{dest_lng}"
-    elif maps_query:
-        dest = urllib.parse.quote(maps_query)
     else:
-        dest = urllib.parse.quote(maps_query or "")
+        dest = maps_query or ""
 
     if orig_lat is not None and orig_lng is not None:
-        orig = f"{orig_lat},{orig_lng}"
-        return f"https://www.google.com/maps/dir/{orig}/{dest}"
+        # Formato oficial de Google Maps URLs: parámetros de query con encoding.
+        # Funciona en navegador y abre la app nativa en Android/iOS.
+        params = {
+            "api": "1",
+            "origin": f"{orig_lat},{orig_lng}",
+            "destination": dest,
+            "travelmode": mode,
+        }
+        return "https://www.google.com/maps/dir/?" + urllib.parse.urlencode(params)
 
     # Sin origen: abrir el lugar directamente (Maps detecta ubicación actual)
-    return f"https://maps.google.com/?q={dest}&zoom=16"
+    return f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote(dest)}"
 
 
 # Referencias de zona por ciudad — misma granularidad que zona_actual del

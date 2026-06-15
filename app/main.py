@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from . import context, db, engine, llm, push, scheduler, search, seed_data, watchers
+from . import context, db, engine, geo, llm, push, scheduler, search, seed_data, watchers
 
 app = FastAPI(title="Voyra Companion", version="0.1.0")
 
@@ -197,11 +197,10 @@ def plan_maps_link(tid: str, plan_id: str,
     city = trip.get("ciudad", "")
     dest_lat, dest_lng = None, None
     lugar_nombre = plan.get("lugar") or plan.get("titulo") or ""
-    lugar_lower = lugar_nombre.strip().lower()
-    for p in db.places_for_city(city):
-        if lugar_lower in p["name"].lower() or p["name"].lower() in lugar_lower:
-            dest_lat, dest_lng = p["lat"], p["lng"]
-            break
+    if lugar_nombre.strip():
+        match = db.best_place_match(lugar_nombre, db.places_for_city(city))
+        if match:
+            dest_lat, dest_lng = match["lat"], match["lng"]
 
     # Origen: parámetros de query > GPS guardado en trip > None
     olat = orig_lat or trip.get("lat_actual")
@@ -217,9 +216,12 @@ def plan_maps_link(tid: str, plan_id: str,
     else:
         # Lugar no curado: buscamos por nombre en Maps
         fallback_query = f"{lugar_nombre} {city}".strip()
-        link = geo.maps_link_from_to(olat, olng, 0, 0, mode=mode,
-                                      maps_query=fallback_query) if not (olat and olng) else \
-               f"https://maps.google.com/?q={urllib.parse.quote(fallback_query)}"
+        if olat and olng:
+            # Con origen: ruta desde la ubicación actual hacia el destino por nombre
+            link = geo.maps_link_from_to(olat, olng, 0, 0, mode=mode,
+                                         maps_query=fallback_query)
+        else:
+            link = f"https://maps.google.com/?q={urllib.parse.quote(fallback_query)}"
 
     minutos = geo.travel_minutes(dist_km, city) if dist_km else None
 

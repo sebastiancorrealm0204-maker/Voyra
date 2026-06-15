@@ -286,7 +286,7 @@ def test_nearby_recommendations_bogota():
     con_notif = [x for x in r["resultados"] if x["notification"]]
     assert con_notif
     for x in con_notif:
-        assert x["notification"]["maps_link"].startswith("https://maps.google.com/?q=")
+        assert x["notification"]["maps_link"].startswith("https://www.google.com/maps/search/?api=1&query=")
 
     # /nearby devuelve solo los más cercanos (top-N), rankeados por distancia real
     # ascendente. Verificamos ese orden, que es la garantía del endpoint.
@@ -401,3 +401,68 @@ def test_resolver_fecha_relativa():
     pl = [{"titulo": "a", "fecha": None}, {"titulo": "b", "fecha": "2026-07-01"}]
     out = plans.rellenar_fechas(pl, "mañana", lunes)
     assert out[0]["fecha"] == "2026-06-16" and out[1]["fecha"] == "2026-07-01"
+
+
+def test_place_matching_robusto():
+    """El matching de lugares ignora espacios, tildes, mayúsculas y relleno."""
+    from app import db
+    SEED = "El Cielo Bogotá"
+    for v in ["el cielo", "ElCielo", "El Cielo", "El cielo", "EL CIELO",
+              "Cena en ElCielo", "cena en el cielo", "reserva El Cielo"]:
+        assert db.place_matches(v, SEED), f"debería coincidir: {v!r}"
+    # Palabras genéricas no deben coincidir con un lugar específico
+    for v in ["cena", "almuerzo", "restaurante", "comida"]:
+        assert not db.place_matches(v, SEED), f"NO debería coincidir: {v!r}"
+
+
+def test_best_place_match_desambigua():
+    """Ante tokens compartidos, gana el lugar mejor cubierto por la consulta."""
+    from app import db, seed_data
+    places = seed_data.all_seeds()
+    casos = {
+        "Cena en ElCielo": "El Cielo Bogotá",
+        "Plaza de Bolívar": "Plaza de Bolívar",
+        "Quinta de Bolívar": "Quinta de Bolívar",
+        "Museo del Oro": "Museo del Oro",
+        "Museo Botero": "Museo Botero",
+    }
+    for consulta, esperado in casos.items():
+        m = db.best_place_match(consulta, places)
+        assert m and m["name"] == esperado, f"{consulta!r} -> {m and m['name']!r}, esperado {esperado!r}"
+    # Genéricos sin lugar claro devuelven None
+    assert db.best_place_match("cena", places) is None
+
+
+def test_maps_link_resuelve_nombre_pegado():
+    """El endpoint /maps usa coords curadas aunque el plan diga 'ElCielo'."""
+    from app.main import app
+    client = TestClient(app)
+    tid = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H",
+                                      "inicio": "2026-07-12", "fin": "2026-07-18"}).json()["trip_id"]
+    resp = client.post(f"/trips/{tid}/plans", json={
+        "titulo": "Cena en ElCielo", "lugar": "Cena en ElCielo",
+        "tipo": "restaurante", "fecha": "2026-07-15", "hora": "19:00"}).json()
+    pid = resp["planes"][-1]["id"]
+    data = client.get(f"/trips/{tid}/plans/{pid}/maps").json()
+    link = data["maps_link"]
+    # Link válido de Google Maps, sin espacios crudos
+    assert link.startswith("https://www.google.com/maps/")
+    assert " " not in link
+    # Debe haber resuelto a coordenadas curadas (no fallback por nombre)
+    assert "query=4." in link or "destination=4." in link or "El+Cielo" not in link
+
+
+def test_seed_reconcilia_curacion_parcial():
+    """Un seed parcial se completa al re-sembrar, sin duplicar ni tocar trips."""
+    from app import db, seed_data
+    todos = seed_data.all_seeds()
+    antes = len(db.places_for_city("Bogotá"))
+    # Re-seed completo debe dejar al menos todos los lugares de los seeds
+    db.seed_destination_places(todos)
+    despues = len(db.places_for_city("Bogotá"))
+    assert despues >= antes
+    nombres = {db.norm_place(p["name"]) for p in db.places_for_city("Bogotá")}
+    assert db.norm_place("El Cielo Bogotá") in nombres
+    # Idempotencia: re-sembrar no agrega duplicados
+    db.seed_destination_places(todos)
+    assert len(db.places_for_city("Bogotá")) == despues

@@ -46,13 +46,14 @@ def _disparar(trip_id: str, kind: str, local_date: str, fn) -> None:
 
 def _plan_coords(plan: dict, city: str) -> tuple[float | None, float | None]:
     """Busca las coordenadas del lugar del plan en destination_places (curación).
-    Primero por nombre exacto (case-insensitive), luego coincidencia parcial."""
-    lugar = (plan.get("lugar") or plan.get("titulo") or "").strip().lower()
+    El matching normaliza tildes, mayúsculas y espacios, así que 'ElCielo',
+    'El Cielo' y 'el cielo' se resuelven al mismo lugar."""
+    lugar = (plan.get("lugar") or plan.get("titulo") or "").strip()
     if not lugar:
         return None, None
-    for p in db.places_for_city(city):
-        if lugar in p["name"].lower() or p["name"].lower() in lugar:
-            return p["lat"], p["lng"]
+    match = db.best_place_match(lugar, db.places_for_city(city))
+    if match:
+        return match["lat"], match["lng"]
     return None, None
 
 
