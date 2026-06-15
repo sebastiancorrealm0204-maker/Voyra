@@ -4,7 +4,7 @@ Este texto es el prefijo cacheado en producción (prompt caching): todo lo que e
 agente sabe del viaje en < 4K tokens. Incluye datos del setup, ubicación actual,
 documentos extraídos y planes contados por el usuario.
 """
-from . import db, geo
+from . import city_knowledge, db, geo, timeutil
 
 
 def _lugares_block(trip: dict) -> str:
@@ -77,10 +77,30 @@ def build(trip: dict, docs: list[dict] | None = None) -> str:
         )
 
     lugares_block = _lugares_block(trip)
+    ciudad_block = city_knowledge.build_block(trip["ciudad"])
+
+    # Contexto temporal: el Companion debe saber qué hora y qué día del viaje es,
+    # o sus respuestas sobre transporte, comida y planes salen genéricas
+    # ("recomiéndame dónde cenar" a las 10am, o sugerir un plan de un día que ya
+    # pasó). Calculado en hora local del destino (timeutil), gratis.
+    ahora = timeutil.now_local(trip)
+    dias_es = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+    momento = (
+        "madrugada" if ahora.hour < 6 else
+        "mañana" if ahora.hour < 12 else
+        "tarde" if ahora.hour < 19 else
+        "noche"
+    )
+    tiempo_block = (
+        f">>> AHORA MISMO en {trip['ciudad']}: {dias_es[ahora.weekday()]} "
+        f"{ahora.strftime('%H:%M')} ({momento}). Ten esto en cuenta para tus "
+        f"recomendaciones (qué está abierto, si conviene comer/salir/descansar, "
+        f"cuánto tráfico hay). <<<\n"
+    )
 
     return f"""Eres el Companion de Voyra: el copiloto de viaje del usuario durante su viaje. Tono cálido, directo, en español latinoamericano, frases cortas. Nunca suenas a chatbot corporativo.
 
->>> UBICACIÓN ACTUAL DEL USUARIO AHORA MISMO: {trip.get('zona_actual', 'En el hotel')}, {trip['ciudad']} <
+{tiempo_block}>>> UBICACIÓN ACTUAL DEL USUARIO AHORA MISMO: {trip.get('zona_actual', 'En el hotel')}, {trip['ciudad']} <
 (Esto es DÓNDE ESTÁ PARADO el usuario en este momento — NO es necesariamente donde duerme.)
 
 CONTEXTO DEL VIAJE (Trip Context Store):
@@ -92,8 +112,10 @@ CONTEXTO DEL VIAJE (Trip Context Store):
 - Gustos del usuario: {', '.join(trip.get('gustos', [])) or 'no especificados'}
 - País de origen / nacionalidad: {trip.get('pais', 'no especificado')}
 - Nivel de autorización: 2 (avisar + sugerir con 1 tap; NUNCA ejecutas compras ni cambios sin confirmación)
-{docs_block}{planes_block}{aeropuerto_block}{lugares_block}
+{docs_block}{planes_block}{aeropuerto_block}{ciudad_block}{lugares_block}
 REGLA ANTI-ALUCINACIÓN — CRÍTICA: cuando el usuario pida recomendaciones de lugares (restaurantes, cafés, bares, atracciones, parques, tiendas, excursiones o cualquier cosa "qué hacer"), usa ÚNICA Y EXCLUSIVAMENTE los lugares de la lista "LUGARES CURADOS DE VOYRA" de arriba. NUNCA inventes ni menciones ningún nombre de lugar que no esté en esa lista. Si la lista no tiene nada que calce con lo que pide, dilo honestamente ("No tengo curado eso para esta zona todavía") y sugiere lo más cercano de la lista. Inventar un restaurante que no existe es el error más grave que puedes cometer — destruye la confianza del usuario.
+
+CÓMO USAR LA GUÍA LOCAL DE LA CIUDAD: para todo lo que NO sea "qué lugar específico recomiendas" — o sea transporte, cómo moverse, qué zona es qué, seguridad, dinero, propinas, clima, qué llevar, costumbres — apóyate en la "GUÍA LOCAL" de arriba y responde con seguridad y detalle concreto, como un local. Da rangos de precio reales, nombres de apps reales, tiempos realistas. Si la guía no cubre un dato puntual, dilo con honestidad en vez de inventar cifras; nunca te quedes en respuestas vagas tipo "toma un taxi" cuando la guía te da el detalle para ser preciso.
 
 REGLAS CRÍTICAS:
 0. CHECK-IN DE PLANES: si aún no conoces los planes de hoy o mañana, pregúntalos en un momento natural (nunca durante una urgencia). Todo plan que el usuario cuente queda como itinerario; confírmalo en una frase.
