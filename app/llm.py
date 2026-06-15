@@ -237,23 +237,47 @@ def chat(system: str, history: list[dict]) -> str:
 
 
 # ── Extracción de documentos y planes (tarea barata → DeepSeek/Groq) ──
+_DIAS_ES = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+
+
 def _trip_ctx_block(trip: dict | None) -> str:
-    """Da al extractor el rango de fechas y el 'hoy' para que pueda resolver
-    referencias relativas ('el viernes', 'mañana') a una fecha real YYYY-MM-DD."""
+    """Da al extractor referencias de fecha YA RESUELTAS (hoy, mañana, y los
+    próximos días de la semana con su fecha) para que solo tenga que copiar la
+    fecha correcta en vez de calcularla. Resolver fechas relativas es donde más
+    fallan los modelos pequeños, así que se lo damos hecho."""
     if not trip:
         return ""
+    from datetime import timedelta
     from . import timeutil
     try:
-        hoy = timeutil.now_local(trip).strftime("%Y-%m-%d")
+        ahora = timeutil.now_local(trip)
     except Exception:
-        hoy = ""
+        ahora = None
+    if ahora is None:
+        return (
+            f"\nCONTEXTO DEL VIAJE:\n- Ciudad: {trip.get('ciudad', '')}\n"
+            f"- El viaje va del {trip.get('inicio', '?')} al {trip.get('fin', '?')}\n"
+            "Si una fecha es relativa y no puedes resolverla, deja fecha en null.\n"
+        )
+    hoy = ahora.date()
+    manana = hoy + timedelta(days=1)
+    # mapa de los próximos 7 días: nombre del día → fecha
+    proximos = []
+    for i in range(0, 8):
+        d = hoy + timedelta(days=i)
+        nombre = _DIAS_ES[d.weekday()]
+        etiqueta = "HOY" if i == 0 else ("MAÑANA" if i == 1 else f"próximo {nombre}")
+        proximos.append(f"  · {etiqueta} = {d.isoformat()} ({nombre})")
+    tabla = "\n".join(proximos)
     return (
-        f"\nCONTEXTO DEL VIAJE (para resolver fechas relativas):\n"
-        f"- Ciudad: {trip.get('ciudad', '')}\n"
+        f"\nCONTEXTO DEL VIAJE Y FECHAS (úsalas para resolver referencias relativas):\n"
+        f"- Ciudad destino: {trip.get('ciudad', '')}\n"
         f"- El viaje va del {trip.get('inicio', '?')} al {trip.get('fin', '?')}\n"
-        f"- HOY es {hoy} (hora local del destino)\n"
-        "Si el texto dice 'mañana', 'el viernes', etc., conviértelo a una fecha "
-        "YYYY-MM-DD DENTRO del rango del viaje. Si no puedes determinar la fecha, deja fecha en null.\n"
+        f"- Fecha y hora local AHORA: {ahora.strftime('%Y-%m-%d %H:%M')}\n"
+        f"- Tabla de equivalencias (NOMBRE = FECHA):\n{tabla}\n"
+        "REGLA OBLIGATORIA: si el texto dice 'hoy', 'mañana', 'el viernes', 'este sábado', etc., "
+        "USA la fecha exacta de la tabla de arriba. 'mañana' SIEMPRE es " + manana.isoformat() + ". "
+        "Solo deja fecha en null si NO hay ninguna pista temporal en el texto.\n"
     )
 
 

@@ -385,3 +385,19 @@ def test_doc_devuelve_planes_propuestos():
     r = client.post(f"/trips/{tid}/documents", json={"filename": "vuelo.txt",
                                                      "text_content": "Vuelo AV245 13 jul 8am"}).json()
     assert "planes_propuestos" in r
+
+
+def test_resolver_fecha_relativa():
+    from app import plans
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    lunes = datetime(2026, 6, 15, 12, 0, tzinfo=ZoneInfo("America/Bogota"))
+    assert plans.resolver_fecha_relativa("mañana cena", lunes) == "2026-06-16"
+    assert plans.resolver_fecha_relativa("el viernes tour", lunes) == "2026-06-19"
+    assert plans.resolver_fecha_relativa("hoy", lunes) == "2026-06-15"
+    assert plans.resolver_fecha_relativa("pasado mañana", lunes) == "2026-06-17"
+    assert plans.resolver_fecha_relativa("comer algo", lunes) is None
+    # rellenar solo toca los que no tienen fecha
+    pl = [{"titulo": "a", "fecha": None}, {"titulo": "b", "fecha": "2026-07-01"}]
+    out = plans.rellenar_fechas(pl, "mañana", lunes)
+    assert out[0]["fecha"] == "2026-06-16" and out[1]["fecha"] == "2026-07-01"

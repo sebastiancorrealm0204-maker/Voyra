@@ -147,3 +147,49 @@ def resumen_para_prompt(planes: list[dict]) -> str:
         lugar = f" @ {p['lugar']}" if p.get("lugar") else ""
         lineas.append(f"- [{cuando}] {p['titulo']} ({p['tipo']}){lugar}{extra}")
     return "\n".join(lineas)
+
+
+# ── Red de seguridad: resolver fechas relativas en backend ──
+_DIAS_ES = {
+    "lunes": 0, "martes": 1, "miercoles": 2, "miércoles": 2, "jueves": 3,
+    "viernes": 4, "sabado": 5, "sábado": 5, "domingo": 6,
+}
+
+
+def resolver_fecha_relativa(texto: str, ahora) -> str | None:
+    """Dado un texto y la fecha/hora local actual (datetime), intenta deducir
+    una fecha YYYY-MM-DD a partir de 'hoy', 'mañana', 'pasado mañana' o un día
+    de la semana ('el viernes'). Devuelve None si no hay pista clara.
+
+    Es una RED DE SEGURIDAD para cuando el LLM no resuelve la fecha él mismo.
+    """
+    if not texto or ahora is None:
+        return None
+    from datetime import timedelta
+    t = texto.lower()
+    hoy = ahora.date()
+    if "pasado mañana" in t or "pasado manana" in t:
+        return (hoy + timedelta(days=2)).isoformat()
+    if "mañana" in t or "manana" in t:
+        return (hoy + timedelta(days=1)).isoformat()
+    if "hoy" in t or "esta noche" in t or "más tarde" in t or "mas tarde" in t:
+        return hoy.isoformat()
+    # día de la semana: "el viernes", "este sábado" → el próximo que caiga
+    for nombre, wd in _DIAS_ES.items():
+        if nombre in t:
+            delta = (wd - hoy.weekday()) % 7
+            if delta == 0:
+                delta = 7  # "el viernes" dicho un viernes = el siguiente
+            return (hoy + timedelta(days=delta)).isoformat()
+    return None
+
+
+def rellenar_fechas(planes: list[dict], texto: str, ahora) -> list[dict]:
+    """Para los planes sin fecha, intenta deducirla del texto de origen."""
+    fecha = resolver_fecha_relativa(texto, ahora)
+    if not fecha:
+        return planes
+    for p in planes:
+        if not p.get("fecha"):
+            p["fecha"] = fecha
+    return planes

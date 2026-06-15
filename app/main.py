@@ -303,9 +303,16 @@ def chat(tid: str, c: ChatIn):
     propuestas = []
     # Los mensajes entre corchetes son taps de notificaciones, no planes.
     if not c.message.strip().startswith("["):
-        from . import plans as plans_mod
+        from . import plans as plans_mod, timeutil
         propuestas = plans_mod.normalizar_lista(
             llm.extract_plans_from_chat(c.message, trip), origen="chat")
+        # Red de seguridad: si el LLM no puso fecha pero el mensaje dice
+        # "mañana", "el viernes", etc., la deducimos aquí.
+        try:
+            ahora = timeutil.now_local(trip)
+            propuestas = plans_mod.rellenar_fechas(propuestas, c.message, ahora)
+        except Exception:
+            pass
     return {"reply": reply, "planes_propuestos": propuestas}
 
 
