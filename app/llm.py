@@ -263,12 +263,22 @@ _EXTRACT_SCHEMA = (
     '  "tipo": "<hotel|vuelo|actividad|restaurante|transporte|otro>",\n'
     '  "resumen": "<2-4 frases con todos los datos concretos: nombres, códigos, direcciones, precios>",\n'
     '  "confirmacion": "<máx 2 frases cálidas confirmando qué entendiste>",\n'
+    '  "trip_info": {\n'
+    '    "ciudad": "<ciudad DESTINO del viaje, o null>",\n'
+    '    "hotel": "<nombre del alojamiento, o null>",\n'
+    '    "inicio": "<YYYY-MM-DD fecha de llegada/inicio del viaje, o null>",\n'
+    '    "fin": "<YYYY-MM-DD fecha de regreso/fin, o null>",\n'
+    '    "vuelo_ida": "<código del vuelo de ida, ej AV245, o null>",\n'
+    '    "vuelo_regreso": "<código del vuelo de regreso, o null>"\n'
+    '  },\n'
     '  "planes": [\n'
     '    {"fecha": "YYYY-MM-DD o null", "hora": "HH:MM o null", "titulo": "<corto>", '
     '"tipo": "<vuelo|hotel|actividad|restaurante|transporte|otro>", '
     '"detalle": "<datos útiles: código, dirección, terminal, etc.>", "lugar": "<nombre del lugar o null>"}\n'
     '  ]\n'
     '}\n'
+    'En "trip_info" deduce los datos GENERALES del viaje SOLO si el documento los revela claramente '
+    '(la ciudad destino, el hotel, las fechas del viaje, los vuelos). Si un dato no aparece, déjalo null. '
     'En "planes" pon UNA entrada por cada cosa con fecha/hora reservada (un vuelo = un plan con su fecha y hora; '
     'una estadía de hotel = un plan el día del check-in; un tour = un plan; una cena = un plan). '
     'Si el documento no contiene nada agendable, deja "planes" como lista vacía [].'
@@ -280,13 +290,16 @@ def _safe_extract(raw: str, filename: str) -> dict:
         out = _parse_json(raw)
     except Exception:
         return {"tipo": "otro", "resumen": f"Documento {filename} (no pude estructurarlo del todo).",
-                "confirmacion": f"Guardé {filename} en tu viaje ✓", "planes": []}
+                "confirmacion": f"Guardé {filename} en tu viaje ✓", "planes": [], "trip_info": {}}
     out.setdefault("tipo", "otro")
     out.setdefault("resumen", f"Extraído de {filename}")
     out.setdefault("confirmacion", f"Leí {filename} y lo anoté ✓")
     out.setdefault("planes", [])
+    out.setdefault("trip_info", {})
     if not isinstance(out["planes"], list):
         out["planes"] = []
+    if not isinstance(out["trip_info"], dict):
+        out["trip_info"] = {}
     return out
 
 
@@ -296,6 +309,7 @@ def extract_document(text_content: str, filename: str, trip: dict | None = None)
         return {"tipo": "actividad",
                 "resumen": f"[demo] Extraído de {filename}: {text_content[:120]}",
                 "confirmacion": f"Leí tu documento {filename} y lo anoté en tu viaje ✓",
+                "trip_info": {},
                 "planes": [{"fecha": None, "hora": None, "titulo": f"[demo] {filename}",
                             "tipo": "otro", "detalle": text_content[:80], "lugar": None}]}
     prompt = (
@@ -315,6 +329,7 @@ def extract_document_image(image_data_url: str, filename: str, trip: dict | None
         return {"tipo": "otro",
                 "resumen": f"[demo] Imagen {filename} recibida (sin modelo de visión configurado).",
                 "confirmacion": f"Recibí tu imagen {filename} ✓",
+                "trip_info": {},
                 "planes": []}
     prompt = (
         f"Esta imagen es una reserva/confirmación de viaje del usuario ({filename}). "

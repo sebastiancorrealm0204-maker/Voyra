@@ -76,6 +76,15 @@ const api = {
     if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
     return r.json();
   },
+  patch: async (path, body) => {
+    const r = await fetch(`${API}${path}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+    return r.json();
+  },
 };
 
 const DEBUG = new URLSearchParams(window.location.search).has("debug");
@@ -387,6 +396,9 @@ function VoyraCompanion() {
   const [log, setLog] = useState([]);        // solo dev
   const [sheet, setSheet] = useState(null);   // null|'menu'|'location'|'dev'
   const [paso, setPaso] = useState(1);         // paso del onboarding
+  const [modoSetup, setModoSetup] = useState(null);  // null (elige) | 'manual' | 'subir'
+  const [subiendoOnb, setSubiendoOnb] = useState(false); // subiendo reservas en onboarding
+  const [docsOnb, setDocsOnb] = useState([]);            // reservas subidas en onboarding
   const [airport, setAirport] = useState(null);   // datos del modo aeropuerto
   const [airportOpen, setAirportOpen] = useState(false);
   // Navegación por pestañas + secciones nuevas (Punto 3 UI)
@@ -402,6 +414,7 @@ function VoyraCompanion() {
 
   const recRef = useRef(null);
   const fileRef = useRef(null);
+  const onbFileRef = useRef(null);
   const scrollRef = useRef(null);
 
   useEffect(() => {
@@ -698,7 +711,7 @@ function VoyraCompanion() {
   };
 
   const reiniciar = () => {
-    setSheet(null); setFase("setup"); setPaso(1); setTripId(null); setStream([]); seqRef.current = 0;
+    setSheet(null); setFase("setup"); setPaso(1); setModoSetup(null); setSubiendoOnb(false); setDocsOnb([]); setTripId(null); setStream([]); seqRef.current = 0;
     setLog([]); setPushUsados(0); setUbicacion("En el hotel"); setZonaActual("En el hotel");
     setGpsEstado("inactivo"); setDocs([]); setPlanes([]); setPlanesPropuestos(null); setVozActiva(false); setCargandoCerca(false); setEscaneando(false);
   };
@@ -755,30 +768,110 @@ function VoyraCompanion() {
           style={{ width: "100%", minWidth: 0, border: `1px solid ${C.line}`, borderRadius: 12, padding: type === "date" ? "12px 10px" : "12px 14px", marginTop: 5, fontSize: type === "date" ? 14.5 : 16, background: C.bg, color: C.ink, outline: "none", boxSizing: "border-box", WebkitAppearance: "none", appearance: "none" }} />
       </div>
     );
+    // Helper compartido: una vez creado el viaje, entra a la app.
+    const entrarApp = (data) => {
+      setTripId(data.trip_id);
+      if (data.greeting) appendStream({ type: "companion", texto: data.greeting });
+      if (data.trip) setViaje((v) => ({
+        ...v,
+        ciudad: data.trip.ciudad || v.ciudad,
+        hotel: data.trip.hotel || v.hotel,
+        inicio: data.trip.inicio || v.inicio,
+        fin: data.trip.fin || v.fin,
+        vueloIda: data.trip.vuelo_ida || v.vueloIda,
+        vueloRegreso: data.trip.vuelo_regreso || v.vueloRegreso,
+      }));
+      cargarPlanes(data.trip_id);
+      setTab("inicio");
+      setGuiaVista(true);
+      setFase("agente");
+      (async () => {
+        try {
+          if (!pushSupported()) return;
+          const pk = await api.get("/push/public-key");
+          if (pk.enabled) {
+            setPushDisponible(true);
+            const reg = await navigator.serviceWorker.ready;
+            const sub = await reg.pushManager.getSubscription();
+            setPushOn(!!sub && Notification.permission === "granted");
+          }
+        } catch (e) {}
+      })();
+    };
+
     const activar = async () => {
       try {
         const data = await api.post("/trips", { ciudad: viaje.ciudad.trim(), hotel: viaje.hotel.trim(), inicio: viaje.inicio, fin: viaje.fin, vuelo_ida: viaje.vueloIda.trim(), vuelo_regreso: viaje.vueloRegreso.trim(), pais: viaje.pais.trim() || "Colombia", gustos: viaje.gustos });
-        setTripId(data.trip_id);
-        appendStream({ type: "companion", texto: data.greeting });
-        cargarPlanes(data.trip_id);
-        setTab("inicio");
-        setGuiaVista(true);
-        setFase("agente");
-        // ¿El navegador soporta push y el backend tiene VAPID? Para ofrecerlo.
-        (async () => {
-          try {
-            if (!pushSupported()) return;
-            const pk = await api.get("/push/public-key");
-            if (pk.enabled) {
-              setPushDisponible(true);
-              const reg = await navigator.serviceWorker.ready;
-              const sub = await reg.pushManager.getSubscription();
-              setPushOn(!!sub && Notification.permission === "granted");
-            }
-          } catch (e) {}
-        })();
+        entrarApp(data);
       } catch (e) {
         alert("No pude conectar con tu Companion. Revisa que el backend esté arriba.");
+      }
+    };
+
+    // ── Camino "subir reservas": crea viaje en blanco si no existe y sube cada archivo ──
+    const asegurarViaje = async () => {
+      if (tripId) return tripId;
+      const data = await api.post("/trips", { pais: viaje.pais.trim() || "Colombia", gustos: viaje.gustos });
+      setTripId(data.trip_id);
+      return data.trip_id;
+    };
+
+    const subirReservaOnb = async (file) => {
+      if (!file) return;
+      const nombre = file.name.toLowerCase();
+      const esPDF = file.type === "application/pdf" || nombre.endsWith(".pdf");
+      const esImg = file.type.startsWith("image/") || /\.(png|jpe?g|webp|heic|gif)$/.test(nombre);
+      const esTexto = file.type === "text/plain" || nombre.endsWith(".txt");
+      if (!esPDF && !esImg && !esTexto) {
+        setDocsOnb((d) => [...d, { nombre: file.name, error: "Formato no soportado (usa PDF, imagen o .txt)" }]);
+        return;
+      }
+      setSubiendoOnb(true);
+      try {
+        const tid = await asegurarViaje();
+        let body = { filename: file.name };
+        if (esPDF) body.pdf_data_url = await leerArchivo(file, "dataurl");
+        else if (esImg) body.image_data_url = await leerArchivo(file, "dataurl");
+        else body.text_content = (await leerArchivo(file, "text")).slice(0, 7000);
+        const data = await api.post(`/trips/${tid}/documents`, body);
+        // refleja en el form lo que se extrajo del viaje
+        if (data.trip) setViaje((v) => ({
+          ...v,
+          ciudad: v.ciudad || data.trip.ciudad || "",
+          hotel: v.hotel || data.trip.hotel || "",
+          inicio: v.inicio || data.trip.inicio || "",
+          fin: v.fin || data.trip.fin || "",
+          vueloIda: v.vueloIda || data.trip.vuelo_ida || "",
+          vueloRegreso: v.vueloRegreso || data.trip.vuelo_regreso || "",
+        }));
+        // guarda planes detectados directo (en onboarding no interrumpimos con la hoja)
+        const props = data.planes_propuestos || [];
+        if (props.length) { try { await api.post(`/trips/${tid}/plans/confirm`, { planes: props }); } catch (e) {} }
+        setDocsOnb((d) => [...d, { nombre: file.name, tipo: data.tipo, resumen: data.resumen, planes: props.length }]);
+      } catch (e) {
+        setDocsOnb((d) => [...d, { nombre: file.name, error: "No pude leerlo" }]);
+      }
+      setSubiendoOnb(false);
+    };
+
+    // Entrar tras subir reservas. Exige al menos ciudad + fechas (las completa el form si faltan).
+    const finalizarSubida = async () => {
+      try {
+        const tid = await asegurarViaje();
+        const patch = {};
+        if (viaje.ciudad.trim()) patch.ciudad = viaje.ciudad.trim();
+        if (viaje.hotel.trim()) patch.hotel = viaje.hotel.trim();
+        if (viaje.inicio) patch.inicio = viaje.inicio;
+        if (viaje.fin) patch.fin = viaje.fin;
+        if (viaje.vueloIda.trim()) patch.vuelo_ida = viaje.vueloIda.trim();
+        if (viaje.vueloRegreso.trim()) patch.vuelo_regreso = viaje.vueloRegreso.trim();
+        if (viaje.pais.trim()) patch.pais = viaje.pais.trim();
+        if (viaje.gustos.length) patch.gustos = viaje.gustos;
+        const trip = await api.patch(`/trips/${tid}`, patch);
+        await cargarPlanes(tid);
+        entrarApp({ trip_id: tid, trip, greeting: `Tu viaje a ${trip.ciudad || "tu destino"} está listo. Cualquier cosa, aquí estoy ✓` });
+      } catch (e) {
+        alert("No pude terminar de armar tu viaje. Revisa la conexión.");
       }
     };
 
@@ -786,30 +879,67 @@ function VoyraCompanion() {
       <div style={{ minHeight: "100dvh", background: C.bg, color: C.ink, overflowY: "auto" }} className="no-scrollbar">
         <div style={{ maxWidth: 440, margin: "0 auto", padding: "max(20px, env(safe-area-inset-top)) 22px 36px", display: "flex", flexDirection: "column", minHeight: "100dvh", boxSizing: "border-box" }}>
 
-          {/* marca + progreso */}
+          {/* marca + volver */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 6 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              {paso === 2 && (
-                <button onClick={() => setPaso(1)} style={{ border: "none", background: "none", fontSize: 22, color: C.inkSoft, cursor: "pointer", lineHeight: 1, padding: 0, marginRight: 2 }}>‹</button>
+              {(modoSetup || paso === 2) && (
+                <button onClick={() => { if (paso === 2) setPaso(1); else setModoSetup(null); }} style={{ border: "none", background: "none", fontSize: 22, color: C.inkSoft, cursor: "pointer", lineHeight: 1, padding: 0, marginRight: 2 }}>‹</button>
               )}
               <div style={{ fontWeight: 800, fontSize: 20, letterSpacing: "-0.02em" }}>Voyra</div>
-            </div>
-            <div style={{ display: "flex", gap: 6 }}>
-              {[1, 2].map((n) => (
-                <div key={n} style={{ width: n === paso ? 22 : 7, height: 7, borderRadius: 999, background: n === paso ? C.orange : C.line, transition: "width .25s" }} />
-              ))}
             </div>
           </div>
 
           {/* héroe: el personaje */}
-          <div className="rise" style={{ textAlign: "center", marginTop: 18 }}>
-            <Mark size={92} pulse />
+          <div className="rise" style={{ textAlign: "center", marginTop: modoSetup ? 14 : 26 }}>
+            <Mark size={modoSetup ? 78 : 104} pulse />
           </div>
 
-          {paso === 1 ? (
-            <div key="p1" className="rise" style={{ marginTop: 6 }}>
-              <h1 style={{ fontSize: 25, fontWeight: 700, lineHeight: 1.2, letterSpacing: "-0.02em", textAlign: "center", margin: 0 }}>Hola, soy tu Companion.<br />¿A dónde vamos?</h1>
-              <p style={{ color: C.inkSoft, marginTop: 10, fontSize: 14.5, lineHeight: 1.5, textAlign: "center" }}>Solo lo esencial. Te acompaño <b style={{ color: C.ink }}>durante todo el viaje</b>, no solo antes.</p>
+          {/* ── PANTALLA DE IMPACTO + ELECCIÓN ── */}
+          {!modoSetup && (
+            <div key="elige" className="rise" style={{ marginTop: 18, display: "flex", flexDirection: "column", flex: 1 }}>
+              <h1 style={{ fontSize: 30, fontWeight: 800, lineHeight: 1.12, letterSpacing: "-0.03em", textAlign: "center", margin: 0 }}>
+                Nunca te pierdas.<br />Nunca viajes solo.
+              </h1>
+              <p style={{ color: C.inkSoft, marginTop: 14, fontSize: 15.5, lineHeight: 1.55, textAlign: "center", maxWidth: 340, marginLeft: "auto", marginRight: "auto" }}>
+                Soy tu Companion: te acompaño en cada paso del viaje y estoy aquí para lo que necesites, cuando lo necesites.
+              </p>
+
+              <div style={{ marginTop: 30, display: "flex", flexDirection: "column", gap: 12 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: C.inkSoft, letterSpacing: "0.06em", textAlign: "center" }}>¿CÓMO ARMAMOS TU VIAJE?</div>
+
+                {/* Opción 1: subir reservas (protagonista) */}
+                <button onClick={() => setModoSetup("subir")} style={{ textAlign: "left", background: C.orange, border: "none", borderRadius: 18, padding: "17px 18px", cursor: "pointer", display: "flex", alignItems: "center", gap: 14, boxShadow: `0 8px 24px ${C.orange}44` }}>
+                  <div style={{ width: 46, height: 46, borderRadius: 13, background: "rgba(255,255,255,.18)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <Icon name="doc" size={24} color="#fff" />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: "#fff" }}>Subir mis reservas</div>
+                    <div style={{ fontSize: 13, color: "rgba(255,255,255,.9)", marginTop: 2, lineHeight: 1.4 }}>Foto, PDF o captura. Yo extraigo todo y armo tu itinerario.</div>
+                  </div>
+                </button>
+
+                {/* Opción 2: manual */}
+                <button onClick={() => setModoSetup("manual")} style={{ textAlign: "left", background: C.card, border: `1px solid ${C.line}`, borderRadius: 18, padding: "17px 18px", cursor: "pointer", display: "flex", alignItems: "center", gap: 14 }}>
+                  <div style={{ width: 46, height: 46, borderRadius: 13, background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <Icon name="pin" size={22} color={C.aqua} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: C.ink }}>Llenar lo esencial a mano</div>
+                    <div style={{ fontSize: 13, color: C.inkSoft, marginTop: 2, lineHeight: 1.4 }}>Destino, fechas y hotel. Toma menos de un minuto.</div>
+                  </div>
+                  <Icon name="exit" size={18} color={C.inkSoft} />
+                </button>
+              </div>
+
+              <p style={{ fontSize: 12, color: C.inkSoft, textAlign: "center", marginTop: "auto", paddingTop: 22 }}>Ubicación inteligente: menos del 2% de batería al día. Sin GPS continuo.</p>
+            </div>
+          )}
+
+          {/* ── CAMINO MANUAL ── */}
+          {modoSetup === "manual" && paso === 1 && (
+            <div key="m1" className="rise" style={{ marginTop: 6 }}>
+              <h1 style={{ fontSize: 24, fontWeight: 700, lineHeight: 1.2, letterSpacing: "-0.02em", textAlign: "center", margin: 0 }}>Cuéntame de tu viaje</h1>
+              <p style={{ color: C.inkSoft, marginTop: 10, fontSize: 14.5, lineHeight: 1.5, textAlign: "center" }}>Solo lo esencial — el resto lo afinamos juntos sobre la marcha.</p>
 
               <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 20, padding: 18, marginTop: 20 }}>
                 <div className="space-y-4">
@@ -827,19 +957,82 @@ function VoyraCompanion() {
                 Siguiente
               </button>
             </div>
-          ) : (
+          )}
+
+          {/* ── CAMINO SUBIR RESERVAS ── */}
+          {modoSetup === "subir" && (
+            <div key="s1" className="rise" style={{ marginTop: 6 }}>
+              <h1 style={{ fontSize: 24, fontWeight: 700, lineHeight: 1.2, letterSpacing: "-0.02em", textAlign: "center", margin: 0 }}>Sube tus reservas</h1>
+              <p style={{ color: C.inkSoft, marginTop: 10, fontSize: 14.5, lineHeight: 1.5, textAlign: "center" }}>Vuelos, hotel, tours, cenas. Leo cada archivo y <b style={{ color: C.ink }}>armo tu viaje solo</b>.</p>
+
+              <input ref={onbFileRef} type="file" multiple accept=".txt,text/plain,application/pdf,.pdf,image/*" style={{ display: "none" }}
+                onChange={(e) => { Array.from(e.target.files).forEach((f) => subirReservaOnb(f)); e.target.value = ""; }} />
+
+              <button onClick={() => onbFileRef.current && onbFileRef.current.click()} disabled={subiendoOnb}
+                style={{ width: "100%", marginTop: 18, background: C.aquaSoft, border: `1.5px dashed ${C.aqua}`, borderRadius: 18, padding: "26px 18px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 9 }}>
+                <Icon name="doc" size={30} color={C.aqua} />
+                <div style={{ fontSize: 15, fontWeight: 800, color: C.ink }}>{subiendoOnb ? "Leyendo…" : "Elegir archivos"}</div>
+                <div style={{ fontSize: 12.5, color: C.inkSoft, textAlign: "center", lineHeight: 1.4 }}>Puedes subir varios a la vez · PDF, foto o captura</div>
+              </button>
+
+              {/* lista de lo subido */}
+              {docsOnb.length > 0 && (
+                <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
+                  {docsOnb.map((d, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, background: C.card, border: `1px solid ${C.line}`, borderRadius: 12, padding: "10px 12px" }}>
+                      <Icon name={d.error ? "alert" : "check"} size={16} color={d.error ? C.coral : C.aqua} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: C.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.nombre}</div>
+                        <div style={{ fontSize: 11.5, color: C.inkSoft }}>{d.error ? d.error : (d.planes ? `${d.planes} ${d.planes === 1 ? "plan agregado" : "planes agregados"}` : "Leído ✓")}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* completar lo que falte: solo aparece tras subir algo */}
+              {docsOnb.some((d) => !d.error) && (
+                <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 20, padding: 18, marginTop: 16 }}>
+                  <div style={{ fontSize: 12.5, color: C.inkSoft, marginBottom: 12, lineHeight: 1.45 }}>
+                    {(viaje.ciudad.trim() && viaje.inicio && viaje.fin)
+                      ? "Esto fue lo que entendí. Corrige si algo no cuadra:"
+                      : "Casi listo. Confírmame esto que no pude deducir de las reservas:"}
+                  </div>
+                  <div className="space-y-4">
+                    {Campo({ label: "DESTINO", k: "ciudad", ph: "Bogotá" })}
+                    <div className="flex gap-3">
+                      <div className="flex-1 min-w-0">{Campo({ label: "LLEGADA", k: "inicio", type: "date" })}</div>
+                      <div className="flex-1 min-w-0">{Campo({ label: "REGRESO", k: "fin", type: "date" })}</div>
+                    </div>
+                    {Campo({ label: "HOTEL · opcional", k: "hotel", ph: "Nombre del hotel" })}
+                  </div>
+                </div>
+              )}
+
+              <button onClick={finalizarSubida} disabled={!(viaje.ciudad.trim() && viaje.inicio && viaje.fin)}
+                style={{ width: "100%", background: (viaje.ciudad.trim() && viaje.inicio && viaje.fin) ? C.orange : C.line, color: (viaje.ciudad.trim() && viaje.inicio && viaje.fin) ? "#fff" : C.inkSoft, border: "none", borderRadius: 14, padding: "15px 0", fontSize: 16, fontWeight: 700, cursor: (viaje.ciudad.trim() && viaje.inicio && viaje.fin) ? "pointer" : "default", marginTop: 18, boxShadow: (viaje.ciudad.trim() && viaje.inicio && viaje.fin) ? `0 6px 18px ${C.orange}44` : "none" }}>
+                {docsOnb.some((d) => !d.error) ? "Entrar a mi viaje" : "Sube al menos una reserva"}
+              </button>
+              <button onClick={() => { setModoSetup("manual"); setPaso(1); }} style={{ width: "100%", background: "none", border: "none", color: C.inkSoft, fontSize: 14, fontWeight: 600, cursor: "pointer", marginTop: 10 }}>
+                Mejor lo lleno a mano
+              </button>
+            </div>
+          )}
+
+          {/* ── PASO 2 (común, opcional, tras manual) ── */}
+          {modoSetup === "manual" && paso === 2 && (
             <div key="p2" className="rise" style={{ marginTop: 6 }}>
-              <h1 style={{ fontSize: 24, fontWeight: 700, lineHeight: 1.2, letterSpacing: "-0.02em", textAlign: "center", margin: 0 }}>Un par de cosas más<br />y quedamos listos.</h1>
-              <p style={{ color: C.inkSoft, marginTop: 10, fontSize: 14.5, lineHeight: 1.5, textAlign: "center" }}>Todo esto es opcional. ¿Tienes las reservas a mano? Mejor aún: <b style={{ color: C.ink }}>actívame y súbelas</b> (PDF, foto o captura) — yo extraigo vuelos, hotel y tours y armo tu itinerario solo.</p>
+              <h1 style={{ fontSize: 24, fontWeight: 700, lineHeight: 1.2, letterSpacing: "-0.02em", textAlign: "center", margin: 0 }}>Para acompañarte mejor</h1>
+              <p style={{ color: C.inkSoft, marginTop: 10, fontSize: 14.5, lineHeight: 1.5, textAlign: "center" }}>Todo opcional. Puedes <b style={{ color: C.ink }}>entrar directo</b> y subir tus reservas adentro cuando quieras.</p>
 
               <div style={{ background: C.aquaSoft, border: `1px solid ${C.aqua}55`, borderRadius: 16, padding: "13px 15px", marginTop: 16, display: "flex", alignItems: "center", gap: 11 }}>
                 <Icon name="doc" size={20} color={C.aqua} />
                 <div style={{ fontSize: 12.5, color: C.inkSoft, lineHeight: 1.45 }}>
-                  Apenas entres, verás <b style={{ color: C.ink }}>“Sube tus reservas”</b> en el inicio. No tienes que escribir nada a mano.
+                  En el inicio verás <b style={{ color: C.ink }}>“Sube tus reservas”</b> — vuelos, hotel y tours se desglosan en tu itinerario.
                 </div>
               </div>
 
-              <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 20, padding: 18, marginTop: 20 }}>
+              <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 20, padding: 18, marginTop: 16 }}>
                 <div className="space-y-4">
                   <div>
                     <label style={{ fontSize: 11.5, fontWeight: 600, color: C.inkSoft, letterSpacing: "0.03em" }}>TUS VUELOS <span style={{ fontWeight: 400, textTransform: "none" }}>· opcional, o súbelos después</span></label>
@@ -877,8 +1070,6 @@ function VoyraCompanion() {
               </button>
             </div>
           )}
-
-          <p style={{ fontSize: 12, color: C.inkSoft, textAlign: "center", marginTop: "auto", paddingTop: 18 }}>Ubicación inteligente: menos del 2% de batería al día. Sin GPS continuo.</p>
         </div>
       </div>
     );

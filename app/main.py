@@ -37,14 +37,26 @@ def _arrancar_scheduler():
 
 # ── Schemas ──
 class TripIn(BaseModel):
-    ciudad: str
-    hotel: str
-    inicio: str
-    fin: str
+    ciudad: str = ""
+    hotel: str = ""
+    inicio: str = ""
+    fin: str = ""
     vuelo_ida: str = ""
     vuelo_regreso: str = ""
     pais: str = "Colombia"
     gustos: list[str] = Field(default_factory=list)
+
+
+class TripPatchIn(BaseModel):
+    """Para completar/corregir datos del viaje (ej. lo que faltó tras subir reservas)."""
+    ciudad: str | None = None
+    hotel: str | None = None
+    inicio: str | None = None
+    fin: str | None = None
+    vuelo_ida: str | None = None
+    vuelo_regreso: str | None = None
+    pais: str | None = None
+    gustos: list[str] | None = None
 
 
 class SignalIn(BaseModel):
@@ -99,10 +111,24 @@ class PushSubIn(BaseModel):
 @app.post("/trips")
 def create_trip(t: TripIn):
     tid = db.create_trip(t.model_dump())
-    saludo = (f"¡Listo! Ya estoy vigilando tu vuelo, el clima y lo que se mueve en {t.ciudad}. "
-              "Para avisarte solo de lo que te sirve: ¿qué planes tienes para hoy y mañana?")
+    if t.ciudad.strip():
+        saludo = (f"¡Listo! Ya estoy vigilando tu vuelo, el clima y lo que se mueve en {t.ciudad}. "
+                  "Para avisarte solo de lo que te sirve: ¿qué planes tienes para hoy y mañana?")
+    else:
+        saludo = ("¡Hola! Soy tu Companion. Sube tus reservas (vuelo, hotel, tours) y armo tu "
+                  "viaje contigo. También puedes contarme a dónde vas y cuándo.")
     db.insert("messages", {"trip_id": tid, "role": "companion", "content": saludo})
-    return {"trip_id": tid, "greeting": saludo}
+    return {"trip_id": tid, "greeting": saludo, "trip": db.get_trip(tid)}
+
+
+@app.patch("/trips/{tid}")
+def patch_trip(tid: str, p: TripPatchIn):
+    if not db.get_trip(tid):
+        raise HTTPException(404, "trip no existe")
+    patch = {k: v for k, v in p.model_dump().items() if v is not None}
+    if patch:
+        db.update_trip(tid, patch)
+    return db.get_trip(tid)
 
 
 @app.get("/trips/{tid}")
@@ -306,6 +332,21 @@ def upload_doc(tid: str, d: DocIn):
         r = llm.extract_document(d.text_content, d.filename, trip)
     db.insert("documents", {"trip_id": tid, "filename": d.filename,
                             "doc_type": r["tipo"], "summary": r["resumen"]})
+    # Si el documento reveló datos del viaje (ciudad, hotel, fechas, vuelos),
+    # rellenamos SOLO los campos que el usuario aún no tiene puestos. Nunca
+    # sobrescribimos lo que ya existe.
+    ti = r.get("trip_info") or {}
+    patch = {}
+    for campo, clave in (("ciudad", "ciudad"), ("hotel", "hotel"),
+                         ("inicio", "inicio"), ("fin", "fin"),
+                         ("vuelo_ida", "vuelo_ida"), ("vuelo_regreso", "vuelo_regreso")):
+        val = (ti.get(clave) or "").strip() if isinstance(ti.get(clave), str) else ti.get(clave)
+        if val and not (trip.get(campo) or "").strip():
+            patch[campo] = val
+    if patch:
+        db.update_trip(tid, patch)
+    r["trip_info_aplicado"] = patch
+    r["trip"] = db.get_trip(tid)
     # Normaliza los planes detectados pero NO los guarda aún: el frontend
     # muestra "encontré estos planes, ¿los agrego a tu calendario?".
     from . import plans as plans_mod
