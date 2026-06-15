@@ -220,9 +220,9 @@ const FRASES = {
 
 // Pasos de la mini-guía de bienvenida (se ve una sola vez).
 const GUIA = [
-  { icon: "🏠", t: "Tu viaje, en un solo lugar", d: "En Inicio ves lo más importante ahora: qué hay cerca, tus planes y la guía del aeropuerto cuando llegas." },
-  { icon: "💬", t: "El Companion siempre contigo", d: "Pregúntale lo que sea desde la pestaña Chat. Vigila tu vuelo, el clima y la ciudad, y te avisa solo cuando algo te sirve." },
-  { icon: "🆘", t: "Nunca te sientes perdido", d: "En Más tienes el botón SOS y un traductor de bolsillo. Para los momentos en que necesitas ayuda ya." },
+  { icon: "home", t: "Todo tu viaje, aquí", d: "Lo importante de ahora, en una sola pantalla." },
+  { icon: "chat", t: "Siempre contigo", d: "Pregúntame lo que sea, cuando sea." },
+  { icon: "sos", t: "Nunca te pierdes", d: "Ayuda al instante si algo sale mal." },
 ];
 
 // Zonas de Bogotá — deben matchear (tras norm_city en el backend) con las keys
@@ -1157,73 +1157,62 @@ function HomeView({ viaje, zonaActual, airport, diasViaje, pushDisponible, pushO
   const hoy = new Date();
   const horaSaludo = hoy.getHours();
   const saludo = horaSaludo < 12 ? "Buenos días" : horaSaludo < 19 ? "Buenas tardes" : "Buenas noches";
-  const proximos = (diasViaje || []).filter((d) => d.planes && d.planes.length).slice(0, 3);
+
+  // Accesos secundarios: discretos, agrupados en una fila. No compiten con lo esencial.
+  const accesos = [
+    { icon: "calendar", label: "Planes", onClick: onPlanes, color: C.orange },
+    { icon: "translate", label: "Traductor", onClick: onTraductor, color: C.aqua },
+    { icon: "info", label: "Info útil", onClick: onInfo, color: C.inkSoft },
+    { icon: "sos", label: "SOS", onClick: onSOS, color: C.coral },
+  ];
 
   return (
-    <div className="no-scrollbar" style={{ flex: 1, overflowY: "auto", padding: "16px 14px", paddingBottom: 20, display: "flex", flexDirection: "column", gap: 12 }}>
-      {/* saludo + acceso al chat */}
-      <div style={{ background: `linear-gradient(150deg, ${C.orange} 0%, ${C.orangeDeep} 100%)`, color: "#fff", borderRadius: 20, padding: "17px 17px" }}>
-        <div style={{ fontSize: 13, opacity: 0.95, fontWeight: 600 }}>{saludo} 👋</div>
-        <div style={{ fontSize: 19, fontWeight: 800, marginTop: 3, lineHeight: 1.2 }}>Tu Companion está contigo en {viaje.ciudad}</div>
-        <div style={{ fontSize: 13.5, marginTop: 6, opacity: 0.95, lineHeight: 1.45 }}>Vigilo tu vuelo, el clima y la ciudad, y te aviso solo cuando algo te sirve.</div>
-        <button onClick={onChat} style={{ marginTop: 12, width: "100%", background: "#fff", color: C.orange, border: "none", borderRadius: 12, padding: "12px 0", fontSize: 14.5, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-          <Icon name="chat" size={19} color={C.orange} /> Pregúntame lo que sea
-        </button>
+    <div className="no-scrollbar" style={{ flex: 1, overflowY: "auto", padding: "20px 16px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+      {/* Primicia: el Companion está contigo. Personaje mediano + saludo cálido. */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", paddingTop: 8 }}>
+        <Mark size={84} pulse />
+        <div style={{ fontSize: 13, color: C.inkSoft, fontWeight: 600, marginTop: 14 }}>{saludo}</div>
+        <div style={{ fontSize: 21, fontWeight: 800, marginTop: 4, lineHeight: 1.2, letterSpacing: "-0.02em" }}>
+          Estoy contigo en {viaje.ciudad}
+        </div>
+        <div style={{ fontSize: 14, color: C.inkSoft, marginTop: 8, lineHeight: 1.5, maxWidth: 300 }}>
+          Vigilo tu viaje y te aviso solo de lo que importa. Para que nunca te sientas perdido.
+        </div>
       </div>
 
-      {/* aviso para activar notificaciones (solo si está disponible y aún no activado) */}
+      {/* Acción protagonista: hablar con el Companion */}
+      <button onClick={onChat} style={{ width: "100%", background: C.orange, color: "#fff", border: "none", borderRadius: 16, padding: "16px 0", fontSize: 15.5, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 9, boxShadow: `0 8px 24px ${C.orange}33` }}>
+        <Icon name="chat" size={20} color="#fff" /> Pregúntame lo que sea
+      </button>
+
+      {/* Notificaciones: solo si falta activarlas, discreto */}
       {pushDisponible && !pushOn && (
-        <div onClick={onActivarPush} style={{ background: C.aquaSoft, border: `1px solid ${C.aqua}55`, borderRadius: 16, padding: "13px 14px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
-          <Icon name="bell" size={22} color={C.aqua} />
-          <span style={{ flex: 1 }}>
-            <span style={{ fontWeight: 800, fontSize: 14, display: "block", color: C.aqua }}>Activa las notificaciones</span>
-            <span style={{ fontSize: 12.5, color: C.inkSoft, lineHeight: 1.4 }}>Para avisarte de tu vuelo, el clima y lo que pasa cerca, aunque tengas la app cerrada.</span>
-          </span>
-          <span style={{ background: C.aqua, color: "#fff", borderRadius: 999, padding: "7px 13px", fontSize: 12.5, fontWeight: 700, flexShrink: 0 }}>Activar</span>
-        </div>
+        <button onClick={onActivarPush} style={{ width: "100%", background: "none", border: `1px dashed ${C.aqua}66`, borderRadius: 14, padding: "11px 14px", cursor: "pointer", display: "flex", alignItems: "center", gap: 10, textAlign: "left" }}>
+          <Icon name="bell" size={18} color={C.aqua} />
+          <span style={{ flex: 1, fontSize: 13, color: C.aqua, fontWeight: 700 }}>Activa las notificaciones para no perderte nada</span>
+        </button>
       )}
 
-      {/* guía aeropuerto, si aplica */}
+      {/* Lo esencial del momento: aeropuerto (si aplica) + qué hay cerca */}
       {airport && airport.disponible && (
         <HomeCard icon="plane" titulo="Guía de llegada al aeropuerto" accent={C.orange} onClick={onAirport} cta="Abrir guía paso a paso">
-          Te guío para salir de {airport.name} sin perderte ni que te cobren de más: migración, equipaje y transporte seguro.
+          Te guío para salir de {airport.name} sin perderte ni que te cobren de más.
         </HomeCard>
       )}
 
-      {/* qué hay cerca */}
-      <HomeCard icon="pin" titulo="Qué hay cerca de mí ahora" accent={C.aqua} onClick={onCerca} cta="Ver lugares cerca">
-        Estás cerca de <b style={{ color: C.ink }}>{zonaActual}</b>. Te muestro lugares curados ordenados por distancia real, con cómo llegar.
+      <HomeCard icon="pin" titulo="Qué hay cerca de mí" accent={C.aqua} onClick={onCerca} cta="Ver lugares cerca">
+        Estás en <b style={{ color: C.ink }}>{zonaActual}</b>. Te muestro lo mejor cerca, con cómo llegar.
       </HomeCard>
 
-      {/* próximos planes */}
-      <HomeCard icon="calendar" titulo="Tus próximos días" accent={C.orange} onClick={onPlanes} cta="Ver mi calendario">
-        {proximos.length
-          ? <>Tienes {proximos.length === 1 ? "un plan próximo" : "planes próximos"}. Toca para ver tu viaje día por día.</>
-          : <>Aún no me has contado tus planes. Cuéntamelos en el chat y los organizo en tu calendario.</>}
-      </HomeCard>
-
-      {/* accesos rápidos */}
-      <div style={{ fontSize: 11.5, fontWeight: 700, color: C.inkSoft, letterSpacing: "0.07em", margin: "4px 2px 0" }}>SIEMPRE A LA MANO</div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-        <button onClick={onSOS} style={{ background: C.coralSoft, border: `1px solid ${C.coral}55`, borderRadius: 16, padding: "14px 12px", cursor: "pointer", textAlign: "left" }}>
-          <Icon name="sos" size={24} color={C.coral} />
-          <div style={{ fontWeight: 800, fontSize: 14, color: C.coral, marginTop: 7 }}>SOS del viajero</div>
-          <div style={{ fontSize: 11.5, color: C.inkSoft, marginTop: 2, lineHeight: 1.35 }}>Ayuda inmediata si algo sale mal</div>
-        </button>
-        <button onClick={onTraductor} style={{ background: C.aquaSoft, border: `1px solid ${C.aqua}55`, borderRadius: 16, padding: "14px 12px", cursor: "pointer", textAlign: "left" }}>
-          <Icon name="translate" size={24} color={C.aqua} />
-          <div style={{ fontWeight: 800, fontSize: 14, color: C.aqua, marginTop: 7 }}>Traductor</div>
-          <div style={{ fontSize: 11.5, color: C.inkSoft, marginTop: 2, lineHeight: 1.35 }}>Frases clave según la situación</div>
-        </button>
+      {/* Todo lo demás: discreto, agrupado, sin competir */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginTop: 2 }}>
+        {accesos.map((a) => (
+          <button key={a.label} onClick={a.onClick} style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 14, padding: "13px 4px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 7 }}>
+            <Icon name={a.icon} size={21} color={a.color} />
+            <span style={{ fontSize: 11.5, fontWeight: 700, color: C.inkSoft }}>{a.label}</span>
+          </button>
+        ))}
       </div>
-      <button onClick={onInfo} style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 16, padding: "13px 14px", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 11 }}>
-        <Icon name="info" size={20} color={C.inkSoft} />
-        <span style={{ flex: 1 }}>
-          <span style={{ fontWeight: 800, fontSize: 14, display: "block", color: C.ink }}>Info útil de {viaje.ciudad}</span>
-          <span style={{ fontSize: 11.5, color: C.inkSoft }}>Emergencias, transporte, propinas, lo básico</span>
-        </span>
-        <span style={{ color: C.inkSoft, fontSize: 18 }}>›</span>
-      </button>
     </div>
   );
 }
@@ -1485,21 +1474,27 @@ function MiniGuia({ onClose }) {
   const paso = GUIA[i];
   const ultimo = i === GUIA.length - 1;
   return (
-    <div style={{ position: "absolute", inset: 0, zIndex: 80, background: "rgba(23,36,47,.55)", display: "flex", alignItems: "flex-end" }}>
-      <div className="rise" style={{ width: "100%", background: C.card, borderRadius: "22px 22px 0 0", padding: "22px 22px calc(22px + env(safe-area-inset-bottom))", maxWidth: 480, margin: "0 auto" }}>
-        <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 40 }}>{paso.icon}</div>
-          <div style={{ fontWeight: 800, fontSize: 19, marginTop: 8, letterSpacing: "-0.02em" }}>{paso.t}</div>
-          <div style={{ fontSize: 14.5, color: C.inkSoft, marginTop: 8, lineHeight: 1.5 }}>{paso.d}</div>
+    <div style={{ position: "absolute", inset: 0, zIndex: 80, background: "rgba(0,0,0,.7)", display: "flex", alignItems: "flex-end" }}>
+      <div className="rise" style={{ width: "100%", background: C.card, borderRadius: "24px 24px 0 0", padding: "28px 24px calc(24px + env(safe-area-inset-bottom))", maxWidth: 480, margin: "0 auto" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
+          {/* el personaje presente en cada paso, con el ícono del paso como acento */}
+          <div style={{ position: "relative" }}>
+            <Mark size={76} pulse />
+            <div style={{ position: "absolute", bottom: -4, right: -8, background: C.orange, borderRadius: 999, width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", border: `3px solid ${C.card}` }}>
+              <Icon name={paso.icon} size={17} color="#fff" />
+            </div>
+          </div>
+          <div style={{ fontWeight: 800, fontSize: 22, marginTop: 18, letterSpacing: "-0.02em" }}>{paso.t}</div>
+          <div style={{ fontSize: 15, color: C.inkSoft, marginTop: 7, lineHeight: 1.5, maxWidth: 280 }}>{paso.d}</div>
         </div>
-        <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 18 }}>
+        <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 22 }}>
           {GUIA.map((_, k) => (
             <div key={k} style={{ width: k === i ? 22 : 7, height: 7, borderRadius: 999, background: k === i ? C.orange : C.line, transition: "all .2s" }} />
           ))}
         </div>
-        <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
-          <button onClick={onClose} style={{ flex: 1, background: "none", border: `1px solid ${C.line}`, color: C.inkSoft, borderRadius: 12, padding: "13px 0", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Saltar</button>
-          <button onClick={() => ultimo ? onClose() : setI(i + 1)} style={{ flex: 2, background: C.orange, color: "#fff", border: "none", borderRadius: 12, padding: "13px 0", fontSize: 14.5, fontWeight: 800, cursor: "pointer" }}>{ultimo ? "Empezar" : "Siguiente"}</button>
+        <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+          {!ultimo && <button onClick={onClose} style={{ flex: 1, background: "none", border: `1px solid ${C.line}`, color: C.inkSoft, borderRadius: 14, padding: "14px 0", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Saltar</button>}
+          <button onClick={() => ultimo ? onClose() : setI(i + 1)} style={{ flex: 2, background: C.orange, color: "#fff", border: "none", borderRadius: 14, padding: "14px 0", fontSize: 15, fontWeight: 800, cursor: "pointer" }}>{ultimo ? "Empezar" : "Siguiente"}</button>
         </div>
       </div>
     </div>
