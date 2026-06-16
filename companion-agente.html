@@ -550,6 +550,140 @@ function AuthScreen({ onSuccess, onCancel }) {
   );
 }
 
+// ════════════════ HOME — PERFIL + SELECTOR DE VIAJES ════════════════
+// Pantalla intermedia entre el login y el Companion de un viaje específico.
+// Todo usuario (nuevo recién registrado o viejo que vuelve) aterriza aquí:
+// ve sus datos básicos y sus viajes (máx. MAX_TRIPS, hoy 2). Elegir un viaje
+// entra al Companion de ese viaje (la vista que ya existía, sin cambios).
+const MAX_TRIPS = 2;
+
+function HomeScreen({ auth, onElegirViaje, onCrearViaje, onCerrarSesion }) {
+  const [viajes, setViajes] = React.useState(null);   // null = cargando
+  const [error, setError] = React.useState("");
+  const [borrando, setBorrando] = React.useState(null); // id en proceso de borrado
+
+  const cargar = React.useCallback(async () => {
+    setError("");
+    try {
+      const r = await api.get("/trips");
+      setViajes(r.trips || []);
+    } catch (e) {
+      setError("No pude cargar tus viajes. Desliza para reintentar.");
+      setViajes([]);
+    }
+  }, []);
+
+  React.useEffect(() => { cargar(); }, [cargar]);
+
+  const borrarViaje = async (id, e) => {
+    e.stopPropagation();
+    if (!window.confirm("¿Borrar este viaje? No se puede deshacer.")) return;
+    setBorrando(id);
+    try {
+      await api.del(`/trips/${id}`);
+      setViajes((vs) => vs.filter((v) => v.id !== id));
+    } catch (e) {
+      alert("No pude borrar el viaje.");
+    }
+    setBorrando(null);
+  };
+
+  const tope = viajes && viajes.length >= MAX_TRIPS;
+  const cargando = viajes === null;
+
+  const fechaCorta = (s) => {
+    if (!s) return null;
+    try {
+      const [y, m, d] = s.split("-");
+      return `${d}/${m}/${y.slice(2)}`;
+    } catch { return s; }
+  };
+
+  return (
+    <div style={{ minHeight: "100dvh", background: C.bg, color: C.ink, overflowY: "auto" }} className="no-scrollbar">
+      <div style={{ maxWidth: 460, margin: "0 auto", padding: "max(24px, env(safe-area-inset-top)) 22px 40px", boxSizing: "border-box" }}>
+
+        {/* ── Encabezado de marca ── */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 22 }}>
+          <span style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Voyra</span>
+          <span style={{ fontSize: 18 }}>🛟</span>
+        </div>
+
+        {/* ── Tarjeta de perfil ── */}
+        <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 16, padding: "16px 18px", display: "flex", alignItems: "center", gap: 12, marginBottom: 26 }}>
+          <div style={{ width: 42, height: 42, borderRadius: "50%", background: C.orangeSoft, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 800, color: C.orange, flexShrink: 0 }}>
+            {(auth?.email || "?")[0].toUpperCase()}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{auth?.email}</div>
+            <div style={{ fontSize: 12.5, color: C.inkSoft, marginTop: 2 }}>
+              Plan {auth?.plan === "free" ? "Explorador (gratis)" : auth?.plan || "Explorador"}
+            </div>
+          </div>
+          <button onClick={onCerrarSesion} title="Cerrar sesión"
+            style={{ background: "none", border: `1px solid ${C.line}`, borderRadius: 10, padding: "7px 12px", color: C.inkSoft, fontSize: 12.5, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>
+            Salir
+          </button>
+        </div>
+
+        {/* ── Lista de viajes ── */}
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
+          <span style={{ fontSize: 11.5, fontWeight: 700, color: C.inkSoft, letterSpacing: "0.07em" }}>TUS VIAJES</span>
+          {viajes && <span style={{ fontSize: 12, color: C.inkSoft }}>{viajes.length}/{MAX_TRIPS}</span>}
+        </div>
+
+        {cargando && (
+          <div style={{ textAlign: "center", color: C.inkSoft, fontSize: 14, padding: "30px 0" }}>Cargando tus viajes…</div>
+        )}
+
+        {error && !cargando && (
+          <div onClick={cargar} style={{ color: C.coral, fontSize: 13.5, padding: "12px 4px", cursor: "pointer" }}>{error}</div>
+        )}
+
+        {!cargando && viajes.length === 0 && !error && (
+          <div style={{ textAlign: "center", padding: "36px 18px", background: C.card, border: `1px dashed ${C.line}`, borderRadius: 16, color: C.inkSoft, fontSize: 14, lineHeight: 1.5 }}>
+            Todavía no tienes viajes. Cuéntale al Companion a dónde vas y te acompaño desde ya.
+          </div>
+        )}
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {!cargando && viajes.map((v) => (
+            <button key={v.id} onClick={() => onElegirViaje(v)}
+              style={{ width: "100%", textAlign: "left", display: "flex", alignItems: "center", gap: 12, background: C.card, border: `1px solid ${C.line}`, borderRadius: 16, padding: "14px 16px", cursor: "pointer" }}>
+              <div style={{ flexShrink: 0 }}><Mark size={38} /></div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 15.5 }}>{v.ciudad || "Viaje sin destino aún"}</div>
+                <div style={{ fontSize: 12.5, color: C.inkSoft, marginTop: 2 }}>
+                  {v.inicio && v.fin ? `${fechaCorta(v.inicio)} – ${fechaCorta(v.fin)}` : (v.hotel || "Completa los datos al entrar")}
+                </div>
+              </div>
+              <button onClick={(e) => borrarViaje(v.id, e)} disabled={borrando === v.id} title="Borrar viaje"
+                style={{ background: "none", border: "none", color: C.inkSoft, fontSize: 18, padding: 6, cursor: "pointer", flexShrink: 0 }}>
+                {borrando === v.id ? "…" : "✕"}
+              </button>
+              <span style={{ color: C.inkSoft, fontSize: 18, flexShrink: 0 }}>›</span>
+            </button>
+          ))}
+        </div>
+
+        {/* ── Crear viaje / tope alcanzado ── */}
+        <div style={{ marginTop: 18 }}>
+          {tope ? (
+            <div style={{ textAlign: "center", fontSize: 13, color: C.inkSoft, padding: "14px 16px", background: C.card, border: `1px solid ${C.line}`, borderRadius: 14, lineHeight: 1.5 }}>
+              Llegaste al máximo de {MAX_TRIPS} viajes activos de tu plan. Borra uno para crear otro.
+            </div>
+          ) : (
+            <button onClick={onCrearViaje} disabled={cargando}
+              style={{ width: "100%", padding: "15px", borderRadius: 14, border: "none", background: C.orange, color: "#fff", fontWeight: 700, fontSize: 15.5, cursor: cargando ? "default" : "pointer", opacity: cargando ? 0.6 : 1 }}>
+              + Crear viaje
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function VoyraCompanion() {
   const [fase, setFase] = useState("setup");
   const [tripId, setTripId] = useState(null);
@@ -620,11 +754,14 @@ function VoyraCompanion() {
       setAuthGate(true);
     });
     // ¿Hay token guardado? Validarlo con /auth/me y restaurar la sesión.
+    // Si la sesión es válida, el usuario "viejo" entra directo al Home (perfil
+    // + lista de viajes) en vez de ver el onboarding de "cuéntanos tu viaje".
     if (tokenStore.get()) {
       (async () => {
         try {
           const u = await authApi.me();
           setAuth({ token: tokenStore.get(), email: u.email, plan: u.plan });
+          setFase("home");
         } catch {
           tokenStore.clear();
         }
@@ -963,6 +1100,55 @@ function VoyraCompanion() {
     setGpsEstado("inactivo"); setDocs([]); setPlanes([]); setPlanesPropuestos(null); setVozActiva(false); setCargandoCerca(false); setEscaneando(false);
   };
 
+  // Volver al Home (perfil + lista de viajes) sin perder la sesión — es el
+  // "atrás" desde dentro de un viaje, distinto de reiniciar() que arranca el
+  // onboarding de un viaje nuevo.
+  const volverAlHome = () => {
+    setSheet(null); setTripId(null); setStream([]); seqRef.current = 0;
+    setPlanes([]); setPlanesPropuestos(null); setCargandoCerca(false); setEscaneando(false);
+    setFase("home");
+  };
+
+  // Entra al Companion de un viaje YA EXISTENTE, elegido desde el Home. Trae
+  // el trip completo (por si el Home solo tenía un resumen), sus planes, y
+  // arranca push igual que antes hacía entrarApp al crear un viaje nuevo.
+  const abrirViaje = async (resumen) => {
+    try {
+      const trip = await api.get(`/trips/${resumen.id}`);
+      setTripId(trip.id);
+      setViaje((v) => ({
+        ...v,
+        ciudad: trip.ciudad || v.ciudad,
+        hotel: trip.hotel || v.hotel,
+        inicio: trip.inicio || v.inicio,
+        fin: trip.fin || v.fin,
+        vueloIda: trip.vuelo_ida || v.vueloIda,
+        vueloRegreso: trip.vuelo_regreso || v.vueloRegreso,
+        pais: trip.pais || v.pais,
+        gustos: trip.gustos && trip.gustos.length ? trip.gustos : v.gustos,
+      }));
+      setZonaActual(trip.zona_actual || "En el hotel");
+      setUbicacion(trip.zona_actual || "En el hotel");
+      await cargarPlanes(trip.id);
+      setStream([]); seqRef.current = 0;
+      setTab("inicio");
+      setGuiaVista(true);
+      setFase("agente");
+      try {
+        if (!pushSupported()) return;
+        const pk = await api.get("/push/public-key");
+        if (pk.enabled) {
+          setPushDisponible(true);
+          const reg = await navigator.serviceWorker.ready;
+          const sub = await reg.pushManager.getSubscription();
+          setPushOn(!!sub && Notification.permission === "granted");
+        }
+      } catch (e) {}
+    } catch (e) {
+      alert("No pude abrir ese viaje. Intenta de nuevo.");
+    }
+  };
+
   // Días del viaje para el calendario de Planes (de 'inicio' a 'fin').
   // IMPORTANTE: debe ir ANTES de cualquier `return` condicional para que el
   // orden de hooks sea idéntico en todos los renders (setup y agente).
@@ -1017,6 +1203,21 @@ function VoyraCompanion() {
     );
   }
 
+  // ════════════════ HOME — perfil + selector de viajes ════════════════
+  // Punto de entrada para todo usuario CON sesión: el viejo llega aquí directo
+  // al cargar; el nuevo llega aquí justo después de crear su cuenta (tras el
+  // onboarding). Desde aquí elige un viaje y entra al Companion, o crea uno.
+  if (fase === "home") {
+    return (
+      <HomeScreen
+        auth={auth}
+        onElegirViaje={abrirViaje}
+        onCrearViaje={() => { setTripId(null); setViaje((v) => ({ ...v, ciudad: "", hotel: "", inicio: "", fin: "", vueloIda: "", vueloRegreso: "" })); setPaso(1); setModoSetup(null); setDocsOnb([]); setFase("setup"); }}
+        onCerrarSesion={cerrarSesion}
+      />
+    );
+  }
+
   // ════════════════ ONBOARDING ════════════════
   if (fase === "setup") {
     const paso1ok = viaje.ciudad.trim() && viaje.hotel.trim() && viaje.inicio && viaje.fin;
@@ -1027,7 +1228,9 @@ function VoyraCompanion() {
           style={{ width: "100%", minWidth: 0, border: `1px solid ${C.line}`, borderRadius: 12, padding: type === "date" ? "12px 10px" : "12px 14px", marginTop: 5, fontSize: type === "date" ? 14.5 : 16, background: C.bg, color: C.ink, outline: "none", boxSizing: "border-box", WebkitAppearance: "none", appearance: "none" }} />
       </div>
     );
-    // Helper compartido: una vez creado el viaje, entra a la app.
+    // Helper compartido: una vez creado el viaje, guarda el saludo inicial y
+    // manda al Home (perfil + lista de viajes) — nunca entra directo al
+    // Companion. Desde el Home, el usuario elige el viaje y ahí sí entra.
     const entrarApp = (data) => {
       setTripId(data.trip_id);
       if (data.greeting) appendStream({ type: "companion", texto: data.greeting });
@@ -1041,21 +1244,7 @@ function VoyraCompanion() {
         vueloRegreso: data.trip.vuelo_regreso || v.vueloRegreso,
       }));
       cargarPlanes(data.trip_id);
-      setTab("inicio");
-      setGuiaVista(true);
-      setFase("agente");
-      (async () => {
-        try {
-          if (!pushSupported()) return;
-          const pk = await api.get("/push/public-key");
-          if (pk.enabled) {
-            setPushDisponible(true);
-            const reg = await navigator.serviceWorker.ready;
-            const sub = await reg.pushManager.getSubscription();
-            setPushOn(!!sub && Notification.permission === "granted");
-          }
-        } catch (e) {}
-      })();
+      setFase("home");
     };
 
     const activar = () => requireAuth(async () => {
@@ -1424,6 +1613,7 @@ function VoyraCompanion() {
           onSOS={() => setSosOpen(true)}
           onTraductor={() => setTraductorOpen(true)}
           onReiniciar={reiniciar}
+          onVolverHome={volverAlHome}
           onDev={() => setSheet("dev")}
           email={auth?.email}
           onCerrarSesion={cerrarSesion}
@@ -1612,7 +1802,7 @@ function VoyraCompanion() {
           <SheetItem icon={vozActiva ? "🔊" : "🔈"} label={`Leer en voz alta: ${vozActiva ? "activado" : "desactivado"}`} onClick={() => { setVozActiva(!vozActiva); if (vozActiva && window.speechSynthesis) window.speechSynthesis.cancel(); }} />
           {docs.length > 0 && <div style={{ fontSize: 12, color: C.inkSoft, padding: "8px 4px 2px" }}>{docs.length} confirmación(es) en tu Trip Context</div>}
           {DEBUG && <SheetItem icon="🛠" label="Panel de desarrollo" onClick={() => setSheet("dev")} />}
-          <SheetItem icon="↺" label="Reiniciar con otro viaje" danger onClick={reiniciar} />
+          <SheetItem icon="🏠" label="Volver a mis viajes" onClick={() => { setSheet(null); volverAlHome(); }} />
         </Sheet>
       )}
 
@@ -2045,7 +2235,7 @@ function ConfirmarPlanesSheet({ data, onConfirmar, onCancelar }) {
     </div>
   );
 }
-function MasView({ viaje, docs, vozActiva, onToggleVoz, onUbicacion, onInfo, onDocs, onSOS, onTraductor, onReiniciar, onDev, debug, pushDisponible, pushOn, onTogglePush, email, onCerrarSesion }) {
+function MasView({ viaje, docs, vozActiva, onToggleVoz, onUbicacion, onInfo, onDocs, onSOS, onTraductor, onReiniciar, onVolverHome, onDev, debug, pushDisponible, pushOn, onTogglePush, email, onCerrarSesion }) {
   const Item = ({ icon, label, sub, onClick, danger }) => (
     <button onClick={onClick} style={{ width: "100%", display: "flex", alignItems: "center", gap: 13, padding: "14px 14px", background: C.card, border: `1px solid ${C.line}`, borderRadius: 14, cursor: "pointer", textAlign: "left" }}>
       <span style={{ width: 24, display: "flex", justifyContent: "center", flexShrink: 0 }}>
@@ -2084,7 +2274,8 @@ function MasView({ viaje, docs, vozActiva, onToggleVoz, onUbicacion, onInfo, onD
       )}
       <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
         {debug && <Item icon="wrench" label="Panel de desarrollo" onClick={onDev} />}
-        <Item icon="refresh" label="Reiniciar con otro viaje" onClick={onReiniciar} danger />
+        {onVolverHome && <Item icon="compass" label="Mis viajes" sub="Ver tu perfil y tus otros viajes" onClick={onVolverHome} />}
+        <Item icon="refresh" label="Crear un viaje nuevo" onClick={onReiniciar} danger />
         {onCerrarSesion && <Item icon="refresh" label="Cerrar sesión" onClick={onCerrarSesion} danger />}
       </div>
       <div style={{ textAlign: "center", marginTop: 22, fontSize: 11.5, color: C.inkSoft }}>Voyra · tu Companion de viaje</div>
