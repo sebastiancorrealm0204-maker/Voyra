@@ -1216,7 +1216,7 @@ function VoyraCompanion() {
                           style={{ background: op ? C.coral : C.teal, color: "#fff", border: "none", borderRadius: 999, padding: "8px 15px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{m.accion}</button>
                       )}
                       {m.mapsLink && (
-                        <a href={m.mapsLink} target="_blank" rel="noopener noreferrer"
+                        <a href={m.mapsLink} rel="noopener noreferrer"
                           style={{ background: "transparent", color: op ? C.coral : C.teal, border: `1px solid ${op ? C.coral : C.teal}`, borderRadius: 999, padding: "8px 15px", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>📍 Cómo llegar{distLabel(m.distancia_km)}</a>
                       )}
                     </div>
@@ -1252,7 +1252,7 @@ function VoyraCompanion() {
                         <div style={{ fontWeight: 700, fontSize: 14 }}>{it.lugar}</div>
                         <div style={{ fontSize: 13, color: C.inkSoft, marginTop: 1, lineHeight: 1.4 }}>{it.mensaje}</div>
                         {it.mapsLink && (
-                          <a href={it.mapsLink} target="_blank" rel="noopener noreferrer" style={{ display: "inline-block", marginTop: 5, fontSize: 12.5, color: C.teal, fontWeight: 600, textDecoration: "none" }}>📍 Cómo llegar{distLabel(it.distancia_km)} →</a>
+                          <a href={it.mapsLink} rel="noopener noreferrer" style={{ display: "inline-block", marginTop: 5, fontSize: 12.5, color: C.teal, fontWeight: 600, textDecoration: "none" }}>📍 Cómo llegar{distLabel(it.distancia_km)} →</a>
                         )}
                       </div>
                     ))}
@@ -1525,17 +1525,22 @@ function PlanCard({ p, tripId, coords, onBorrar }) {
 
   const abrirMapa = async () => {
     setLoadingMaps(true);
+    let url;
     try {
       const params = new URLSearchParams();
       if (coords) { params.set("orig_lat", coords.lat); params.set("orig_lng", coords.lng); }
       const data = await api.get(`/trips/${tripId}/plans/${p.id}/maps?${params}`);
-      window.open(data.maps_link, "_blank");
+      url = data.maps_link;
     } catch (e) {
       // fallback: búsqueda directa por nombre
       const q = encodeURIComponent((p.lugar || p.titulo || "") + " Bogotá");
-      window.open(`https://www.google.com/maps/search/?q=${q}`, "_blank");
+      url = `https://www.google.com/maps/search/?api=1&query=${q}`;
     }
     setLoadingMaps(false);
+    // Navegar en la MISMA pestaña: el SO intercepta el link de Maps y abre la
+    // app nativa, dejando la web intacta debajo. Con window.open(_blank) en iOS
+    // quedaba una pestaña en blanco al volver a la app.
+    if (url) window.location.href = url;
   };
 
   return (
@@ -1817,7 +1822,7 @@ function SosView({ viaje, zonaActual, gpsEstado, coords, onClose, onChat }) {
         <div style={{ fontSize: 12, fontWeight: 700, color: C.inkSoft, letterSpacing: "0.05em" }}>DÓNDE ESTOY AHORA</div>
         <div style={{ fontSize: 15, fontWeight: 700, marginTop: 5 }}>📍 {ubicTxt}</div>
         <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 2 }}>{coords ? "Coordenadas GPS exactas" : "Zona aproximada (activa el GPS para precisión)"}</div>
-        <a href={mapsUrl} target="_blank" rel="noopener noreferrer" style={{ display: "inline-block", marginTop: 9, background: C.aquaSoft, color: C.aqua, borderRadius: 999, padding: "8px 14px", fontSize: 13, fontWeight: 700, textDecoration: "none" }}>Abrir mi ubicación en Maps →</a>
+        <a href={mapsUrl} rel="noopener noreferrer" style={{ display: "inline-block", marginTop: 9, background: C.aquaSoft, color: C.aqua, borderRadius: 999, padding: "8px 14px", fontSize: 13, fontWeight: 700, textDecoration: "none" }}>Abrir mi ubicación en Maps →</a>
       </div>
 
       {/* qué hacer según el caso */}
