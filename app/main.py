@@ -212,6 +212,9 @@ def plan_maps_link(tid: str, plan_id: str,
         dest_lat, dest_lng = match["lat"], match["lng"]
         dest_dir = match.get("dir")
         dest_query = match.get("maps_query")
+        dest_place_id = match.get("place_id")
+    else:
+        dest_place_id = None
     lugar_nombre = (plan.get("lugar") or plan.get("titulo") or "").strip()
 
     # Origen: parámetros de query > GPS guardado en trip > None
@@ -226,10 +229,10 @@ def plan_maps_link(tid: str, plan_id: str,
     # dirección), que Google resuelve al POI exacto. La dirección sola es el
     # respaldo. Las coordenadas guardadas NO se usan como destino porque pueden
     # estar mal; solo sirven para estimar distancia/tiempo.
-    if dest_query or dest_dir:
+    if dest_query or dest_dir or dest_place_id:
         destino_texto = dest_query or dest_dir
-        link = geo.maps_link_from_to(olat, olng, None, None, mode=mode,
-                                     maps_query=destino_texto)
+        link = geo.maps_link_from_to(olat, olng, dest_lat, dest_lng, mode=mode,
+                                     maps_query=destino_texto, place_id=dest_place_id)
     else:
         # Lugar no curado: armamos la mejor query posible.
         # Elegimos entre lugar y título el texto con más "sustancia" (que tenga
@@ -348,6 +351,36 @@ def nearby(tid: str):
     if not db.get_trip(tid):
         raise HTTPException(404, "trip no existe")
     return watchers.nearby_recommendations(tid)
+
+
+@app.get("/trips/{tid}/nearby-chain")
+def nearby_chain(tid: str, q: str, orig_lat: float | None = None,
+                 orig_lng: float | None = None, radio_m: int = 2500):
+    """Búsqueda EN VIVO de cadenas/servicios cerca del usuario (Carulla, cajero,
+    farmacia, etc.). Consulta Google Places al momento — NO usa la curación.
+
+    Pasa orig_lat/orig_lng (GPS del usuario) o usa la ubicación guardada del trip.
+    """
+    from . import places_live
+    trip = db.get_trip(tid)
+    if not trip:
+        raise HTTPException(404, "trip no existe")
+    olat = orig_lat or trip.get("lat_actual")
+    olng = orig_lng or trip.get("lng_actual")
+    if olat is None or olng is None:
+        # sin GPS, intenta con coords de la zona conocida
+        coords = geo.zone_coords(trip.get("ciudad", ""), trip.get("zona_actual", ""))
+        if coords:
+            olat, olng = coords
+    if olat is None or olng is None:
+        return {"disponible": places_live.disponible(), "resultados": [],
+                "nota": "No tengo tu ubicación. Comparte tu GPS para buscar cerca."}
+    resultados = places_live.buscar_cerca(q, olat, olng, radio_m=radio_m)
+    return {"disponible": places_live.disponible(), "query": q,
+            "resultados": resultados,
+            "nota": None if resultados else (
+                "No encontré nada cerca." if places_live.disponible()
+                else "Búsqueda en vivo no configurada (falta GOOGLE_MAPS_API_KEY).")}
 
 
 @app.get("/trips/{tid}/airport")
@@ -503,8 +536,9 @@ def decisions(tid: str):
 
 @app.get("/health")
 def health():
+    from . import places_live
     return {"status": "ok", "llm_mode": llm.MODE, "search_mode": search.MODE,
-            "push_enabled": push.enabled()}
+            "push_enabled": push.enabled(), "places_live": places_live.MODE}
 
 
 # ── Frontend / PWA ──

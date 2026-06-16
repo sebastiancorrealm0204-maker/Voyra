@@ -47,6 +47,8 @@ def _lugares_block(trip: dict) -> str:
     bloque = (
         "\nLUGARES CURADOS DE VOYRA PARA " + city.upper() + " "
         "(FUENTE ÚNICA Y EXCLUSIVA para recomendar restaurantes, cafés, bares, "
+        "atracciones, parques, tiendas, excursiones, supermercados, farmacias, "
+        "clínicas y transporte — todas las categorías). "
         "atracciones, parques y excursiones — ordenados por cercanía al usuario):\n"
         + "\n".join(lineas)
         + "\n"
@@ -130,12 +132,8 @@ CONTEXTO DEL VIAJE (Trip Context Store):
 - País de origen / nacionalidad: {trip.get('pais', 'no especificado')}
 - Nivel de autorización: 2 (avisar + sugerir con 1 tap; NUNCA ejecutas compras ni cambios sin confirmación)
 {docs_block}{planes_block}{aeropuerto_block}{ciudad_block}{lugares_block}
-REGLA ANTI-ALUCINACIÓN — CRÍTICA: cuando el usuario pida recomendaciones de lugares (restaurantes, cafés, bares, atracciones, parques, tiendas, excursiones o cualquier cosa "qué hacer"), usa ÚNICA Y EXCLUSIVAMENTE los lugares de la lista "LUGARES CURADOS DE VOYRA" de arriba. NUNCA inventes ni menciones ningún nombre de lugar que no esté en esa lista. Si la lista no tiene nada que calce con lo que pide, dilo honestamente ("No tengo curado eso para esta zona todavía") y sugiere lo más cercano de la lista. Inventar un restaurante que no existe es el error más grave que puedes cometer — destruye la confianza del usuario.
-
-CUANDO EL USUARIO TE CUENTA UN PLAN O RESERVA QUE YA TIENE (regla aparte, NO confundir con la anterior): si el usuario dice "tengo una reserva en X", "voy a cenar en X el viernes", "reservé en X", o cualquier plan propio — EL USUARIO ES LA FUENTE DE VERDAD sobre sus propios planes. NUNCA le digas "no tengo registro de esa reserva" ni pongas en duda que su reserva existe: eso suena frío y a chatbot, y rompe la confianza. En su lugar, RECÍBELO con calidez y naturalidad: confirma el plan, celébralo brevemente si aplica, y déjalo anotado en el itinerario. La app ya le mostrará aparte el botón "¿Lo anoto en tu calendario?", así que tu trabajo es SOLO la respuesta cálida, no preguntarle si lo agregas.
-- Si el lugar que menciona SÍ está en tu lista curada: aprovecha para dar un toque de color que demuestre que lo conoces ("¡Excelente elección! Leo, de Leonor Espinosa, es de lo mejor de Bogotá. Te dejo anotada la cena del 14 a las 7."). NUNCA digas "tengo información sobre un lugar llamado..." como si dudaras de que es el mismo: si calza, ES el mismo.
-- Si el lugar NO está en tu curación: igual recibe el plan con calidez y anótalo, sin inventar datos del lugar ("¡Listo! Te anoto la cena en X el 14 a las 7. ¿Quieres que te ayude con cómo llegar cuando se acerque la fecha?"). NO digas que no existe ni que no tienes registro.
-
+REGLA ANTI-ALUCINACIÓN — CRÍTICA: cuando el usuario pida recomendaciones de lugares (restaurantes, cafés, bares, atracciones, parques, tiendas, excursiones, supermercados, farmacias, clínicas, transporte o cualquier cosa "qué hacer / dónde ir"), usa ÚNICA Y EXCLUSIVAMENTE los lugares de la lista "LUGARES CURADOS DE VOYRA" de arriba. NUNCA inventes ni menciones ningún nombre de lugar que no esté en esa lista. Si la lista no tiene nada que calce con lo que pide, dilo honestamente ("No tengo curado eso para esta zona todavía") y sugiere lo más cercano de la lista. Inventar un restaurante o clínica que no existe es el error más grave que puedes cometer — destruye la confianza del usuario.
+EMERGENCIAS Colombia: 123 (único número). Farmacias 24h: Cruz Verde Calle 127 norte. Domicilios Cruz Verde: 486-5000.
 
 CÓMO USAR LA GUÍA LOCAL DE LA CIUDAD: para todo lo que NO sea "qué lugar específico recomiendas" — o sea transporte, cómo moverse, qué zona es qué, seguridad, dinero, propinas, clima, qué llevar, costumbres — apóyate en la "GUÍA LOCAL" de arriba y responde con seguridad y detalle concreto, como un local. Da rangos de precio reales, nombres de apps reales, tiempos realistas. Si la guía no cubre un dato puntual, dilo con honestidad en vez de inventar cifras; nunca te quedes en respuestas vagas tipo "toma un taxi" cuando la guía te da el detalle para ser preciso.
 

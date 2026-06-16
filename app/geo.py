@@ -53,15 +53,15 @@ def maps_link_from_to(
     dest_lat: float | None, dest_lng: float | None,
     mode: str = "driving",
     maps_query: str | None = None,
+    place_id: str | None = None,
 ) -> str:
     """Deep link con ORIGEN y DESTINO explícitos (ruta completa).
 
-    - Con origen: abre Google Maps en modo navegación con la ruta ya calculada.
-    - Sin origen: abre Maps mostrando el destino para que el usuario inicie la ruta.
-
-    Destino: si se pasa `maps_query` (dirección o nombre curado), tiene
-    prioridad — Google lo geocodifica con precisión y evita pines errados por
-    coordenadas mal guardadas. Solo si no hay query se usan lat,lng.
+    Prioridad del destino (de más a menos preciso):
+      1. place_id — apunta al POI EXACTO de Google, cero ambigüedad. Es lo
+         ideal y lo que deja `enrich_places.py`. Se pasa como destination_place_id.
+      2. maps_query (dirección/nombre curado) — Google lo geocodifica bien.
+      3. lat,lng — último recurso (coordenadas pueden estar aproximadas).
 
     Usa el formato oficial de Google Maps URLs (api=1), que funciona en
     navegador y abre la app nativa en Android e iOS.
@@ -74,17 +74,22 @@ def maps_link_from_to(
         dest = ""
 
     if orig_lat is not None and orig_lng is not None:
-        # Formato oficial de Google Maps URLs: parámetros de query con encoding.
-        # Funciona en navegador y abre la app nativa en Android/iOS.
         params = {
             "api": "1",
             "origin": f"{orig_lat},{orig_lng}",
             "destination": dest,
             "travelmode": mode,
         }
+        # place_id manda al POI exacto (Google ignora 'destination' si hay id,
+        # pero lo dejamos como respaldo legible).
+        if place_id:
+            params["destination_place_id"] = place_id
         return "https://www.google.com/maps/dir/?" + urllib.parse.urlencode(params)
 
-    # Sin origen: abrir el lugar directamente (Maps detecta ubicación actual)
+    # Sin origen: abrir el lugar directamente
+    if place_id:
+        return ("https://www.google.com/maps/search/?api=1"
+                f"&query={urllib.parse.quote(dest)}&query_place_id={place_id}")
     return f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote(dest)}"
 
 

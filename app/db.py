@@ -148,6 +148,12 @@ def init_db():
             c.execute("ALTER TABLE destination_places ADD COLUMN maps_query TEXT")
         if "dir" not in dp_cols:
             c.execute("ALTER TABLE destination_places ADD COLUMN dir TEXT")
+        if "place_id" not in dp_cols:
+            c.execute("ALTER TABLE destination_places ADD COLUMN place_id TEXT")
+        if "rating" not in dp_cols:
+            c.execute("ALTER TABLE destination_places ADD COLUMN rating REAL")
+        if "price_level" not in dp_cols:
+            c.execute("ALTER TABLE destination_places ADD COLUMN price_level TEXT")
 
 def new_id() -> str:
     return uuid.uuid4().hex[:12]
@@ -425,11 +431,12 @@ def seed_destination_places(places: list[dict]):
         c.execute("DELETE FROM destination_places WHERE city=?", (city,))
         for p in places:
             c.execute(
-                "INSERT INTO destination_places (id, city, city_display, name, category, zona, lat, lng, descripcion, confianza, maps_query, dir, created_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO destination_places (id, city, city_display, name, category, zona, lat, lng, descripcion, confianza, maps_query, dir, place_id, rating, price_level, created_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (new_id(), norm_city(p["city_display"]), p["city_display"], p["name"], p["category"],
                  p["zona"], p["lat"], p["lng"], p["descripcion"], p["confianza"],
-                 p.get("maps_query"), p.get("dir"), now()),
+                 p.get("maps_query"), p.get("dir"), p.get("place_id"),
+                 p.get("rating"), p.get("price_level"), now()),
             )
 
 
