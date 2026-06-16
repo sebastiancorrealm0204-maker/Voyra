@@ -433,9 +433,9 @@ function WelcomeScreen({ onSoyNuevo, onYaTengoCuenta }) {
             Tu Companion de viaje
           </h1>
           <p style={{ color: C.inkSoft, fontSize: 15.5, lineHeight: 1.55, maxWidth: 320 }}>
-            No solo te ayuda a planear. Te acompaña durante todo el camino —
-            desde que sueñas el destino hasta que vuelves a casa. Siempre cerca,
-            para que nunca te pierdas.
+            Tu guía durante todo el viaje. Te acompaña sobre el terreno, te
+            responde al instante y te avisa de lo que importa — para que nunca
+            te sientas perdido, estés donde estés.
           </p>
         </div>
 
@@ -454,8 +454,12 @@ function WelcomeScreen({ onSoyNuevo, onYaTengoCuenta }) {
   );
 }
 
-function AuthScreen({ onSuccess, onCancel }) {
-  const [modo, setModo] = React.useState("login");   // login | signup | revisa
+function AuthScreen({ onSuccess, onCancel, modoInicial = "login" }) {
+  // modoInicial define el camino: "signup" (usuario nuevo, al guardar su viaje)
+  // o "login" (usuario que ya tiene cuenta). NO se ofrece cambiar al otro modo
+  // dentro de esta pantalla — el camino lo decidió la Bienvenida. El único
+  // cambio de modo permitido es signup → "revisa" (confirma tu correo).
+  const [modo, setModo] = React.useState(modoInicial);   // login | signup | revisa
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [cargando, setCargando] = React.useState(false);
@@ -463,6 +467,7 @@ function AuthScreen({ onSuccess, onCancel }) {
   const [aviso, setAviso] = React.useState("");
   const [devLink, setDevLink] = React.useState("");   // solo si el backend está en modo dev
 
+  const esSignup = modo === "signup";
   const limpiar = () => { setError(""); setAviso(""); };
 
   const hacerSignup = async () => {
@@ -475,7 +480,7 @@ function AuthScreen({ onSuccess, onCancel }) {
       if (r.dev_verification_link) setDevLink(r.dev_verification_link);
       setModo("revisa");
     } catch (e) {
-      setError(e.status === 409 ? "Ese email ya tiene cuenta. Inicia sesión." : (e.message || "No pude crear la cuenta."));
+      setError(e.status === 409 ? "Ese email ya tiene cuenta. Vuelve y entra con 'Ya tengo cuenta'." : (e.message || "No pude crear la cuenta."));
     }
     setCargando(false);
   };
@@ -533,7 +538,7 @@ function AuthScreen({ onSuccess, onCancel }) {
               <div style={{ fontSize: 40, marginBottom: 8 }}>✉️</div>
               <h1 style={{ fontSize: 24, fontWeight: 800, margin: "4px 0 8px" }}>Confirma tu correo</h1>
               <p style={{ color: C.inkSoft, fontSize: 15, lineHeight: 1.5 }}>
-                Te enviamos un enlace a <b style={{ color: C.ink }}>{email.trim()}</b>. Ábrelo para activar tu cuenta y luego inicia sesión.
+                Te enviamos un enlace a <b style={{ color: C.ink }}>{email.trim()}</b>. Ábrelo para activar tu cuenta y vuelve aquí.
               </p>
               {devLink && (
                 <div style={{ marginTop: 14, padding: 12, borderRadius: 10, background: C.aquaSoft, border: `1px solid ${C.line}` }}>
@@ -547,18 +552,18 @@ function AuthScreen({ onSuccess, onCancel }) {
                 Reenviar enlace
               </button>
               <button onClick={() => { setModo("login"); limpiar(); }} style={{ width: "100%", marginTop: 10, padding: 12, borderRadius: 12, border: "none", background: C.orange, color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer" }}>
-                Ya lo confirmé, iniciar sesión
+                Ya lo confirmé, entrar
               </button>
             </div>
           ) : (
             <div>
               <h1 style={{ fontSize: 26, fontWeight: 800, margin: "0 0 6px", letterSpacing: "-0.02em" }}>
-                {modo === "signup" ? "Crea tu cuenta" : "Inicia sesión"}
+                {esSignup ? "Crea tu cuenta" : "Inicia sesión"}
               </h1>
               <p style={{ color: C.inkSoft, fontSize: 15, lineHeight: 1.5, marginBottom: 18 }}>
-                {modo === "signup"
+                {esSignup
                   ? "Para guardar tu viaje y que tu Companion te acompañe durante todo el camino."
-                  : "Entra para retomar tu viaje y tu Companion."}
+                  : "Entra para retomar tus viajes y tu Companion."}
               </p>
 
               <label style={{ fontSize: 11.5, fontWeight: 600, color: C.inkSoft, letterSpacing: "0.03em" }}>EMAIL</label>
@@ -568,21 +573,13 @@ function AuthScreen({ onSuccess, onCancel }) {
               <div style={{ marginTop: 14 }}>
                 <label style={{ fontSize: 11.5, fontWeight: 600, color: C.inkSoft, letterSpacing: "0.03em" }}>CONTRASEÑA</label>
                 <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") (modo === "signup" ? hacerSignup() : hacerLogin()); }}
-                  placeholder={modo === "signup" ? "Mínimo 8 caracteres" : "Tu contraseña"} style={inputStyle} />
+                  onKeyDown={(e) => { if (e.key === "Enter") (esSignup ? hacerSignup() : hacerLogin()); }}
+                  placeholder={esSignup ? "Mínimo 8 caracteres" : "Tu contraseña"} style={inputStyle} />
               </div>
 
               {error && <p style={{ color: C.coral, fontSize: 13.5, marginTop: 12 }}>{error}</p>}
 
-              {btnPrimario(modo === "signup" ? "Crear cuenta" : "Entrar", modo === "signup" ? hacerSignup : hacerLogin)}
-
-              <div style={{ textAlign: "center", marginTop: 18, fontSize: 14, color: C.inkSoft }}>
-                {modo === "signup" ? "¿Ya tienes cuenta? " : "¿Nuevo en Voyra? "}
-                <button onClick={() => { setModo(modo === "signup" ? "login" : "signup"); limpiar(); }}
-                  style={{ background: "none", border: "none", color: C.orange, fontWeight: 700, fontSize: 14, cursor: "pointer", padding: 0 }}>
-                  {modo === "signup" ? "Inicia sesión" : "Crea una cuenta"}
-                </button>
-              </div>
+              {btnPrimario(esSignup ? "Crear cuenta" : "Entrar", esSignup ? hacerSignup : hacerLogin)}
             </div>
           )}
         </div>
@@ -789,10 +786,11 @@ function VoyraCompanion() {
   // ── Rehidratar sesión al cargar + capturar 401 globales ──
   useEffect(() => {
     // Si una request devuelve 401 (token expirado/limpiado), cerramos sesión y
-    // mostramos el login. La acción pendiente, si la hay, se mantiene.
+    // mandamos al login (no a crear cuenta: el usuario ya la tenía).
     api.onUnauthorized(() => {
       setAuth(null);
-      setAuthGate(true);
+      setAuthGate(false);
+      setFase("login");
     });
     // ¿Hay token guardado? Validarlo con /auth/me y restaurar la sesión.
     // Si la sesión es válida, el usuario "viejo" entra directo al Home (perfil
@@ -1236,23 +1234,41 @@ function VoyraCompanion() {
   // ════════════════ BIENVENIDA ════════════════
   // Primera pantalla cuando no hay sesión guardada (si hay token válido, la
   // rehidratación de sesión ya mandó a "home" antes de llegar aquí).
-  if (fase === "bienvenida") {
+  // ════════════════ LOGIN (usuario que ya tiene cuenta) ════════════════
+  // Camino "Ya tengo cuenta" de la Bienvenida. Modo login fijo (sin opción de
+  // crear cuenta aquí). "Volver" regresa a la Bienvenida.
+  if (fase === "login") {
     return (
-      <WelcomeScreen
-        onSoyNuevo={() => setFase("setup")}
-        onYaTengoCuenta={() => setAuthGate(true)}
+      <AuthScreen
+        modoInicial="login"
+        onSuccess={onAuthSuccess}
+        onCancel={() => setFase("bienvenida")}
       />
     );
   }
 
-  // ════════════════ GATE DE SESIÓN ════════════════
-  // Si una acción requirió login (o expiró la sesión), mostramos la pantalla de
-  // auth por encima de todo. Al lograr sesión, se reanuda la acción pendiente.
+  // ════════════════ GATE DE SIGNUP (usuario nuevo, al guardar su viaje) ═════
+  // Se abre cuando el usuario nuevo termina el onboarding e intenta guardar.
+  // Modo signup fijo. "Volver" descarta la acción pendiente y regresa a la
+  // Bienvenida (no al onboarding a medias, que no tenía sentido).
   if (authGate) {
     return (
       <AuthScreen
+        modoInicial="signup"
         onSuccess={onAuthSuccess}
-        onCancel={() => { pendingActionRef.current = null; setAuthGate(false); }}
+        onCancel={() => { pendingActionRef.current = null; setAuthGate(false); setFase("bienvenida"); }}
+      />
+    );
+  }
+
+  // ════════════════ BIENVENIDA ════════════════
+  // Primera pantalla cuando no hay sesión guardada (si hay token válido, la
+  // rehidratación de sesión ya mandó a "home" antes de llegar aquí).
+  if (fase === "bienvenida") {
+    return (
+      <WelcomeScreen
+        onSoyNuevo={() => setFase("setup")}
+        onYaTengoCuenta={() => setFase("login")}
       />
     );
   }
@@ -1384,8 +1400,12 @@ function VoyraCompanion() {
           {/* marca + volver */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 6 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              {(modoSetup || paso === 2) && (
+              {(modoSetup || paso === 2) ? (
                 <button onClick={() => { if (paso === 2) setPaso(1); else setModoSetup(null); }} style={{ border: "none", background: "none", fontSize: 22, color: C.inkSoft, cursor: "pointer", lineHeight: 1, padding: 0, marginRight: 2 }}>‹</button>
+              ) : (
+                // En la pantalla de impacto (sin modo elegido), "volver" regresa
+                // a la Bienvenida (usuario nuevo / ya registrado), no se queda atascado.
+                <button onClick={() => setFase("bienvenida")} style={{ border: "none", background: "none", fontSize: 22, color: C.inkSoft, cursor: "pointer", lineHeight: 1, padding: 0, marginRight: 2 }}>‹</button>
               )}
               <div style={{ fontWeight: 800, fontSize: 20, letterSpacing: "-0.02em" }}>Voyra</div>
             </div>
@@ -1403,7 +1423,7 @@ function VoyraCompanion() {
                 Nunca te pierdas.<br />Nunca viajes solo.
               </h1>
               <p style={{ color: C.inkSoft, marginTop: 14, fontSize: 15.5, lineHeight: 1.55, textAlign: "center", maxWidth: 340, marginLeft: "auto", marginRight: "auto" }}>
-                Soy tu Companion: te acompaño en cada paso del viaje y estoy aquí para lo que necesites, cuando lo necesites.
+                Cuéntame de tu viaje y me convierto en tu asistente durante el camino: te guío sobre el terreno, te respondo al instante y te aviso de lo que importa, para que nunca te sientas perdido.
               </p>
 
               <div style={{ marginTop: 30, display: "flex", flexDirection: "column", gap: 12 }}>
