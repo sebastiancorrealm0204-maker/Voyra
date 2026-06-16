@@ -193,17 +193,26 @@ def plan_maps_link(tid: str, plan_id: str,
     if not plan:
         raise HTTPException(404, "plan no existe")
 
-    # Datos del destino desde la curación
+    # Datos del destino desde la curación.
+    # Probamos con el lugar Y con el título: a veces el extractor guarda un
+    # lugar genérico ("Bogotá") pero el título trae el nombre real ("Cena en
+    # El Cielo"). Nos quedamos con el match de mayor puntaje entre ambos.
     city = trip.get("ciudad", "")
     dest_lat, dest_lng = None, None
     dest_dir, dest_query = None, None
-    lugar_nombre = plan.get("lugar") or plan.get("titulo") or ""
-    if lugar_nombre.strip():
-        match = db.best_place_match(lugar_nombre, db.places_for_city(city))
-        if match:
-            dest_lat, dest_lng = match["lat"], match["lng"]
-            dest_dir = match.get("dir")
-            dest_query = match.get("maps_query")
+    candidatos_texto = [t for t in (plan.get("lugar"), plan.get("titulo")) if t and t.strip()]
+    places = db.places_for_city(city)
+    match = None
+    for texto in candidatos_texto:
+        m = db.best_place_match(texto, places)
+        if m:
+            match = m
+            break
+    if match:
+        dest_lat, dest_lng = match["lat"], match["lng"]
+        dest_dir = match.get("dir")
+        dest_query = match.get("maps_query")
+    lugar_nombre = (plan.get("lugar") or plan.get("titulo") or "").strip()
 
     # Origen: parámetros de query > GPS guardado en trip > None
     olat = orig_lat or trip.get("lat_actual")
@@ -221,13 +230,24 @@ def plan_maps_link(tid: str, plan_id: str,
         destino_texto = dest_query or dest_dir
         link = geo.maps_link_from_to(olat, olng, None, None, mode=mode,
                                      maps_query=destino_texto)
-    elif lugar_nombre.strip():
-        # Lugar no curado: nombre + ciudad para que Maps lo geocodifique
-        fallback_query = f"{lugar_nombre} {city}".strip()
-        link = geo.maps_link_from_to(olat, olng, None, None, mode=mode,
-                                     maps_query=fallback_query)
     else:
-        link = f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote(city)}"
+        # Lugar no curado: armamos la mejor query posible.
+        # Elegimos entre lugar y título el texto con más "sustancia" (que tenga
+        # tokens distintivos, no solo "Bogotá" o "cena"). Si ninguno la tiene,
+        # caemos a búsqueda de la ciudad.
+        mejor_texto = ""
+        for texto in candidatos_texto:
+            if db.place_tokens(texto):  # tiene al menos un token distintivo
+                mejor_texto = texto
+                break
+        if mejor_texto:
+            # Evitar duplicar la ciudad si ya está en el texto
+            base = mejor_texto.strip()
+            query = base if city.lower() in base.lower() else f"{base}, {city}"
+            link = geo.maps_link_from_to(olat, olng, None, None, mode=mode,
+                                         maps_query=query)
+        else:
+            link = f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote(city)}"
 
     minutos = geo.travel_minutes(dist_km, city) if dist_km else None
 
@@ -391,6 +411,11 @@ def chat(tid: str, c: ChatIn):
         from . import plans as plans_mod, timeutil
         propuestas = plans_mod.normalizar_lista(
             llm.extract_plans_from_chat(c.message, trip), origen="chat")
+        # No dejar la ciudad como "lugar" (rompe el match y manda a sitios random)
+        propuestas = plans_mod.limpiar_lugar_ciudad(propuestas, trip.get("ciudad", ""))
+        # Si el plan coincide con un lugar curado, corrige tipo (ícono) y lugar
+        propuestas = plans_mod.enriquecer_con_curacion(
+            propuestas, db.places_for_city(trip.get("ciudad", "")), db.best_place_match)
         # Red de seguridad: si el LLM no puso fecha pero el mensaje dice
         # "mañana", "el viernes", etc., la deducimos aquí.
         try:
@@ -443,6 +468,9 @@ def upload_doc(tid: str, d: DocIn):
     # muestra "encontré estos planes, ¿los agrego a tu calendario?".
     from . import plans as plans_mod
     propuestas = plans_mod.normalizar_lista(r.get("planes", []), origen="documento")
+    propuestas = plans_mod.limpiar_lugar_ciudad(propuestas, trip.get("ciudad", ""))
+    propuestas = plans_mod.enriquecer_con_curacion(
+        propuestas, db.places_for_city(trip.get("ciudad", "")), db.best_place_match)
     r["planes_propuestos"] = propuestas
     return r
 

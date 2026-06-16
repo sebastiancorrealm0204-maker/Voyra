@@ -387,10 +387,18 @@ def extract_plans_from_chat(message: str, trip: dict | None = None) -> list[dict
         "¿El usuario está contando un PLAN o RESERVA futura concreta (algo que va a hacer, "
         "con o sin fecha/hora)? Si SÍ, extráelo. Si es una PREGUNTA, una duda, o charla general "
         "SIN un plan concreto, devuelve lista vacía.\n"
+        "REGLAS para los campos:\n"
+        "- \"lugar\": el NOMBRE ESPECÍFICO del sitio (ej. \"El Cielo\", \"Andrés Carne de Res\", "
+        "\"Museo del Oro\"). NUNCA pongas la ciudad ni una zona genérica. Si el usuario no "
+        "menciona un sitio concreto, usa null. JAMÁS pongas \"Bogotá\" como lugar.\n"
+        "- \"tipo\": clasifica por la actividad — una cena/almuerzo en un sitio = \"restaurante\"; "
+        "un tour/museo/parque/paseo = \"actividad\"; un vuelo = \"vuelo\"; check-in de hotel = \"hotel\"; "
+        "un traslado/taxi = \"transporte\". Solo usa \"otro\" si de verdad no encaja en ninguno.\n"
+        "- \"titulo\": breve y claro (ej. \"Cena en El Cielo\").\n"
         'Responde SOLO JSON válido sin markdown: {"planes": [ '
         '{"fecha": "YYYY-MM-DD o null", "hora": "HH:MM o null", "titulo": "<corto>", '
         '"tipo": "<vuelo|hotel|actividad|restaurante|transporte|otro>", '
-        '"detalle": "<datos útiles o vacío>", "lugar": "<lugar o null>"} ] }'
+        '"detalle": "<datos útiles o vacío>", "lugar": "<nombre del sitio o null, NUNCA la ciudad>"} ] }'
     )
     try:
         out = _parse_json(_call(EXTRACT_PROVIDER, "Eres el detector de planes de viaje de Voyra.",

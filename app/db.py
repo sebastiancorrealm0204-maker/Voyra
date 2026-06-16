@@ -340,8 +340,14 @@ def place_match_score(consulta: str, nombre_curado: str) -> float:
         return 1.0
 
     ta, tb = place_tokens(consulta), place_tokens(nombre_curado)
-    if not ta or not tb:
-        # Sin tokens distintivos (solo categorías genéricas); apóyate en
+    if not ta:
+        # La consulta no tiene NINGÚN token distintivo (solo stopwords como
+        # "Bogotá", "cena", "restaurante"). No es una referencia a un lugar
+        # concreto: no debe coincidir con nada. Antes, "Bogotá" hacía match por
+        # subcadena con "Bogotá Beer Company" y mandaba todo a BBC.
+        return 0.0
+    if not tb:
+        # El nombre curado no tiene tokens distintivos (raro): apóyate en
         # contención de cadena completa, exigiendo solape sustancial.
         if len(a) >= 5 and (a in b or b in a):
             return 0.6

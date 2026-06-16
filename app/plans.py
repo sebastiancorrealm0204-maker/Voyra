@@ -193,3 +193,65 @@ def rellenar_fechas(planes: list[dict], texto: str, ahora) -> list[dict]:
         if not p.get("fecha"):
             p["fecha"] = fecha
     return planes
+
+
+def limpiar_lugar_ciudad(planes: list[dict], city: str) -> list[dict]:
+    """Anula el campo 'lugar' si es igual a la ciudad (o una zona genérica).
+
+    El extractor a veces pone la ciudad ("Bogotá") como lugar; eso no es un
+    sitio concreto y rompe el matching/maps. Lo dejamos en None para que el
+    link use el título o caiga al fallback de ciudad correctamente.
+    """
+    import unicodedata
+    def norm(s):
+        return unicodedata.normalize("NFKD", (s or "").strip().lower()) \
+            .encode("ascii", "ignore").decode()
+    c = norm(city)
+    genericos = {c, "centro", "centro historico", "zona t", "zona g",
+                 "zona rosa", "chapinero", "la candelaria", "colombia"}
+    for p in planes:
+        if norm(p.get("lugar")) in genericos:
+            p["lugar"] = None
+    return planes
+
+
+# Mapea la categoría curada (seed_data) al tipo de plan
+_CAT_A_TIPO = {
+    "restaurante": "restaurante", "bar": "restaurante", "cafe": "restaurante",
+    "mercado": "actividad", "parque": "actividad", "mirador": "actividad",
+    "atraccion": "actividad", "experiencia": "actividad", "excursion": "actividad",
+    "compras": "actividad",
+}
+
+
+def enriquecer_con_curacion(planes: list[dict], places: list[dict],
+                            best_match_fn) -> list[dict]:
+    """Si un plan coincide con un lugar curado, corrige tipo y normaliza el
+    nombre del lugar. Así 'cena en el cielo' (que el LLM marcó 'otro') queda
+    como 'restaurante' con lugar canónico, y el ícono sale bien.
+
+    best_match_fn(texto, places) -> dict|None  (inyectado para evitar import
+    circular con db).
+    """
+    for p in planes:
+        textos = [t for t in (p.get("lugar"), p.get("titulo")) if t and t.strip()]
+        m = None
+        for t in textos:
+            m = best_match_fn(t, places)
+            if m:
+                break
+        if not m:
+            continue
+        cat = (m.get("category") or "").lower()
+        if p.get("tipo") in (None, "", "otro") and cat in _CAT_A_TIPO:
+            p["tipo"] = _CAT_A_TIPO[cat]
+        # Si el lugar quedó vacío (lo limpiamos por ser ciudad) pero hay match,
+        # usamos un nombre corto y limpio del lugar curado.
+        if not p.get("lugar"):
+            nombre = m.get("name", "")
+            # quitar sufijo de ciudad redundante ("El Cielo Bogotá" -> "El Cielo")
+            for suf in (" Bogotá", " (BBC)"):
+                if nombre.endswith(suf):
+                    nombre = nombre[: -len(suf)]
+            p["lugar"] = nombre.strip() or None
+    return planes

@@ -540,3 +540,43 @@ def test_seed_elimina_filas_viejas_erroneas():
     assert ciel[0]["name"] == "El Cielo Bogotá"
     assert "Calle 70" in (ciel[0].get("dir") or "")
     assert 4.64 < ciel[0]["lat"] < 4.66  # Zona G, no Zona T
+
+
+# ── Bug fixes: matching de lugares (sesión maps) ──
+def test_bogota_no_matchea_bbc():
+    """La ciudad sola NO debe coincidir con ningún lugar (antes caía en BBC)."""
+    from app import db, seed_data
+    db.seed_destination_places(seed_data.all_seeds())
+    places = db.places_for_city("Bogotá")
+    assert db.best_place_match("Bogotá", places) is None
+    assert db.best_place_match("restaurante", places) is None
+    assert db.best_place_match("cena", places) is None
+
+
+def test_el_cielo_matchea_bien():
+    from app import db, seed_data
+    db.seed_destination_places(seed_data.all_seeds())
+    places = db.places_for_city("Bogotá")
+    for inp in ["El Cielo", "el cielo", "ElCielo", "Cena en El Cielo"]:
+        m = db.best_place_match(inp, places)
+        assert m and m["name"] == "El Cielo Bogotá", f"{inp} -> {m}"
+    # BBC sigue funcionando por su nombre real
+    assert db.best_place_match("Bogotá Beer Company", places)["name"].startswith("Bogotá Beer")
+
+
+def test_limpiar_lugar_ciudad():
+    from app import plans
+    pl = [{"titulo": "Cena", "lugar": "Bogotá"}, {"titulo": "x", "lugar": "El Cielo"}]
+    out = plans.limpiar_lugar_ciudad(pl, "Bogotá")
+    assert out[0]["lugar"] is None
+    assert out[1]["lugar"] == "El Cielo"
+
+
+def test_enriquecer_con_curacion_corrige_tipo_y_lugar():
+    from app import plans, db, seed_data
+    db.seed_destination_places(seed_data.all_seeds())
+    places = db.places_for_city("Bogotá")
+    pl = [{"titulo": "Cena en El Cielo", "lugar": None, "tipo": "otro"}]
+    out = plans.enriquecer_con_curacion(pl, places, db.best_place_match)
+    assert out[0]["tipo"] == "restaurante"
+    assert out[0]["lugar"] == "El Cielo"
