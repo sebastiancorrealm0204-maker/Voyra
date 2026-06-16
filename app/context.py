@@ -34,7 +34,7 @@ def _lugares_block(trip: dict) -> str:
             key=lambda p: geo.haversine_km(origin[0], origin[1], p["lat"], p["lng"]),
         )
 
-    # Top 30 — suficiente para responder bien sin saturar el contexto
+    # Top 30 con descripción completa — para recomendar por cercanía
     top = places[:30]
     lineas = []
     for p in top:
@@ -44,13 +44,28 @@ def _lugares_block(trip: dict) -> str:
             dist = f" (~{km:.1f} km)"
         lineas.append(f"- {p['name']} [{p['category']}]{dist} · {p['zona']} · {p['descripcion']}")
 
-    return (
+    bloque = (
         "\nLUGARES CURADOS DE VOYRA PARA " + city.upper() + " "
         "(FUENTE ÚNICA Y EXCLUSIVA para recomendar restaurantes, cafés, bares, "
         "atracciones, parques y excursiones — ordenados por cercanía al usuario):\n"
         + "\n".join(lineas)
         + "\n"
     )
+
+    # Índice del resto de lugares curados (solo nombre + zona). Evita que el
+    # Companion diga "no tengo ese lugar" cuando SÍ está curado pero quedó fuera
+    # del top 30 por distancia. Si el usuario pregunta por uno de estos, el
+    # Companion sabe que existe y es válido recomendarlo.
+    resto = places[30:]
+    if resto:
+        nombres = ", ".join(f"{p['name']} ({p['zona']})" for p in resto)
+        bloque += (
+            "\nOTROS LUGARES CURADOS DE VOYRA (también válidos para recomendar; "
+            "están más lejos del usuario pero son parte de la curación oficial — "
+            "NUNCA digas que no existen):\n" + nombres + "\n"
+        )
+
+    return bloque
 
 
 def build(trip: dict, docs: list[dict] | None = None) -> str:

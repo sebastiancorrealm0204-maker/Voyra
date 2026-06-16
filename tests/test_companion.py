@@ -500,3 +500,20 @@ def test_el_cielo_datos_correctos():
     # Coordenadas dentro de Chapinero/Zona G (no en otra zona de la ciudad)
     assert 4.64 < ec["lat"] < 4.66
     assert -74.07 < ec["lng"] < -74.05
+
+
+def test_contexto_incluye_todos_los_lugares_curados():
+    """El system prompt nombra TODOS los lugares curados, no solo los 30 más
+    cercanos, para que el Companion nunca niegue uno que sí existe."""
+    from app import db, context, seed_data
+    db.seed_destination_places(seed_data.all_seeds())
+    total = len(db.places_for_city("Bogotá"))
+    # Usuario en La Candelaria (sur) — El Cielo (norte) cae fuera del top 30
+    trip = {"ciudad": "Bogotá", "zona_actual": "La Candelaria",
+            "lat_actual": 4.5981, "lng_actual": -74.0758}
+    block = context._lugares_block(trip)
+    # El Cielo debe estar presente aunque esté lejos
+    assert "El Cielo" in block
+    # Cada lugar curado debe aparecer nombrado en algún lugar del prompt
+    faltantes = [p["name"] for p in db.places_for_city("Bogotá") if p["name"] not in block]
+    assert not faltantes, f"lugares ausentes del prompt: {faltantes}"
