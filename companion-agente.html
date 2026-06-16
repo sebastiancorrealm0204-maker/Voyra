@@ -413,6 +413,47 @@ function Icon({ name, size = 22, color = "currentColor", strokeWidth = 2, style 
 //   crear cuenta  →  "revisa tu correo"  →  (confirma en su email)  →  entrar
 // El login exige email verificado; mientras no lo esté, el backend responde 403
 // y mostramos el aviso de "confirma tu correo" con opción de reenviar.
+// ════════════════ BIENVENIDA ════════════════
+// Primera pantalla absoluta cuando no hay sesión guardada. Comunica la
+// promesa central del producto (el Companion te acompaña todo el viaje, no
+// solo te ayuda a planear) y bifurca: usuario nuevo va al onboarding de
+// siempre; usuario que ya tiene cuenta va directo al login.
+function WelcomeScreen({ onSoyNuevo, onYaTengoCuenta }) {
+  return (
+    <div style={{ minHeight: "100dvh", background: C.bg, color: C.ink, overflowY: "auto" }} className="no-scrollbar">
+      <div style={{ maxWidth: 420, margin: "0 auto", padding: "max(28px, env(safe-area-inset-top)) 26px 40px", display: "flex", flexDirection: "column", minHeight: "100dvh", boxSizing: "border-box" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Voyra</span>
+          <span style={{ fontSize: 18 }}>🛟</span>
+        </div>
+
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
+          <Mark size={92} pulse />
+          <h1 style={{ fontSize: 27, fontWeight: 800, letterSpacing: "-0.02em", margin: "26px 0 10px", lineHeight: 1.2 }}>
+            Tu Companion de viaje
+          </h1>
+          <p style={{ color: C.inkSoft, fontSize: 15.5, lineHeight: 1.55, maxWidth: 320 }}>
+            No solo te ayuda a planear. Te acompaña durante todo el camino —
+            desde que sueñas el destino hasta que vuelves a casa. Siempre cerca,
+            para que nunca te pierdas.
+          </p>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+          <button onClick={onSoyNuevo}
+            style={{ width: "100%", padding: "15px", borderRadius: 14, border: "none", background: C.orange, color: "#fff", fontWeight: 700, fontSize: 16, cursor: "pointer" }}>
+            Soy nuevo aquí
+          </button>
+          <button onClick={onYaTengoCuenta}
+            style={{ width: "100%", padding: "15px", borderRadius: 14, border: `1px solid ${C.line}`, background: "none", color: C.ink, fontWeight: 700, fontSize: 16, cursor: "pointer" }}>
+            Ya tengo cuenta
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AuthScreen({ onSuccess, onCancel }) {
   const [modo, setModo] = React.useState("login");   // login | signup | revisa
   const [email, setEmail] = React.useState("");
@@ -685,7 +726,7 @@ function HomeScreen({ auth, onElegirViaje, onCrearViaje, onCerrarSesion }) {
 }
 
 function VoyraCompanion() {
-  const [fase, setFase] = useState("setup");
+  const [fase, setFase] = useState("bienvenida");
   const [tripId, setTripId] = useState(null);
   // ── Sesión del usuario ──
   // auth = null (sin sesión) | { token, email, plan }. Se rehidrata del token
@@ -785,6 +826,7 @@ function VoyraCompanion() {
     const pend = pendingActionRef.current;
     pendingActionRef.current = null;
     if (pend) { try { pend(); } catch {} }
+    else setFase("home"); // venía de "Ya tengo cuenta": sin acción que reanudar, va directo al Home.
   };
 
   const cerrarSesion = async () => {
@@ -794,7 +836,7 @@ function VoyraCompanion() {
     setTripId(null);
     setStream([]);
     setPlanes([]);
-    setFase("setup");
+    setFase("bienvenida");
     setModoSetup(null);
     setPaso(1);
     setAuthGate(false);
@@ -1190,6 +1232,18 @@ function VoyraCompanion() {
       }
     }
   };
+
+  // ════════════════ BIENVENIDA ════════════════
+  // Primera pantalla cuando no hay sesión guardada (si hay token válido, la
+  // rehidratación de sesión ya mandó a "home" antes de llegar aquí).
+  if (fase === "bienvenida") {
+    return (
+      <WelcomeScreen
+        onSoyNuevo={() => setFase("setup")}
+        onYaTengoCuenta={() => setAuthGate(true)}
+      />
+    );
+  }
 
   // ════════════════ GATE DE SESIÓN ════════════════
   // Si una acción requirió login (o expiró la sesión), mostramos la pantalla de
