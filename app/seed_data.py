@@ -34,7 +34,7 @@ BOGOTA = [
     # ════════════ ALTA COCINA — rankings internacionales ════════════
     {
         "city_display": "Bogotá", "name": "El Chato", "price_level": "PRICE_LEVEL_VERY_EXPENSIVE", "rating": 4.4, "place_id": "ChIJQclc-kSaP44RJgBygHivOB4", "category": "restaurante", "zona": "Chapinero Alto",
-        "dir": "Cl. 65 #4-76, Chapinero, Alto, Bogotá", Chapinero, Bogotá, Colombia",
+        "dir": "Cl. 65 #4-76, Chapinero, Alto, Bogotá",
         "maps_query": "El Chato restaurante Bogotá",
         "lat": 4.647952, "lng": -74.057071,
         "descripcion": "El #1 de Latin America's 50 Best Restaurants 2025 — nombrado el Mejor Restaurante de Latinoamérica. Del chef Álvaro Clavijo: alta cocina colombiana de temporada que realza el producto local con técnica global. Reservar con semanas de anticipación.",
