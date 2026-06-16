@@ -50,7 +50,7 @@ def maps_link(lat: float, lng: float, mode: str = "walking",
 
 def maps_link_from_to(
     orig_lat: float | None, orig_lng: float | None,
-    dest_lat: float, dest_lng: float,
+    dest_lat: float | None, dest_lng: float | None,
     mode: str = "driving",
     maps_query: str | None = None,
 ) -> str:
@@ -59,14 +59,19 @@ def maps_link_from_to(
     - Con origen: abre Google Maps en modo navegación con la ruta ya calculada.
     - Sin origen: abre Maps mostrando el destino para que el usuario inicie la ruta.
 
-    El formato /dir/origen/destino funciona en navegador y abre la app nativa
-    en Android e iOS (si está instalada), sin el problema del api=1.
+    Destino: si se pasa `maps_query` (dirección o nombre curado), tiene
+    prioridad — Google lo geocodifica con precisión y evita pines errados por
+    coordenadas mal guardadas. Solo si no hay query se usan lat,lng.
+
+    Usa el formato oficial de Google Maps URLs (api=1), que funciona en
+    navegador y abre la app nativa en Android e iOS.
     """
-    # Destino: preferimos lat,lng exacto (más preciso) sobre el nombre
-    if dest_lat and dest_lng:
+    if maps_query:
+        dest = maps_query
+    elif dest_lat is not None and dest_lng is not None:
         dest = f"{dest_lat},{dest_lng}"
     else:
-        dest = maps_query or ""
+        dest = ""
 
     if orig_lat is not None and orig_lng is not None:
         # Formato oficial de Google Maps URLs: parámetros de query con encoding.

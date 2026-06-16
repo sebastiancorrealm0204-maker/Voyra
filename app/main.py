@@ -193,14 +193,17 @@ def plan_maps_link(tid: str, plan_id: str,
     if not plan:
         raise HTTPException(404, "plan no existe")
 
-    # Coordenadas del destino desde la curación
+    # Datos del destino desde la curación
     city = trip.get("ciudad", "")
     dest_lat, dest_lng = None, None
+    dest_dir, dest_query = None, None
     lugar_nombre = plan.get("lugar") or plan.get("titulo") or ""
     if lugar_nombre.strip():
         match = db.best_place_match(lugar_nombre, db.places_for_city(city))
         if match:
             dest_lat, dest_lng = match["lat"], match["lng"]
+            dest_dir = match.get("dir")
+            dest_query = match.get("maps_query")
 
     # Origen: parámetros de query > GPS guardado en trip > None
     olat = orig_lat or trip.get("lat_actual")
@@ -210,18 +213,21 @@ def plan_maps_link(tid: str, plan_id: str,
         if (olat and dest_lat) else None
     mode = geo.suggest_mode(dist_km)
 
-    if dest_lat:
-        # Lugar en curación: usamos coordenadas exactas — sin ambigüedad
-        link = geo.maps_link_from_to(olat, olng, dest_lat, dest_lng, mode=mode)
-    else:
-        # Lugar no curado: buscamos por nombre en Maps
+    # Destino para el LINK: preferimos la query curada (nombre del negocio +
+    # dirección), que Google resuelve al POI exacto. La dirección sola es el
+    # respaldo. Las coordenadas guardadas NO se usan como destino porque pueden
+    # estar mal; solo sirven para estimar distancia/tiempo.
+    if dest_query or dest_dir:
+        destino_texto = dest_query or dest_dir
+        link = geo.maps_link_from_to(olat, olng, None, None, mode=mode,
+                                     maps_query=destino_texto)
+    elif lugar_nombre.strip():
+        # Lugar no curado: nombre + ciudad para que Maps lo geocodifique
         fallback_query = f"{lugar_nombre} {city}".strip()
-        if olat and olng:
-            # Con origen: ruta desde la ubicación actual hacia el destino por nombre
-            link = geo.maps_link_from_to(olat, olng, 0, 0, mode=mode,
-                                         maps_query=fallback_query)
-        else:
-            link = f"https://maps.google.com/?q={urllib.parse.quote(fallback_query)}"
+        link = geo.maps_link_from_to(olat, olng, None, None, mode=mode,
+                                     maps_query=fallback_query)
+    else:
+        link = f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote(city)}"
 
     minutos = geo.travel_minutes(dist_km, city) if dist_km else None
 

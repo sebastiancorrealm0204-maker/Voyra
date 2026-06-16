@@ -81,11 +81,11 @@ BOGOTA = [
         "confianza": "alta",
     },
     {
-        "city_display": "Bogotá", "name": "El Cielo Bogotá", "category": "restaurante", "zona": "Zona T / El Retiro",
-        "dir": "Carrera 9 #79-04, Bogotá, Colombia",
-        "maps_query": "El Cielo restaurante Bogotá",
-        "lat": 4.6620, "lng": -74.0560,
-        "descripcion": "Experiencia multisensorial del chef Juan Manuel Barrientos (quien obtuvo estrella Michelin con El Cielo en EE. UU.). Menú-degustación con 'momentos' que van más allá del plato. Reservar; ideal para ocasiones.",
+        "city_display": "Bogotá", "name": "El Cielo Bogotá", "category": "restaurante", "zona": "Zona G / Chapinero",
+        "dir": "Calle 70 #4-47, Zona G, Chapinero, Bogotá, Colombia",
+        "maps_query": "Elcielo Restaurant Bogotá Calle 70 4-47 Zona G",
+        "lat": 4.6477, "lng": -74.0588,
+        "descripcion": "Experiencia multisensorial del chef Juan Manuel Barrientos (estrella Michelin con El Cielo en EE. UU.). Menú-degustación con 'momentos' que van más allá del plato, en Zona G. Reservar; ideal para ocasiones.",
         "confianza": "alta",
     },
     {

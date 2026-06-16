@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS destination_places (
   descripcion TEXT NOT NULL,
   confianza TEXT NOT NULL,        -- muy_alta | alta | media_alta | media
   maps_query TEXT,                -- nombre buscable para landmarks (deep link a Maps); NULL = usar lat,lng
+  dir TEXT,                       -- dirección exacta (Calle/Carrera #...) para geocodificar el deep link
   created_at REAL NOT NULL
 );
 CREATE TABLE IF NOT EXISTS place_recommendations (
@@ -131,6 +132,8 @@ def init_db():
         dp_cols = {r["name"] for r in c.execute("PRAGMA table_info(destination_places)").fetchall()}
         if "maps_query" not in dp_cols:
             c.execute("ALTER TABLE destination_places ADD COLUMN maps_query TEXT")
+        if "dir" not in dp_cols:
+            c.execute("ALTER TABLE destination_places ADD COLUMN dir TEXT")
 
 def new_id() -> str:
     return uuid.uuid4().hex[:12]
@@ -381,33 +384,48 @@ def places_for_city(city: str) -> list[dict]:
 
 
 def seed_destination_places(places: list[dict]):
-    """Reconcilia la curación: inserta los lugares que falten, sin duplicar.
+    """Reconcilia la curación: inserta los que faltan y ACTUALIZA los que ya
+    están si cambió su dato curado (coordenadas, dirección, query, etc.).
 
-    Antes saltaba por completo si ya existía cualquier lugar de la ciudad, lo
-    que dejaba bases viejas con curaciones parciales (p. ej. 37 de 77 lugares).
-    Ahora compara por nombre normalizado e inserta solo los que faltan. Es
-    idempotente y seguro: solo toca destination_places, nunca trips ni planes.
+    Antes saltaba la ciudad entera si existía cualquier lugar, dejando bases
+    viejas con curaciones parciales o con datos erróneos ya corregidos en el
+    código (p. ej. dirección/coordenadas de El Cielo). Ahora hace upsert por
+    nombre normalizado. Es idempotente y seguro: solo toca destination_places,
+    nunca trips ni planes.
     """
     if not places:
         return
     city = norm_city(places[0]["city_display"])
     with conn() as c:
+        # name normalizado -> id, para decidir insert vs update
         existentes = {
-            norm_place(r["name"])
+            norm_place(r["name"]): r["id"]
             for r in c.execute(
-                "SELECT name FROM destination_places WHERE city=?", (city,)
+                "SELECT id, name FROM destination_places WHERE city=?", (city,)
             ).fetchall()
         }
         for p in places:
-            if norm_place(p["name"]) in existentes:
-                continue
-            c.execute(
-                "INSERT INTO destination_places (id, city, city_display, name, category, zona, lat, lng, descripcion, confianza, maps_query, created_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                (new_id(), norm_city(p["city_display"]), p["city_display"], p["name"], p["category"],
-                 p["zona"], p["lat"], p["lng"], p["descripcion"], p["confianza"], p.get("maps_query"), now()),
-            )
-            existentes.add(norm_place(p["name"]))
+            clave = norm_place(p["name"])
+            if clave in existentes:
+                # Actualiza los campos curados (no toca id ni created_at).
+                c.execute(
+                    "UPDATE destination_places SET city_display=?, name=?, category=?, "
+                    "zona=?, lat=?, lng=?, descripcion=?, confianza=?, maps_query=?, dir=? "
+                    "WHERE id=?",
+                    (p["city_display"], p["name"], p["category"], p["zona"], p["lat"],
+                     p["lng"], p["descripcion"], p["confianza"], p.get("maps_query"),
+                     p.get("dir"), existentes[clave]),
+                )
+            else:
+                nid = new_id()
+                c.execute(
+                    "INSERT INTO destination_places (id, city, city_display, name, category, zona, lat, lng, descripcion, confianza, maps_query, dir, created_at) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (nid, norm_city(p["city_display"]), p["city_display"], p["name"], p["category"],
+                     p["zona"], p["lat"], p["lng"], p["descripcion"], p["confianza"],
+                     p.get("maps_query"), p.get("dir"), now()),
+                )
+                existentes[clave] = nid
 
 
 # ── Dedup de /nearby: no repetir los mismos lugares dentro de la ventana ──

@@ -433,8 +433,9 @@ def test_best_place_match_desambigua():
     assert db.best_place_match("cena", places) is None
 
 
-def test_maps_link_resuelve_nombre_pegado():
-    """El endpoint /maps usa coords curadas aunque el plan diga 'ElCielo'."""
+def test_maps_link_resuelve_a_direccion_curada():
+    """El endpoint /maps resuelve 'Cena en ElCielo' al lugar curado y usa su
+    dirección/nombre como destino (no coordenadas crudas, que pueden estar mal)."""
     from app.main import app
     client = TestClient(app)
     tid = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H",
@@ -448,8 +449,29 @@ def test_maps_link_resuelve_nombre_pegado():
     # Link válido de Google Maps, sin espacios crudos
     assert link.startswith("https://www.google.com/maps/")
     assert " " not in link
-    # Debe haber resuelto a coordenadas curadas (no fallback por nombre)
-    assert "query=4." in link or "destination=4." in link or "El+Cielo" not in link
+    # El destino debe ser la query/dirección curada de El Cielo (geocodificable
+    # por Google), no las coordenadas. Comprobamos que aparece 'cielo' o la calle.
+    import urllib.parse
+    decoded = urllib.parse.unquote_plus(link).lower()
+    assert "elcielo" in decoded or "el cielo" in decoded or "calle 70" in decoded
+    # No debe enviar coordenadas como destino
+    assert "destination=4." not in link and "query=4." not in link
+
+
+def test_maps_link_sin_gps_abre_busqueda():
+    """Sin origen GPS, el link abre la búsqueda del lugar (no una ruta vacía)."""
+    from app.main import app
+    client = TestClient(app)
+    tid = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H",
+                                      "inicio": "2026-07-12", "fin": "2026-07-18"}).json()["trip_id"]
+    resp = client.post(f"/trips/{tid}/plans", json={
+        "titulo": "El Cielo", "lugar": "El Cielo",
+        "tipo": "restaurante", "fecha": "2026-07-15", "hora": "19:00"}).json()
+    pid = resp["planes"][-1]["id"]
+    data = client.get(f"/trips/{tid}/plans/{pid}/maps").json()
+    link = data["maps_link"]
+    assert "maps/search/?api=1&query=" in link
+    assert " " not in link
 
 
 def test_seed_reconcilia_curacion_parcial():
@@ -466,3 +488,15 @@ def test_seed_reconcilia_curacion_parcial():
     # Idempotencia: re-sembrar no agrega duplicados
     db.seed_destination_places(todos)
     assert len(db.places_for_city("Bogotá")) == despues
+
+
+def test_el_cielo_datos_correctos():
+    """La curación de El Cielo apunta a Calle 70 #4-47, Zona G (dirección real)."""
+    from app import seed_data
+    ec = [p for p in seed_data.all_seeds() if "cielo" in p["name"].lower()][0]
+    # Dirección verificada (Zona G, Chapinero), no la antigua errónea
+    assert "70" in ec["dir"] and "4-47" in ec["dir"]
+    assert "zona g" in ec["zona"].lower() or "chapinero" in ec["zona"].lower()
+    # Coordenadas dentro de Chapinero/Zona G (no en otra zona de la ciudad)
+    assert 4.64 < ec["lat"] < 4.66
+    assert -74.07 < ec["lng"] < -74.05
