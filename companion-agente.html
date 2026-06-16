@@ -599,6 +599,11 @@ function VoyraCompanion() {
       // Si detectó un plan en lo que el usuario contó, ofrecer agregarlo.
       const props = data.planes_propuestos || [];
       if (props.length) setPlanesPropuestos({ fuente: "chat", planes: props });
+      // Si detectó búsqueda de cadena, mostrar resultados con mapa.
+      if (data.chain_results && data.chain_results.items && data.chain_results.items.length) {
+        appendStream({ type: "chain_recos", query: data.chain_results.query,
+                       items: data.chain_results.items });
+      }
     } catch (e) {
       appendStream({ type: "companion", texto: "Se me cruzaron los cables un segundo. ¿Me lo repites?" });
     }
@@ -1216,7 +1221,7 @@ function VoyraCompanion() {
                           style={{ background: op ? C.coral : C.teal, color: "#fff", border: "none", borderRadius: 999, padding: "8px 15px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{m.accion}</button>
                       )}
                       {m.mapsLink && (
-                        <a href={m.mapsLink} rel="noopener noreferrer"
+                        <a href={m.mapsLink} target="_blank" rel="noopener noreferrer"
                           style={{ background: "transparent", color: op ? C.coral : C.teal, border: `1px solid ${op ? C.coral : C.teal}`, borderRadius: 999, padding: "8px 15px", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>📍 Cómo llegar{distLabel(m.distancia_km)}</a>
                       )}
                     </div>
@@ -1252,8 +1257,40 @@ function VoyraCompanion() {
                         <div style={{ fontWeight: 700, fontSize: 14 }}>{it.lugar}</div>
                         <div style={{ fontSize: 13, color: C.inkSoft, marginTop: 1, lineHeight: 1.4 }}>{it.mensaje}</div>
                         {it.mapsLink && (
-                          <a href={it.mapsLink} rel="noopener noreferrer" style={{ display: "inline-block", marginTop: 5, fontSize: 12.5, color: C.teal, fontWeight: 600, textDecoration: "none" }}>📍 Cómo llegar{distLabel(it.distancia_km)} →</a>
+                          <a href={it.mapsLink} target="_blank" rel="noopener noreferrer" style={{ display: "inline-block", marginTop: 5, fontSize: 12.5, color: C.teal, fontWeight: 600, textDecoration: "none" }}>📍 Cómo llegar{distLabel(it.distancia_km)} →</a>
                         )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            );
+          if (m.type === "chain_recos")
+            return (
+              <div key={m.seq} className="rise" style={{ alignSelf: "stretch", display: "flex", gap: 8 }}>
+                <div style={{ flexShrink: 0, marginTop: 2 }}><Mark size={34} /></div>
+                <div style={{ flex: 1, background: C.card, border: `1px solid ${C.line}`, borderRadius: "16px 16px 16px 4px", padding: "11px 13px" }}>
+                  <div style={{ fontSize: 10.5, fontWeight: 700, color: C.aqua, letterSpacing: "0.07em", marginBottom: 8 }}>
+                    📍 {(m.query || "CERCA DE TI").toUpperCase()}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+                    {(m.items || []).map((it, i) => (
+                      <div key={i} style={{ background: C.bg, borderRadius: 12, padding: "10px 11px", border: `1px solid ${C.line}` }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 700, fontSize: 13.5, color: C.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.name}</div>
+                            <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.address}</div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 3 }}>
+                              {it.rating && <span style={{ fontSize: 12, color: C.orange, fontWeight: 700 }}>★ {it.rating}</span>}
+                              {it.abierto_ahora === true && <span style={{ fontSize: 11, color: "#4CAF50", fontWeight: 600 }}>Abierto</span>}
+                              {it.abierto_ahora === false && <span style={{ fontSize: 11, color: C.coral, fontWeight: 600 }}>Cerrado</span>}
+                            </div>
+                          </div>
+                          <a href={it.maps_link} target="_blank" rel="noopener noreferrer"
+                            style={{ flexShrink: 0, background: C.aquaSoft, border: `1px solid ${C.aqua}55`, color: C.aqua, borderRadius: 10, padding: "7px 11px", fontSize: 12.5, fontWeight: 700, textDecoration: "none", display: "flex", alignItems: "center", gap: 5 }}>
+                            <Icon name="compass" size={14} color={C.aqua} /> Ir
+                          </a>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1525,22 +1562,17 @@ function PlanCard({ p, tripId, coords, onBorrar }) {
 
   const abrirMapa = async () => {
     setLoadingMaps(true);
-    let url;
     try {
       const params = new URLSearchParams();
       if (coords) { params.set("orig_lat", coords.lat); params.set("orig_lng", coords.lng); }
       const data = await api.get(`/trips/${tripId}/plans/${p.id}/maps?${params}`);
-      url = data.maps_link;
+      window.open(data.maps_link, "_blank");
     } catch (e) {
       // fallback: búsqueda directa por nombre
       const q = encodeURIComponent((p.lugar || p.titulo || "") + " Bogotá");
-      url = `https://www.google.com/maps/search/?api=1&query=${q}`;
+      window.open(`https://www.google.com/maps/search/?q=${q}`, "_blank");
     }
     setLoadingMaps(false);
-    // Navegar en la MISMA pestaña: el SO intercepta el link de Maps y abre la
-    // app nativa, dejando la web intacta debajo. Con window.open(_blank) en iOS
-    // quedaba una pestaña en blanco al volver a la app.
-    if (url) window.location.href = url;
   };
 
   return (
@@ -1822,7 +1854,7 @@ function SosView({ viaje, zonaActual, gpsEstado, coords, onClose, onChat }) {
         <div style={{ fontSize: 12, fontWeight: 700, color: C.inkSoft, letterSpacing: "0.05em" }}>DÓNDE ESTOY AHORA</div>
         <div style={{ fontSize: 15, fontWeight: 700, marginTop: 5 }}>📍 {ubicTxt}</div>
         <div style={{ fontSize: 12, color: C.inkSoft, marginTop: 2 }}>{coords ? "Coordenadas GPS exactas" : "Zona aproximada (activa el GPS para precisión)"}</div>
-        <a href={mapsUrl} rel="noopener noreferrer" style={{ display: "inline-block", marginTop: 9, background: C.aquaSoft, color: C.aqua, borderRadius: 999, padding: "8px 14px", fontSize: 13, fontWeight: 700, textDecoration: "none" }}>Abrir mi ubicación en Maps →</a>
+        <a href={mapsUrl} target="_blank" rel="noopener noreferrer" style={{ display: "inline-block", marginTop: 9, background: C.aquaSoft, color: C.aqua, borderRadius: 999, padding: "8px 14px", fontSize: 13, fontWeight: 700, textDecoration: "none" }}>Abrir mi ubicación en Maps →</a>
       </div>
 
       {/* qué hacer según el caso */}

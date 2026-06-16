@@ -456,7 +456,23 @@ def chat(tid: str, c: ChatIn):
             propuestas = plans_mod.rellenar_fechas(propuestas, c.message, ahora)
         except Exception:
             pass
-    return {"reply": reply, "planes_propuestos": propuestas}
+    # Búsqueda en vivo de cadenas: detectar si el usuario pide algo cerca.
+    chain_results = None
+    from . import places_live
+    cadena_q = places_live.detectar_busqueda_cadena(c.message)
+    if cadena_q and places_live.disponible():
+        olat = trip.get("lat_actual")
+        olng = trip.get("lng_actual")
+        if olat is None or olng is None:
+            coords = geo.zone_coords(trip.get("ciudad", ""), trip.get("zona_actual", ""))
+            if coords:
+                olat, olng = coords
+        if olat and olng:
+            resultados = places_live.buscar_cerca(cadena_q, olat, olng)
+            if resultados:
+                chain_results = {"query": cadena_q, "items": resultados}
+
+    return {"reply": reply, "planes_propuestos": propuestas, "chain_results": chain_results}
 
 
 # ── Documentos ──

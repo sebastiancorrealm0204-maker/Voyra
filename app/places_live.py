@@ -54,7 +54,61 @@ SINONIMOS = {
 }
 
 
+
+# ── Detección de intención de búsqueda de cadena ──
+# Palabras clave que indican que el usuario quiere encontrar algo cerca.
+# Formato: (patrones_en_mensaje, query_para_google)
+_INTENCIONES = [
+    # Supermercados
+    (["carulla", "carulla cerca"], "Carulla supermercado"),
+    (["éxito", "exito", "almacenes éxito"], "Éxito supermercado"),
+    (["d1", "tienda d1", "d uno"], "D1 tienda descuento"),
+    (["ara ", " ara,", "supermercado ara"], "Ara supermercado"),
+    (["jumbo", "tienda jumbo"], "Jumbo supermercado"),
+    (["supermercado cerca", "mercado cerca", "súper cerca", "super cerca",
+      "dónde comprar", "donde comprar", "comprar comida", "comprar agua",
+      "comprar cosas", "tienda cerca"], "supermercado"),
+    # Farmacias
+    (["farmacia", "droguería", "drogueria", "medicamento", "pastilla",
+      "cruz verde", "farmacenter", "drogas la rebaja"], "farmacia droguería"),
+    # Cajeros / bancos
+    (["cajero", "cajeros", "atm", "plata en efectivo", "retirar plata",
+      "sacar plata", "efectivo", "bancolombia", "davivienda"], "cajero automático ATM"),
+    # Comida rápida / cadenas colombianas
+    (["crepes", "crepes & waffles", "crepes y waffles"], "Crepes & Waffles restaurante"),
+    (["juan valdez", "café juan valdez"], "Juan Valdez Café"),
+    (["el corral", "hamburguesa cerca", "hamburguesas cerca"], "El Corral hamburguesas"),
+    (["frisby", "pollo frito cerca"], "Frisby pollo"),
+    # Gasolina / movilidad
+    (["gasolina", "combustible", "gasolinera", "estación de servicio"], "estación de gasolina"),
+    # Café genérico
+    (["café cerca", "cafetería cerca", "cafe cerca"], "café"),
+]
+
+
 def disponible() -> bool:
+    return MODE == "real"
+
+
+def detectar_busqueda_cadena(mensaje: str) -> str | None:
+    """Devuelve la query de búsqueda si el mensaje pide encontrar una cadena/servicio.
+    Devuelve None si es charla general."""
+    m = mensaje.lower().strip()
+    # Palabras de proximidad — si no aparece ninguna, probablemente no está buscando
+    proximidad = ["cerca", "aquí", "aqui", "hay un", "hay una", "dónde hay",
+                  "donde hay", "encuentro", "busca", "buscame", "encuéntrame",
+                  "encuentrame", "necesito", "quiero ir", "quiero comprar"]
+    tiene_proximidad = any(p in m for p in proximidad)
+    for patrones, query in _INTENCIONES:
+        if any(p in m for p in patrones):
+            # Con palabras de proximidad: seguro que está buscando
+            if tiene_proximidad:
+                return query
+            # Sin palabras de proximidad pero menciona la cadena específica:
+            # solo activar si NO es una pregunta sobre el lugar (p.ej. "¿qué tiene Carulla?")
+            if any(p in m for p in patrones[:2]):  # nombre específico de cadena
+                return query
+    return None
     return MODE == "real"
 
 
