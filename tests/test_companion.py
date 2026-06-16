@@ -9,11 +9,40 @@ from fastapi.testclient import TestClient
 from app import db, engine, seed_data
 
 
+# ── Helpers de autenticación para los tests de API ──
+# Tras introducir el login por usuario, los endpoints de trip exigen sesión.
+# Estos helpers crean un usuario verificado y devuelven el client + headers,
+# para que los tests de API sigan probando la lógica de negocio sin fricción.
+_user_counter = [0]
+
+
+def _auth_headers(client):
+    """Crea un usuario único, lo verifica e inicia sesión. Devuelve headers Bearer."""
+    _user_counter[0] += 1
+    email = f"test{_user_counter[0]}@example.com"
+    r = client.post("/auth/signup", json={"email": email, "password": "supersecret"})
+    link = r.json()["dev_verification_link"]
+    token = link.split("token=")[1]
+    client.get("/auth/verify", params={"token": token})
+    r = client.post("/auth/login", json={"email": email, "password": "supersecret"})
+    return {"Authorization": f"Bearer {r.json()['token']}"}
+
+
+def _auth_client():
+    """Client + headers de un usuario verificado listo para usar."""
+    from app.main import app
+    client = TestClient(app)
+    return client, _auth_headers(client)
+
+
+
 @pytest.fixture(autouse=True)
 def fresh_db(tmp_path):
-    from app import scheduler
+    from app import scheduler, auth, limits
     db.DB_PATH = str(tmp_path / "test.db")
     db.init_db()
+    auth.init_auth()
+    limits.init_limits()
     db.seed_destination_places(seed_data.all_seeds())
     engine.QUIET_START, engine.QUIET_END = 24.0, 0.0  # desactivar quiet hours en tests
     _mat, _noc = scheduler.MATUTINO, scheduler.NOCTURNO  # guardar para restaurar
@@ -81,21 +110,22 @@ def test_decisiones_quedan_en_dataset(trip):
 def test_api_end_to_end():
     from app.main import app
     client = TestClient(app)
+    H = _auth_headers(client)
     t = client.post("/trips", json={"ciudad": "Cartagena", "hotel": "H", "inicio": "2026-07-12",
-                                    "fin": "2026-07-18"}).json()
+                                    "fin": "2026-07-18"}, headers=H).json()
     tid = t["trip_id"]
     assert "planes" not in t  # greeting devuelto
-    assert client.post(f"/trips/{tid}/location", json={"zona": "Getsemaní"}).json()["zona_actual"] == "Getsemaní"
+    assert client.post(f"/trips/{tid}/location", json={"zona": "Getsemaní"}, headers=H).json()["zona_actual"] == "Getsemaní"
     s = client.post(f"/trips/{tid}/signals", json={"source": "Duffel webhook", "category": "vuelo",
-                                                   "operational": True, "payload": "retraso 2h"}).json()
+                                                   "operational": True, "payload": "retraso 2h"}, headers=H).json()
     assert s["decision"] == "push"
-    chat = client.post(f"/trips/{tid}/chat", json={"message": "estoy perdido"}).json()
+    chat = client.post(f"/trips/{tid}/chat", json={"message": "estoy perdido"}, headers=H).json()
     assert chat["reply"]
     doc = client.post(f"/trips/{tid}/documents", json={"filename": "tour.pdf",
-                                                       "text_content": "Tour islas 13 jul 9am código XK29"}).json()
+                                                       "text_content": "Tour islas 13 jul 9am código XK29"}, headers=H).json()
     assert doc["tipo"]
-    assert client.get(f"/trips/{tid}/notifications").json()
-    assert client.get(f"/trips/{tid}/decisions").json()
+    assert client.get(f"/trips/{tid}/notifications", headers=H).json()
+    assert client.get(f"/trips/{tid}/decisions", headers=H).json()
 
 
 def test_push_disabled_sin_vapid():
@@ -113,12 +143,13 @@ def test_push_subscribe_guarda_y_borra():
     """Suscribir guarda la suscripción; desuscribir la borra."""
     from app.main import app
     client = TestClient(app)
+    H = _auth_headers(client)
     tid = db.create_trip({"ciudad": "Bogotá", "hotel": "H", "inicio": "2026-07-12", "fin": "2026-07-18"})
     sub = {"endpoint": "https://push.example.com/abc123", "keys": {"p256dh": "x", "auth": "y"}}
-    r = client.post(f"/trips/{tid}/push/subscribe", json={"subscription": sub}).json()
+    r = client.post(f"/trips/{tid}/push/subscribe", json={"subscription": sub}, headers=H).json()
     assert r["ok"] is True
     assert len(db.list_push_subscriptions(tid)) == 1
-    client.post(f"/trips/{tid}/push/unsubscribe", json={"subscription": sub})
+    client.post(f"/trips/{tid}/push/unsubscribe", json={"subscription": sub}, headers=H)
     assert len(db.list_push_subscriptions(tid)) == 0
 
 
@@ -191,17 +222,18 @@ def test_modo_aeropuerto_se_activa_y_payload():
     devuelve el timeline de llegada + transporte curado de El Dorado."""
     from app.main import app
     client = TestClient(app)
+    H = _auth_headers(client)
     t = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "Hotel NH Teusaquillo",
-                                    "inicio": "2026-07-12", "fin": "2026-07-18"}).json()
+                                    "inicio": "2026-07-12", "fin": "2026-07-18"}, headers=H).json()
     tid = t["trip_id"]
 
     # Llega al aeropuerto → modo aeropuerto + flag de recién llegado
-    loc = client.post(f"/trips/{tid}/location", json={"zona": "Aeropuerto", "disparar_geofence": False}).json()
+    loc = client.post(f"/trips/{tid}/location", json={"zona": "Aeropuerto", "disparar_geofence": False}, headers=H).json()
     assert loc["modo_aeropuerto"] is True
     assert loc["acaba_de_llegar"] is True
 
     # El payload de llegada trae pasos del timeline y opciones de transporte
-    a = client.get(f"/trips/{tid}/airport").json()
+    a = client.get(f"/trips/{tid}/airport", headers=H).json()
     assert a["disponible"] is True
     assert a["code"] == "BOG"
     assert [p["id"] for p in a["pasos"]] == ["migracion", "equipaje", "aduana", "salida"]
@@ -215,11 +247,12 @@ def test_modo_aeropuerto_se_apaga_al_salir():
     """Al moverse a una zona normal, el modo aeropuerto se apaga."""
     from app.main import app
     client = TestClient(app)
+    H = _auth_headers(client)
     t = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H",
-                                    "inicio": "2026-07-12", "fin": "2026-07-18"}).json()
+                                    "inicio": "2026-07-12", "fin": "2026-07-18"}, headers=H).json()
     tid = t["trip_id"]
-    client.post(f"/trips/{tid}/location", json={"zona": "Aeropuerto"})
-    salida = client.post(f"/trips/{tid}/location", json={"zona": "Usaquén"}).json()
+    client.post(f"/trips/{tid}/location", json={"zona": "Aeropuerto"}, headers=H)
+    salida = client.post(f"/trips/{tid}/location", json={"zona": "Usaquén"}, headers=H).json()
     assert salida["modo_aeropuerto"] is False
     assert salida["acaba_de_llegar"] is False
 
@@ -228,11 +261,12 @@ def test_airport_gps_activa_modo():
     """Con coordenadas reales de El Dorado, el modo aeropuerto se activa solo."""
     from app.main import app
     client = TestClient(app)
+    H = _auth_headers(client)
     t = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H",
-                                    "inicio": "2026-07-12", "fin": "2026-07-18"}).json()
+                                    "inicio": "2026-07-12", "fin": "2026-07-18"}, headers=H).json()
     tid = t["trip_id"]
     loc = client.post(f"/trips/{tid}/location",
-                      json={"lat": 4.7016, "lng": -74.1469, "zona": "En el hotel"}).json()
+                      json={"lat": 4.7016, "lng": -74.1469, "zona": "En el hotel"}, headers=H).json()
     assert loc["zona_actual"] == "Aeropuerto"
     assert loc["modo_aeropuerto"] is True
 
@@ -241,10 +275,11 @@ def test_airport_ciudad_sin_curacion():
     """Una ciudad sin aeropuerto curado responde 'no disponible', sin romper."""
     from app.main import app
     client = TestClient(app)
+    H = _auth_headers(client)
     t = client.post("/trips", json={"ciudad": "Cartagena", "hotel": "H",
-                                    "inicio": "2026-07-12", "fin": "2026-07-18"}).json()
+                                    "inicio": "2026-07-12", "fin": "2026-07-18"}, headers=H).json()
     tid = t["trip_id"]
-    a = client.get(f"/trips/{tid}/airport").json()
+    a = client.get(f"/trips/{tid}/airport", headers=H).json()
     assert a["disponible"] is False
 
 
@@ -252,10 +287,11 @@ def test_scan_mock_mode_no_crash():
     """Sin TAVILY_API_KEY, /scan corre en modo mock: 0 resultados, no rompe nada."""
     from app.main import app
     client = TestClient(app)
+    H = _auth_headers(client)
     t = client.post("/trips", json={"ciudad": "Cartagena", "hotel": "H", "inicio": "2026-07-12",
-                                    "fin": "2026-07-18"}).json()
+                                    "fin": "2026-07-18"}, headers=H).json()
     tid = t["trip_id"]
-    r = client.post(f"/trips/{tid}/scan").json()
+    r = client.post(f"/trips/{tid}/scan", headers=H).json()
     assert r["search_mode"] == "mock"
     assert r["encontrados"] == 0
     assert r["procesados"] == 0
@@ -266,8 +302,9 @@ def test_nearby_recommendations_bogota():
     """Recomendaciones curadas, rankeadas por distancia real y con maps_link."""
     from app.main import app
     client = TestClient(app)
+    H = _auth_headers(client)
     t = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "Hotel Zona G", "inicio": "2026-08-01",
-                                    "fin": "2026-08-05", "gustos": ["Gastronomía local"]}).json()
+                                    "fin": "2026-08-05", "gustos": ["Gastronomía local"]}, headers=H).json()
     tid = t["trip_id"]
 
     # Sin destinations, este endpoint devuelve la base curada para Bogotá
@@ -275,8 +312,8 @@ def test_nearby_recommendations_bogota():
     assert len(places) >= 10
 
     # Usuario en Usaquén: lo más cercano debería ser el mercado de Usaquén (distancia ~0)
-    client.post(f"/trips/{tid}/location", json={"zona": "Usaquén", "disparar_geofence": False})
-    r = client.post(f"/trips/{tid}/nearby").json()
+    client.post(f"/trips/{tid}/location", json={"zona": "Usaquén", "disparar_geofence": False}, headers=H)
+    r = client.post(f"/trips/{tid}/nearby", headers=H).json()
     assert r["candidatos"] >= 10
     top = r["resultados"][0]
     assert top["lugar"] == "Mercado de pulgas de Usaquén"
@@ -298,10 +335,11 @@ def test_nearby_dedup_no_repeats():
     """Llamadas repetidas a /nearby no repiten lugares; se agota cubriendo todos los curados."""
     from app.main import app
     client = TestClient(app)
+    H = _auth_headers(client)
     t = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "Hotel Zona G", "inicio": "2026-08-01",
-                                    "fin": "2026-08-05", "gustos": ["Gastronomía local"]}).json()
+                                    "fin": "2026-08-05", "gustos": ["Gastronomía local"]}, headers=H).json()
     tid = t["trip_id"]
-    client.post(f"/trips/{tid}/location", json={"zona": "Usaquén", "disparar_geofence": False})
+    client.post(f"/trips/{tid}/location", json={"zona": "Usaquén", "disparar_geofence": False}, headers=H)
 
     # Total de lugares curados que el endpoint puede devolver para esta ciudad
     # (se deriva del seed, así el test no se rompe cuando la curación crece).
@@ -311,7 +349,7 @@ def test_nearby_dedup_no_repeats():
     agotado = False
     # Suficientes llamadas para agotar todos los lugares (3 por llamada) + margen.
     for _ in range(total_curados + 2):
-        r = client.post(f"/trips/{tid}/nearby").json()
+        r = client.post(f"/trips/{tid}/nearby", headers=H).json()
         lugares = {x["lugar"] for x in r["resultados"]}
         assert lugares.isdisjoint(vistos_total)  # nunca repite uno ya visto
         vistos_total |= lugares
@@ -350,43 +388,46 @@ def test_plans_hora_pm():
 def test_plans_crud_api():
     from app.main import app
     client = TestClient(app)
+    H = _auth_headers(client)
     tid = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H", "inicio": "2026-07-12",
-                                      "fin": "2026-07-18"}).json()["trip_id"]
+                                      "fin": "2026-07-18"}, headers=H).json()["trip_id"]
     # agregar plan estructurado
     r = client.post(f"/trips/{tid}/plans", json={"titulo": "Monserrate", "fecha": "2026-07-14",
-                                                 "hora": "08:00", "tipo": "actividad"}).json()
+                                                 "hora": "08:00", "tipo": "actividad"}, headers=H).json()
     assert len(r["planes"]) == 1
     pid = r["planes"][0]["id"]
     # listar agrupado por día
-    lst = client.get(f"/trips/{tid}/plans").json()
+    lst = client.get(f"/trips/{tid}/plans", headers=H).json()
     assert "2026-07-14" in lst["por_dia"]
     # confirmar planes propuestos (desde chat/doc)
     client.post(f"/trips/{tid}/plans/confirm", json={"planes": [
-        {"titulo": "Cena Andrés", "fecha": "2026-07-14", "hora": "20:00", "tipo": "restaurante"}]})
-    assert len(client.get(f"/trips/{tid}/plans").json()["planes"]) == 2
+        {"titulo": "Cena Andrés", "fecha": "2026-07-14", "hora": "20:00", "tipo": "restaurante"}]}, headers=H)
+    assert len(client.get(f"/trips/{tid}/plans", headers=H).json()["planes"]) == 2
     # borrar
-    client.delete(f"/trips/{tid}/plans/{pid}")
-    assert len(client.get(f"/trips/{tid}/plans").json()["planes"]) == 1
+    client.delete(f"/trips/{tid}/plans/{pid}", headers=H)
+    assert len(client.get(f"/trips/{tid}/plans", headers=H).json()["planes"]) == 1
 
 
 def test_chat_devuelve_propuestas():
     from app.main import app
     client = TestClient(app)
+    H = _auth_headers(client)
     tid = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H", "inicio": "2026-07-12",
-                                      "fin": "2026-07-18"}).json()["trip_id"]
-    r = client.post(f"/trips/{tid}/chat", json={"message": "mañana tengo tour a Monserrate 9am"}).json()
+                                      "fin": "2026-07-18"}, headers=H).json()["trip_id"]
+    r = client.post(f"/trips/{tid}/chat", json={"message": "mañana tengo tour a Monserrate 9am"}, headers=H).json()
     assert "planes_propuestos" in r
     # en modo mock la heurística detecta el plan; no se guarda hasta confirmar
-    assert client.get(f"/trips/{tid}/plans").json()["planes"] == []
+    assert client.get(f"/trips/{tid}/plans", headers=H).json()["planes"] == []
 
 
 def test_doc_devuelve_planes_propuestos():
     from app.main import app
     client = TestClient(app)
+    H = _auth_headers(client)
     tid = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H", "inicio": "2026-07-12",
-                                      "fin": "2026-07-18"}).json()["trip_id"]
+                                      "fin": "2026-07-18"}, headers=H).json()["trip_id"]
     r = client.post(f"/trips/{tid}/documents", json={"filename": "vuelo.txt",
-                                                     "text_content": "Vuelo AV245 13 jul 8am"}).json()
+                                                     "text_content": "Vuelo AV245 13 jul 8am"}, headers=H).json()
     assert "planes_propuestos" in r
 
 
@@ -441,13 +482,14 @@ def test_maps_link_resuelve_a_direccion_curada():
     dirección/nombre como destino (no coordenadas crudas, que pueden estar mal)."""
     from app.main import app
     client = TestClient(app)
+    H = _auth_headers(client)
     tid = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H",
-                                      "inicio": "2026-07-12", "fin": "2026-07-18"}).json()["trip_id"]
-    resp = client.post(f"/trips/{tid}/plans", json={
+                                      "inicio": "2026-07-12", "fin": "2026-07-18"}, headers=H).json()["trip_id"]
+    resp = client.post(f"/trips/{tid}/plans", headers=H, json={
         "titulo": "Cena en ElCielo", "lugar": "Cena en ElCielo",
         "tipo": "restaurante", "fecha": "2026-07-15", "hora": "19:00"}).json()
     pid = resp["planes"][-1]["id"]
-    data = client.get(f"/trips/{tid}/plans/{pid}/maps").json()
+    data = client.get(f"/trips/{tid}/plans/{pid}/maps", headers=H).json()
     link = data["maps_link"]
     # Link válido de Google Maps, sin espacios crudos
     assert link.startswith("https://www.google.com/maps/")
@@ -465,13 +507,14 @@ def test_maps_link_sin_gps_abre_busqueda():
     """Sin origen GPS, el link abre la búsqueda del lugar (no una ruta vacía)."""
     from app.main import app
     client = TestClient(app)
+    H = _auth_headers(client)
     tid = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H",
-                                      "inicio": "2026-07-12", "fin": "2026-07-18"}).json()["trip_id"]
-    resp = client.post(f"/trips/{tid}/plans", json={
+                                      "inicio": "2026-07-12", "fin": "2026-07-18"}, headers=H).json()["trip_id"]
+    resp = client.post(f"/trips/{tid}/plans", headers=H, json={
         "titulo": "El Cielo", "lugar": "El Cielo",
         "tipo": "restaurante", "fecha": "2026-07-15", "hora": "19:00"}).json()
     pid = resp["planes"][-1]["id"]
-    data = client.get(f"/trips/{tid}/plans/{pid}/maps").json()
+    data = client.get(f"/trips/{tid}/plans/{pid}/maps", headers=H).json()
     link = data["maps_link"]
     assert "maps/search/?api=1&query=" in link
     assert " " not in link
@@ -589,10 +632,115 @@ def test_nearby_chain_endpoint():
     """La búsqueda en vivo de cadenas responde (vacío en mock, sin romper)."""
     from app.main import app
     client = TestClient(app)
+    H = _auth_headers(client)
     tid = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H",
-                                      "inicio": "2026-07-12", "fin": "2026-07-18"}).json()["trip_id"]
-    r = client.get(f"/trips/{tid}/nearby-chain?q=Carulla&orig_lat=4.66&orig_lng=-74.05")
+                                      "inicio": "2026-07-12", "fin": "2026-07-18"}, headers=H).json()["trip_id"]
+    r = client.get(f"/trips/{tid}/nearby-chain?q=Carulla&orig_lat=4.66&orig_lng=-74.05", headers=H)
     assert r.status_code == 200
     data = r.json()
     assert "disponible" in data and "resultados" in data
     assert isinstance(data["resultados"], list)
+
+
+# ── Auth + cuotas (sesión: login por usuario y límites) ──
+def test_signup_login_verify_flow():
+    from app.main import app
+    client = TestClient(app)
+    # signup en modo dev devuelve el enlace
+    r = client.post("/auth/signup", json={"email": "a@b.com", "password": "supersecret"})
+    assert r.status_code == 200
+    link = r.json()["dev_verification_link"]
+    # login antes de verificar -> 403
+    assert client.post("/auth/login", json={"email": "a@b.com", "password": "supersecret"}).status_code == 403
+    # verificar
+    tok = link.split("token=")[1]
+    assert client.get("/auth/verify", params={"token": tok}).status_code == 200
+    # login ok
+    r = client.post("/auth/login", json={"email": "a@b.com", "password": "supersecret"})
+    assert r.status_code == 200 and r.json()["token"]
+
+
+def test_password_corta_rechazada():
+    from app.main import app
+    client = TestClient(app)
+    assert client.post("/auth/signup", json={"email": "x@y.com", "password": "corta"}).status_code == 400
+
+
+def test_signup_duplicado():
+    from app.main import app
+    client = TestClient(app)
+    client.post("/auth/signup", json={"email": "dup@z.com", "password": "supersecret"})
+    assert client.post("/auth/signup", json={"email": "dup@z.com", "password": "supersecret"}).status_code == 409
+
+
+def test_trip_requiere_auth():
+    from app.main import app
+    client = TestClient(app)
+    assert client.post("/trips", json={"ciudad": "Bogotá"}).status_code == 401
+
+
+def test_no_puedo_ver_trip_ajeno():
+    from app.main import app
+    client = TestClient(app)
+    H1 = _auth_headers(client)
+    H2 = _auth_headers(client)
+    tid = client.post("/trips", json={"ciudad": "Bogotá"}, headers=H1).json()["trip_id"]
+    assert client.get(f"/trips/{tid}", headers=H2).status_code == 403
+    assert client.get(f"/trips/{tid}", headers=H1).status_code == 200
+
+
+def test_tope_de_trips_activos(monkeypatch):
+    from app import limits
+    from app.main import app
+    monkeypatch.setattr(limits, "MAX_TRIPS_PER_USER", 1)
+    client = TestClient(app)
+    H = _auth_headers(client)
+    assert client.post("/trips", json={"ciudad": "Bogotá"}, headers=H).status_code == 200
+    assert client.post("/trips", json={"ciudad": "Cali"}, headers=H).status_code == 429
+
+
+def test_cuota_chat_se_agota(monkeypatch):
+    from app import limits
+    from app.main import app
+    monkeypatch.setitem(limits.FREE_LIMITS, "chat", 2)
+    client = TestClient(app)
+    H = _auth_headers(client)
+    tid = client.post("/trips", json={"ciudad": "Bogotá"}, headers=H).json()["trip_id"]
+    assert client.post(f"/trips/{tid}/chat", json={"message": "hola"}, headers=H).status_code == 200
+    assert client.post(f"/trips/{tid}/chat", json={"message": "hola"}, headers=H).status_code == 200
+    r = client.post(f"/trips/{tid}/chat", json={"message": "hola"}, headers=H)
+    assert r.status_code == 429
+
+
+def test_tap_notificacion_no_gasta_cuota_chat(monkeypatch):
+    from app import limits
+    from app.main import app
+    monkeypatch.setitem(limits.FREE_LIMITS, "chat", 1)
+    client = TestClient(app)
+    H = _auth_headers(client)
+    tid = client.post("/trips", json={"ciudad": "Bogotá"}, headers=H).json()["trip_id"]
+    # taps entre corchetes no consumen cuota
+    for _ in range(3):
+        assert client.post(f"/trips/{tid}/chat", json={"message": "[tap notif]"}, headers=H).status_code == 200
+    # y todavía queda la cuota real
+    assert client.post(f"/trips/{tid}/chat", json={"message": "hola"}, headers=H).status_code == 200
+
+
+def test_circuit_breaker_global_maps(monkeypatch):
+    from app import limits
+    monkeypatch.setattr(limits, "GLOBAL_MAPS_PER_DAY", 1)
+    u1 = limits.db.new_id()
+    limits.check_and_consume(u1, "maps")  # primera ok
+    try:
+        limits.check_and_consume(u1, "maps")
+        assert False, "debió bloquear por circuit breaker"
+    except limits.QuotaError as e:
+        assert e.global_block is True
+
+
+def test_email_no_verificado_no_crea_trip():
+    from app.main import app
+    client = TestClient(app)
+    r = client.post("/auth/signup", json={"email": "nv@x.com", "password": "supersecret"})
+    # no verificamos; intentamos loguear -> 403, así que no hay token
+    assert client.post("/auth/login", json={"email": "nv@x.com", "password": "supersecret"}).status_code == 403

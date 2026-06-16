@@ -6,14 +6,15 @@ Docs:    http://localhost:8000/docs
 import json
 import urllib.parse
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, Field
 
-from . import context, db, engine, geo, llm, push, scheduler, search, seed_data, watchers
+from . import (context, db, engine, geo, llm, push, scheduler, search, seed_data,
+               watchers, auth, limits, email_send)
 
-app = FastAPI(title="Voyra Companion", version="0.1.0")
+app = FastAPI(title="Voyra Companion", version="0.2.0")
 
 # CORS: permite que el frontend (corriendo en el navegador, ej. un Artifact de
 # Claude) llame a este backend en localhost. En producción, reemplaza "*" por
@@ -26,7 +27,68 @@ app.add_middleware(
 )
 
 db.init_db()
+auth.init_auth()
+limits.init_limits()
 db.seed_destination_places(seed_data.all_seeds())
+
+
+# ── Dependencias de autenticación ──
+def _token_from_header(authorization: str | None) -> str:
+    """Extrae el token de 'Authorization: Bearer <token>'."""
+    if not authorization:
+        return ""
+    parts = authorization.split(" ", 1)
+    if len(parts) == 2 and parts[0].lower() == "bearer":
+        return parts[1].strip()
+    return authorization.strip()
+
+
+def current_user(authorization: str | None = Header(default=None)) -> dict:
+    """Usuario autenticado por su token de sesión. 401 si no hay sesión válida."""
+    user = auth.user_for_session(_token_from_header(authorization))
+    if not user:
+        raise HTTPException(401, "No autenticado. Inicia sesión.")
+    return user
+
+
+def verified_user(user: dict = Depends(current_user)) -> dict:
+    """Usuario autenticado Y con email verificado. Exigido para endpoints caros."""
+    if not user.get("email_verified"):
+        raise HTTPException(403, "Verifica tu email para usar esta función. "
+                                 "Revisa tu correo o pide un nuevo enlace.")
+    return user
+
+
+def own_trip(tid: str, user: dict) -> dict:
+    """Carga el trip y verifica que sea del usuario. 404 si no existe, 403 si no es suyo."""
+    trip = db.get_trip(tid)
+    if not trip:
+        raise HTTPException(404, "trip no existe")
+    owner = db.trip_owner(tid)
+    # Trips legacy sin dueño: se permiten (compat con datos previos a auth).
+    if owner is not None and owner != user["id"]:
+        raise HTTPException(403, "Este viaje no es tuyo.")
+    return trip
+
+
+def _consume_or_429(user: dict, resource: str):
+    """Aplica cuota; convierte QuotaError en HTTP 429 con detalle para el front."""
+    try:
+        limits.check_and_consume(user["id"], resource)
+    except limits.QuotaError as e:
+        if e.global_block:
+            raise HTTPException(429, {
+                "error": "global_limit",
+                "resource": resource,
+                "mensaje": "La búsqueda en vivo está temporalmente pausada por alta demanda. "
+                           "Vuelve a intentar más tarde."})
+        raise HTTPException(429, {
+            "error": "quota",
+            "resource": resource,
+            "limite": e.limit,
+            "usado": e.used,
+            "mensaje": f"Alcanzaste tu límite diario de {e.limit} para esta función. "
+                       "Se renueva mañana."})
 
 
 @app.on_event("startup")
@@ -108,10 +170,125 @@ class PushSubIn(BaseModel):
     subscription: dict   # {endpoint, keys:{p256dh, auth}} que da el navegador
 
 
+# ── Auth schemas ──
+class SignupIn(BaseModel):
+    email: str
+    password: str
+
+
+class LoginIn(BaseModel):
+    email: str
+    password: str
+
+
+class ResendIn(BaseModel):
+    email: str
+
+
+# ── Auth endpoints ──
+@app.post("/auth/signup")
+def signup(body: SignupIn, request: Request):
+    """Registro. Crea el usuario SIN verificar y envía el correo de verificación.
+    No inicia sesión hasta que el email esté verificado (anti-abuso)."""
+    ip = request.client.host if request.client else "unknown"
+    if auth.ip_signup_blocked(ip):
+        raise HTTPException(429, "Demasiados registros desde esta red. Intenta más tarde.")
+
+    email = auth.normalize_email(body.email)
+    if not auth.valid_email(email):
+        raise HTTPException(400, "Email inválido.")
+    ok, msg = auth.valid_password(body.password)
+    if not ok:
+        raise HTTPException(400, msg)
+    if auth.get_user_by_email(email):
+        raise HTTPException(409, "Ese email ya está registrado. Inicia sesión.")
+
+    auth.record_signup_attempt(ip)
+    user = auth.create_user(email, body.password, ip=ip)
+    token = auth.create_verification_token(user["id"])
+    res = email_send.send_verification(email, token)
+
+    out = {"ok": True, "email": email,
+           "mensaje": "Te enviamos un correo para confirmar tu email.",
+           "email_enviado": res.get("sent", False), "email_mode": res.get("mode")}
+    # En modo dev (sin proveedor de correo), devolvemos el enlace para probar.
+    if res.get("dev_link"):
+        out["dev_verification_link"] = res["dev_link"]
+    return out
+
+
+@app.get("/auth/verify")
+def verify_email(token: str):
+    """Confirma el email desde el enlace del correo. Devuelve una página simple."""
+    user = auth.consume_verification_token(token)
+    if not user:
+        return HTMLResponse(
+            "<div style='font-family:system-ui;text-align:center;padding:48px'>"
+            "<h2>Enlace inválido o vencido</h2>"
+            "<p>Pide un nuevo enlace de verificación desde la app.</p></div>",
+            status_code=400)
+    return HTMLResponse(
+        "<div style='font-family:system-ui;text-align:center;padding:48px'>"
+        "<h2>✅ ¡Email confirmado!</h2>"
+        "<p>Ya puedes volver a la app e iniciar sesión.</p></div>")
+
+
+@app.post("/auth/resend-verification")
+def resend_verification(body: ResendIn):
+    """Reenvía el correo de verificación. Respuesta genérica para no filtrar
+    qué emails existen."""
+    email = auth.normalize_email(body.email)
+    user = auth.get_user_by_email(email)
+    out = {"ok": True, "mensaje": "Si ese email existe y no está verificado, te reenviamos el enlace."}
+    if user and not user["email_verified"]:
+        token = auth.create_verification_token(user["id"])
+        res = email_send.send_verification(email, token)
+        if res.get("dev_link"):
+            out["dev_verification_link"] = res["dev_link"]
+    return out
+
+
+@app.post("/auth/login")
+def login(body: LoginIn):
+    """Inicia sesión. Exige email verificado. Devuelve un token de sesión."""
+    user = auth.authenticate(body.email, body.password)
+    if not user:
+        raise HTTPException(401, "Email o contraseña incorrectos.")
+    if not user["email_verified"]:
+        raise HTTPException(403, {"error": "email_no_verificado",
+                                  "mensaje": "Confirma tu email antes de entrar. "
+                                             "Revisa tu correo o pide otro enlace."})
+    token = auth.create_session(user["id"])
+    return {"token": token, "user": {"id": user["id"], "email": user["email"],
+                                     "plan": user["plan"]}}
+
+
+@app.post("/auth/logout")
+def logout(authorization: str | None = Header(default=None)):
+    auth.destroy_session(_token_from_header(authorization))
+    return {"ok": True}
+
+
+@app.get("/auth/me")
+def me(user: dict = Depends(current_user)):
+    """Datos del usuario + cuánto le queda de cada cuota hoy."""
+    return {"id": user["id"], "email": user["email"], "plan": user["plan"],
+            "email_verified": bool(user["email_verified"]),
+            "cuotas": limits.usage_summary(user["id"]),
+            "trips": {"usados": limits.trips_count(user["id"]),
+                      "limite": limits.MAX_TRIPS_PER_USER}}
+
+
 # ── Trips ──
 @app.post("/trips")
-def create_trip(t: TripIn):
-    tid = db.create_trip(t.model_dump())
+def create_trip(t: TripIn, user: dict = Depends(verified_user)):
+    if not limits.can_create_trip(user["id"]):
+        raise HTTPException(429, {
+            "error": "trip_limit",
+            "limite": limits.MAX_TRIPS_PER_USER,
+            "mensaje": f"Tu plan permite {limits.MAX_TRIPS_PER_USER} viajes activos. "
+                       "Borra uno para crear otro."})
+    tid = db.create_trip(t.model_dump(), user_id=user["id"])
     if t.ciudad.strip():
         saludo = (f"¡Listo! Ya estoy vigilando tu vuelo, el clima y lo que se mueve en {t.ciudad}. "
                   "Para avisarte solo de lo que te sirve: ¿qué planes tienes para hoy y mañana?")
@@ -122,10 +299,18 @@ def create_trip(t: TripIn):
     return {"trip_id": tid, "greeting": saludo, "trip": db.get_trip(tid)}
 
 
+@app.get("/trips")
+def list_my_trips(user: dict = Depends(current_user)):
+    """Lista los viajes del usuario autenticado."""
+    with db.conn() as c:
+        rs = c.execute("SELECT id FROM trips WHERE user_id=? ORDER BY created_at DESC",
+                       (user["id"],)).fetchall()
+    return {"trips": [db.get_trip(r["id"]) for r in rs]}
+
+
 @app.patch("/trips/{tid}")
-def patch_trip(tid: str, p: TripPatchIn):
-    if not db.get_trip(tid):
-        raise HTTPException(404, "trip no existe")
+def patch_trip(tid: str, p: TripPatchIn, user: dict = Depends(current_user)):
+    own_trip(tid, user)
     patch = {k: v for k, v in p.model_dump().items() if v is not None}
     if patch:
         db.update_trip(tid, patch)
@@ -133,18 +318,23 @@ def patch_trip(tid: str, p: TripPatchIn):
 
 
 @app.get("/trips/{tid}")
-def get_trip(tid: str):
-    t = db.get_trip(tid)
-    if not t:
-        raise HTTPException(404, "trip no existe")
-    return t
+def get_trip(tid: str, user: dict = Depends(current_user)):
+    return own_trip(tid, user)
+
+
+@app.delete("/trips/{tid}")
+def delete_trip(tid: str, user: dict = Depends(current_user)):
+    """Borra un viaje del usuario (libera un cupo de trips activos)."""
+    own_trip(tid, user)
+    with db.conn() as c:
+        c.execute("DELETE FROM trips WHERE id=?", (tid,))
+    return {"ok": True}
 
 
 @app.get("/trips/{tid}/plans")
-def list_plans(tid: str):
+def list_plans(tid: str, user: dict = Depends(current_user)):
     """Planes del viaje: lista plana ordenada + agrupados por día (para el calendario)."""
-    if not db.get_trip(tid):
-        raise HTTPException(404, "trip no existe")
+    own_trip(tid, user)
     from . import plans as plans_mod
     planes = db.get_plans(tid)
     return {"planes": plans_mod.ordenar(planes),
@@ -152,9 +342,8 @@ def list_plans(tid: str):
 
 
 @app.post("/trips/{tid}/plans")
-def add_plan(tid: str, p: PlanIn):
-    if not db.get_trip(tid):
-        raise HTTPException(404, "trip no existe")
+def add_plan(tid: str, p: PlanIn, user: dict = Depends(current_user)):
+    own_trip(tid, user)
     # Compat: si llega 'plan' como texto suelto, se guarda como antes.
     if p.plan and not (p.titulo or p.fecha):
         nuevo = {"titulo": p.plan}
@@ -165,29 +354,26 @@ def add_plan(tid: str, p: PlanIn):
 
 
 @app.post("/trips/{tid}/plans/confirm")
-def confirm_plans(tid: str, body: PlansConfirmIn):
+def confirm_plans(tid: str, body: PlansConfirmIn, user: dict = Depends(current_user)):
     """Guarda los planes que el chat o un documento propuso (tras confirmación del usuario)."""
-    if not db.get_trip(tid):
-        raise HTTPException(404, "trip no existe")
+    own_trip(tid, user)
     return {"planes": db.add_plans(tid, body.planes, origen="chat")}
 
 
 @app.delete("/trips/{tid}/plans/{plan_id}")
-def remove_plan(tid: str, plan_id: str):
-    if not db.get_trip(tid):
-        raise HTTPException(404, "trip no existe")
+def remove_plan(tid: str, plan_id: str, user: dict = Depends(current_user)):
+    own_trip(tid, user)
     return {"planes": db.delete_plan(tid, plan_id)}
 
 
 @app.get("/trips/{tid}/plans/{plan_id}/maps")
 def plan_maps_link(tid: str, plan_id: str,
-                   orig_lat: float | None = None, orig_lng: float | None = None):
+                   orig_lat: float | None = None, orig_lng: float | None = None,
+                   user: dict = Depends(current_user)):
     """Devuelve el deep link de Google Maps con ruta desde la ubicación actual
     del usuario hasta el lugar del plan. Si el lugar está en la curación,
     usa sus coordenadas exactas; si no, usa el nombre para que Maps lo geocodifique."""
-    trip = db.get_trip(tid)
-    if not trip:
-        raise HTTPException(404, "trip no existe")
+    trip = own_trip(tid, user)
     planes = db.get_plans(tid)
     plan = next((p for p in planes if p.get("id") == plan_id), None)
     if not plan:
@@ -261,7 +447,8 @@ def plan_maps_link(tid: str, plan_id: str,
 
 # ── Señales / watchers ──
 @app.post("/trips/{tid}/signals")
-def ingest_signal(tid: str, s: SignalIn):
+def ingest_signal(tid: str, s: SignalIn, user: dict = Depends(current_user)):
+    own_trip(tid, user)
     try:
         return engine.ingest(tid, s.source, s.category, s.operational, s.payload)
     except KeyError:
@@ -270,28 +457,27 @@ def ingest_signal(tid: str, s: SignalIn):
 
 @app.post("/webhooks/duffel/{tid}")
 def duffel(tid: str, payload: dict):
+    # Webhook de proveedor: no lleva sesión de usuario. Se deja sin auth de
+    # usuario a propósito (en producción, validar firma del webhook de Duffel).
     return watchers.duffel_webhook(tid, payload)
 
 
 @app.post("/trips/{tid}/location")
-def location(tid: str, loc: LocationIn):
-    if not db.get_trip(tid):
-        raise HTTPException(404, "trip no existe")
+def location(tid: str, loc: LocationIn, user: dict = Depends(current_user)):
+    own_trip(tid, user)
     return watchers.update_location(tid, loc.zona, loc.disparar_geofence, lat=loc.lat, lng=loc.lng)
 
 
 @app.post("/trips/{tid}/checkin")
-def checkin(tid: str):
-    if not db.get_trip(tid):
-        raise HTTPException(404, "trip no existe")
+def checkin(tid: str, user: dict = Depends(current_user)):
+    own_trip(tid, user)
     return watchers.check_in(tid)
 
 
 @app.post("/trips/{tid}/checkin-matutino")
-def checkin_matutino(tid: str):
+def checkin_matutino(tid: str, user: dict = Depends(current_user)):
     """Check-in matutino. En producción lo dispara el scheduler ~8am hora local."""
-    if not db.get_trip(tid):
-        raise HTTPException(404, "trip no existe")
+    own_trip(tid, user)
     return watchers.check_in_matutino(tid)
 
 
@@ -311,17 +497,17 @@ def push_public_key():
 
 
 @app.post("/trips/{tid}/push/subscribe")
-def push_subscribe(tid: str, body: PushSubIn):
+def push_subscribe(tid: str, body: PushSubIn, user: dict = Depends(current_user)):
     """Guarda la suscripción push del navegador para este viaje."""
-    if not db.get_trip(tid):
-        raise HTTPException(404, "trip no existe")
+    own_trip(tid, user)
     push.save_subscription(tid, body.subscription)
     return {"ok": True}
 
 
 @app.post("/trips/{tid}/push/unsubscribe")
-def push_unsubscribe(tid: str, body: PushSubIn):
+def push_unsubscribe(tid: str, body: PushSubIn, user: dict = Depends(current_user)):
     """Elimina una suscripción (cuando el usuario desactiva las notificaciones)."""
+    own_trip(tid, user)
     endpoint = body.subscription.get("endpoint")
     if endpoint:
         push.delete_subscription(endpoint)
@@ -329,42 +515,40 @@ def push_unsubscribe(tid: str, body: PushSubIn):
 
 
 @app.post("/trips/{tid}/push/test")
-def push_test(tid: str):
+def push_test(tid: str, user: dict = Depends(current_user)):
     """Manda una notificación de prueba a los dispositivos suscritos del viaje."""
-    if not db.get_trip(tid):
-        raise HTTPException(404, "trip no existe")
+    own_trip(tid, user)
     return push.send_to_trip(tid, "Voyra 🛟", "¡Las notificaciones funcionan! Te avisaré de lo que importe.",
                              data={"kind": "test"})
 
 
 @app.post("/trips/{tid}/scan")
-def scan(tid: str):
+def scan(tid: str, user: dict = Depends(verified_user)):
     """Dispara el News watcher + Destination Scanner reales (Tavily) para este viaje."""
-    if not db.get_trip(tid):
-        raise HTTPException(404, "trip no existe")
+    own_trip(tid, user)
+    _consume_or_429(user, "scan")  # Tavily se paga/limita
     return watchers.scan_destination(tid)
 
 
 @app.post("/trips/{tid}/nearby")
-def nearby(tid: str):
-    """Recomendaciones desde la base curada, rankeadas por distancia real a zona_actual."""
-    if not db.get_trip(tid):
-        raise HTTPException(404, "trip no existe")
+def nearby(tid: str, user: dict = Depends(current_user)):
+    """Recomendaciones desde la base curada, rankeadas por distancia real a zona_actual.
+    Usa SOLO la curación local (sin costo de API), así que no consume cuota."""
+    own_trip(tid, user)
     return watchers.nearby_recommendations(tid)
 
 
 @app.get("/trips/{tid}/nearby-chain")
 def nearby_chain(tid: str, q: str, orig_lat: float | None = None,
-                 orig_lng: float | None = None, radio_m: int = 2500):
+                 orig_lng: float | None = None, radio_m: int = 2500,
+                 user: dict = Depends(verified_user)):
     """Búsqueda EN VIVO de cadenas/servicios cerca del usuario (Carulla, cajero,
     farmacia, etc.). Consulta Google Places al momento — NO usa la curación.
 
     Pasa orig_lat/orig_lng (GPS del usuario) o usa la ubicación guardada del trip.
     """
     from . import places_live
-    trip = db.get_trip(tid)
-    if not trip:
-        raise HTTPException(404, "trip no existe")
+    trip = own_trip(tid, user)
     olat = orig_lat or trip.get("lat_actual")
     olng = orig_lng or trip.get("lng_actual")
     if olat is None or olng is None:
@@ -375,21 +559,24 @@ def nearby_chain(tid: str, q: str, orig_lat: float | None = None,
     if olat is None or olng is None:
         return {"disponible": places_live.disponible(), "resultados": [],
                 "nota": "No tengo tu ubicación. Comparte tu GPS para buscar cerca."}
+    # Solo consumimos cuota si de verdad vamos a pegarle a Google (hay key y GPS).
+    if places_live.disponible():
+        _consume_or_429(user, "maps")
     resultados = places_live.buscar_cerca(q, olat, olng, radio_m=radio_m)
     return {"disponible": places_live.disponible(), "query": q,
             "resultados": resultados,
+            "restante_maps": limits.remaining(user["id"], "maps"),
             "nota": None if resultados else (
                 "No encontré nada cerca." if places_live.disponible()
                 else "Búsqueda en vivo no configurada (falta GOOGLE_MAPS_API_KEY).")}
 
 
 @app.get("/trips/{tid}/airport")
-def airport_arrival(tid: str):
+def airport_arrival(tid: str, user: dict = Depends(current_user)):
     """Modo aeropuerto: timeline de llegada (migración → equipaje → salida) +
     opciones de transporte con tips anti-estafa, curado por aeropuerto y con
     tiempos en vivo si hay búsqueda configurada."""
-    if not db.get_trip(tid):
-        raise HTTPException(404, "trip no existe")
+    own_trip(tid, user)
     return watchers.airport_arrival(tid)
 
 
@@ -428,10 +615,14 @@ def diagnostico():
 
 # ── Chat ──
 @app.post("/trips/{tid}/chat")
-def chat(tid: str, c: ChatIn):
-    trip = db.get_trip(tid)
-    if not trip:
-        raise HTTPException(404, "trip no existe")
+def chat(tid: str, c: ChatIn, user: dict = Depends(verified_user)):
+    trip = own_trip(tid, user)
+    # Los taps de notificaciones (mensajes entre corchetes) no gastan cuota de
+    # chat: son acciones de UI, no conversación real con el LLM. Igual cuentan
+    # poco, pero para no penalizar al usuario por interactuar, los eximimos.
+    es_tap = c.message.strip().startswith("[")
+    if not es_tap:
+        _consume_or_429(user, "chat")
     db.insert("messages", {"trip_id": tid, "role": "user", "content": c.message})
     history = [{"role": m["role"], "content": m["content"]} for m in db.rows("messages", tid)]
     reply = llm.chat(context.build(trip), history)
@@ -440,7 +631,7 @@ def chat(tid: str, c: ChatIn):
     # preguntará "¿lo anoto en tu calendario?" antes de persistir.
     propuestas = []
     # Los mensajes entre corchetes son taps de notificaciones, no planes.
-    if not c.message.strip().startswith("["):
+    if not es_tap:
         from . import plans as plans_mod, timeutil
         propuestas = plans_mod.normalizar_lista(
             llm.extract_plans_from_chat(c.message, trip), origen="chat")
@@ -468,19 +659,29 @@ def chat(tid: str, c: ChatIn):
             if coords:
                 olat, olng = coords
         if olat and olng:
-            resultados = places_live.buscar_cerca(cadena_q, olat, olng)
-            if resultados:
-                chain_results = {"query": cadena_q, "items": resultados}
+            # Esta búsqueda SÍ pega a Google Maps → consume cuota "maps".
+            # Si el usuario ya no tiene cuota (o saltó el circuit breaker), no
+            # rompemos el chat: simplemente omitimos la búsqueda en vivo y
+            # avisamos suave. La respuesta del Companion ya se generó.
+            try:
+                limits.check_and_consume(user["id"], "maps")
+                resultados = places_live.buscar_cerca(cadena_q, olat, olng)
+                if resultados:
+                    chain_results = {"query": cadena_q, "items": resultados}
+            except limits.QuotaError:
+                chain_results = {"query": cadena_q, "items": [],
+                                 "nota": "Llegaste a tu límite de búsquedas en vivo por hoy. "
+                                         "Se renueva mañana."}
 
-    return {"reply": reply, "planes_propuestos": propuestas, "chain_results": chain_results}
+    return {"reply": reply, "planes_propuestos": propuestas, "chain_results": chain_results,
+            "restante_chat": limits.remaining(user["id"], "chat")}
 
 
 # ── Documentos ──
 @app.post("/trips/{tid}/documents")
-def upload_doc(tid: str, d: DocIn):
-    trip = db.get_trip(tid)
-    if not trip:
-        raise HTTPException(404, "trip no existe")
+def upload_doc(tid: str, d: DocIn, user: dict = Depends(verified_user)):
+    trip = own_trip(tid, user)
+    _consume_or_429(user, "document")  # extracción/visión = LLM caro
     if d.pdf_data_url:
         from . import docparse
         texto = docparse.pdf_b64_to_text(d.pdf_data_url)
@@ -526,7 +727,8 @@ def upload_doc(tid: str, d: DocIn):
 
 # ── Notificaciones y feedback ──
 @app.get("/trips/{tid}/notifications")
-def notifications(tid: str):
+def notifications(tid: str, user: dict = Depends(current_user)):
+    own_trip(tid, user)
     rows = db.rows("notifications", tid)
     for r in rows:
         if r.get("extra"):
@@ -537,7 +739,13 @@ def notifications(tid: str):
 
 
 @app.post("/notifications/{nid}/feedback")
-def feedback(nid: str, f: FeedbackIn):
+def feedback(nid: str, f: FeedbackIn, user: dict = Depends(current_user)):
+    # Verifica que la notificación pertenezca a un trip del usuario.
+    with db.conn() as c:
+        r = c.execute("SELECT trip_id FROM notifications WHERE id=?", (nid,)).fetchone()
+    if not r:
+        raise HTTPException(404, "notificación no existe")
+    own_trip(r["trip_id"], user)
     try:
         return engine.feedback(nid, f.feedback)
     except KeyError:
@@ -546,7 +754,8 @@ def feedback(nid: str, f: FeedbackIn):
 
 # ── Dataset (el log de decisiones que acordamos guardar desde el día uno) ──
 @app.get("/trips/{tid}/decisions")
-def decisions(tid: str):
+def decisions(tid: str, user: dict = Depends(current_user)):
+    own_trip(tid, user)
     return db.rows("decisions", tid)
 
 
@@ -554,7 +763,12 @@ def decisions(tid: str):
 def health():
     from . import places_live
     return {"status": "ok", "llm_mode": llm.MODE, "search_mode": search.MODE,
-            "push_enabled": push.enabled(), "places_live": places_live.MODE}
+            "push_enabled": push.enabled(), "places_live": places_live.MODE,
+            "email_mode": email_send.mode(),
+            "limits": {"free": limits.FREE_LIMITS,
+                       "max_trips": limits.MAX_TRIPS_PER_USER,
+                       "global_maps_per_day": limits.GLOBAL_MAPS_PER_DAY,
+                       "maps_used_today": limits.global_used_today("maps")}}
 
 
 # ── Frontend / PWA ──

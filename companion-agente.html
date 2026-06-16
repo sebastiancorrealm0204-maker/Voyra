@@ -56,35 +56,76 @@ const API = (typeof process !== "undefined" && process.env?.REACT_APP_API_URL)
       ? "http://localhost:8000"
       : window.location.origin);
 
+// ── Sesión: token guardado en localStorage e inyectado en cada request ──
+// El backend ahora exige Authorization: Bearer <token> en los endpoints de
+// trip. Centralizamos aquí para que TODA llamada lo lleve sin tocar cada caso.
+const TOKEN_KEY = "voyra_token";
+const tokenStore = {
+  get: () => { try { return localStorage.getItem(TOKEN_KEY) || ""; } catch { return ""; } },
+  set: (t) => { try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch {} },
+  clear: () => { try { localStorage.removeItem(TOKEN_KEY); } catch {} },
+};
+
+// Cuando una sesión muere (401), avisamos al árbol React para volver al login.
+// Se setea desde el componente raíz vía api.onUnauthorized.
+let _onUnauthorized = null;
+
+// Error de API con el status accesible (para distinguir 401/403/429 en la UI).
+class ApiError extends Error {
+  constructor(status, body) {
+    let detalle = body;
+    try { const j = JSON.parse(body); detalle = j.detail ?? j; } catch {}
+    const msg = typeof detalle === "string" ? detalle
+      : (detalle && detalle.mensaje) ? detalle.mensaje : `Error ${status}`;
+    super(msg);
+    this.status = status;
+    this.detail = detalle;
+  }
+}
+
+function authHeaders(extra) {
+  const h = { ...(extra || {}) };
+  const t = tokenStore.get();
+  if (t) h["Authorization"] = `Bearer ${t}`;
+  return h;
+}
+
+async function handle(r) {
+  if (r.status === 401) {
+    // Token ausente o expirado: limpiar y mandar a login.
+    tokenStore.clear();
+    if (_onUnauthorized) _onUnauthorized();
+    throw new ApiError(401, await r.text());
+  }
+  if (!r.ok) throw new ApiError(r.status, await r.text());
+  return r.json();
+}
+
 const api = {
-  post: async (path, body) => {
-    const r = await fetch(`${API}${path}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
-    return r.json();
-  },
-  get: async (path) => {
-    const r = await fetch(`${API}${path}`);
-    if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
-    return r.json();
-  },
-  del: async (path) => {
-    const r = await fetch(`${API}${path}`, { method: "DELETE" });
-    if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
-    return r.json();
-  },
-  patch: async (path, body) => {
-    const r = await fetch(`${API}${path}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
-    return r.json();
-  },
+  onUnauthorized: (fn) => { _onUnauthorized = fn; },
+  post: async (path, body) => handle(await fetch(`${API}${path}`, {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(body),
+  })),
+  get: async (path) => handle(await fetch(`${API}${path}`, { headers: authHeaders() })),
+  del: async (path) => handle(await fetch(`${API}${path}`, {
+    method: "DELETE", headers: authHeaders(),
+  })),
+  patch: async (path, body) => handle(await fetch(`${API}${path}`, {
+    method: "PATCH",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(body),
+  })),
+};
+
+// ── Endpoints de auth (no llevan token salvo logout/me) ──
+const authApi = {
+  signup: (email, password) => api.post("/auth/signup", { email, password }),
+  login: (email, password) => api.post("/auth/login", { email, password }),
+  resend: (email) => api.post("/auth/resend-verification", { email }),
+  me: () => api.get("/auth/me"),
+  logout: () => api.post("/auth/logout", {}),
 };
 
 const DEBUG = new URLSearchParams(window.location.search).has("debug");
@@ -367,9 +408,158 @@ function Icon({ name, size = 22, color = "currentColor", strokeWidth = 2, style 
   );
 }
 
+// ════════════════ PANTALLA DE AUTENTICACIÓN ════════════════
+// Aparece cuando el usuario va a guardar/crear su viaje sin sesión. Flujo:
+//   crear cuenta  →  "revisa tu correo"  →  (confirma en su email)  →  entrar
+// El login exige email verificado; mientras no lo esté, el backend responde 403
+// y mostramos el aviso de "confirma tu correo" con opción de reenviar.
+function AuthScreen({ onSuccess, onCancel }) {
+  const [modo, setModo] = React.useState("login");   // login | signup | revisa
+  const [email, setEmail] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [cargando, setCargando] = React.useState(false);
+  const [error, setError] = React.useState("");
+  const [aviso, setAviso] = React.useState("");
+  const [devLink, setDevLink] = React.useState("");   // solo si el backend está en modo dev
+
+  const limpiar = () => { setError(""); setAviso(""); };
+
+  const hacerSignup = async () => {
+    limpiar();
+    if (!email.trim() || !password) { setError("Escribe tu email y una contraseña."); return; }
+    if (password.length < 8) { setError("La contraseña debe tener al menos 8 caracteres."); return; }
+    setCargando(true);
+    try {
+      const r = await authApi.signup(email.trim(), password);
+      if (r.dev_verification_link) setDevLink(r.dev_verification_link);
+      setModo("revisa");
+    } catch (e) {
+      setError(e.status === 409 ? "Ese email ya tiene cuenta. Inicia sesión." : (e.message || "No pude crear la cuenta."));
+    }
+    setCargando(false);
+  };
+
+  const hacerLogin = async () => {
+    limpiar();
+    if (!email.trim() || !password) { setError("Escribe tu email y contraseña."); return; }
+    setCargando(true);
+    try {
+      const r = await authApi.login(email.trim(), password);
+      tokenStore.set(r.token);
+      onSuccess({ token: r.token, email: r.user.email, plan: r.user.plan });
+    } catch (e) {
+      if (e.status === 403) { setModo("revisa"); setError(""); }
+      else setError(e.status === 401 ? "Email o contraseña incorrectos." : (e.message || "No pude iniciar sesión."));
+    }
+    setCargando(false);
+  };
+
+  const reenviar = async () => {
+    limpiar();
+    setCargando(true);
+    try {
+      const r = await authApi.resend(email.trim());
+      if (r.dev_verification_link) setDevLink(r.dev_verification_link);
+      setAviso("Te reenviamos el enlace. Revisa tu correo (y spam).");
+    } catch (e) { setError("No pude reenviar el enlace."); }
+    setCargando(false);
+  };
+
+  const inputStyle = { width: "100%", boxSizing: "border-box", border: `1px solid ${C.line}`, borderRadius: 12, padding: "13px 14px", marginTop: 6, fontSize: 16, background: C.bg, color: C.ink, outline: "none", WebkitAppearance: "none" };
+  const btnPrimario = (txt, on) => (
+    <button onClick={on} disabled={cargando}
+      style={{ width: "100%", marginTop: 18, padding: "14px", borderRadius: 12, border: "none", background: cargando ? C.line : C.orange, color: cargando ? C.inkSoft : "#fff", fontWeight: 700, fontSize: 16, cursor: cargando ? "default" : "pointer" }}>
+      {cargando ? "Un momento…" : txt}
+    </button>
+  );
+
+  return (
+    <div style={{ minHeight: "100dvh", background: C.bg, color: C.ink, overflowY: "auto" }} className="no-scrollbar">
+      <div style={{ maxWidth: 420, margin: "0 auto", padding: "max(28px, env(safe-area-inset-top)) 24px 40px", display: "flex", flexDirection: "column", minHeight: "100dvh", boxSizing: "border-box" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Voyra</span>
+            <span style={{ fontSize: 18 }}>🛟</span>
+          </div>
+          {onCancel && (
+            <button onClick={onCancel} style={{ background: "none", border: "none", color: C.inkSoft, fontSize: 14, cursor: "pointer" }}>Volver</button>
+          )}
+        </div>
+
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+          {modo === "revisa" ? (
+            <div>
+              <div style={{ fontSize: 40, marginBottom: 8 }}>✉️</div>
+              <h1 style={{ fontSize: 24, fontWeight: 800, margin: "4px 0 8px" }}>Confirma tu correo</h1>
+              <p style={{ color: C.inkSoft, fontSize: 15, lineHeight: 1.5 }}>
+                Te enviamos un enlace a <b style={{ color: C.ink }}>{email.trim()}</b>. Ábrelo para activar tu cuenta y luego inicia sesión.
+              </p>
+              {devLink && (
+                <div style={{ marginTop: 14, padding: 12, borderRadius: 10, background: C.aquaSoft, border: `1px solid ${C.line}` }}>
+                  <div style={{ fontSize: 11.5, color: C.inkSoft, marginBottom: 6 }}>Modo desarrollo — enlace directo:</div>
+                  <a href={devLink} target="_blank" rel="noreferrer" style={{ color: C.aqua, fontSize: 13, wordBreak: "break-all" }}>{devLink}</a>
+                </div>
+              )}
+              {aviso && <p style={{ color: C.aqua, fontSize: 13.5, marginTop: 12 }}>{aviso}</p>}
+              {error && <p style={{ color: C.coral, fontSize: 13.5, marginTop: 12 }}>{error}</p>}
+              <button onClick={reenviar} disabled={cargando} style={{ width: "100%", marginTop: 16, padding: 12, borderRadius: 12, border: `1px solid ${C.line}`, background: "none", color: C.ink, fontWeight: 600, fontSize: 14.5, cursor: "pointer" }}>
+                Reenviar enlace
+              </button>
+              <button onClick={() => { setModo("login"); limpiar(); }} style={{ width: "100%", marginTop: 10, padding: 12, borderRadius: 12, border: "none", background: C.orange, color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer" }}>
+                Ya lo confirmé, iniciar sesión
+              </button>
+            </div>
+          ) : (
+            <div>
+              <h1 style={{ fontSize: 26, fontWeight: 800, margin: "0 0 6px", letterSpacing: "-0.02em" }}>
+                {modo === "signup" ? "Crea tu cuenta" : "Inicia sesión"}
+              </h1>
+              <p style={{ color: C.inkSoft, fontSize: 15, lineHeight: 1.5, marginBottom: 18 }}>
+                {modo === "signup"
+                  ? "Para guardar tu viaje y que tu Companion te acompañe durante todo el camino."
+                  : "Entra para retomar tu viaje y tu Companion."}
+              </p>
+
+              <label style={{ fontSize: 11.5, fontWeight: 600, color: C.inkSoft, letterSpacing: "0.03em" }}>EMAIL</label>
+              <input type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" value={email}
+                onChange={(e) => setEmail(e.target.value)} placeholder="tu@correo.com" style={inputStyle} />
+
+              <div style={{ marginTop: 14 }}>
+                <label style={{ fontSize: 11.5, fontWeight: 600, color: C.inkSoft, letterSpacing: "0.03em" }}>CONTRASEÑA</label>
+                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") (modo === "signup" ? hacerSignup() : hacerLogin()); }}
+                  placeholder={modo === "signup" ? "Mínimo 8 caracteres" : "Tu contraseña"} style={inputStyle} />
+              </div>
+
+              {error && <p style={{ color: C.coral, fontSize: 13.5, marginTop: 12 }}>{error}</p>}
+
+              {btnPrimario(modo === "signup" ? "Crear cuenta" : "Entrar", modo === "signup" ? hacerSignup : hacerLogin)}
+
+              <div style={{ textAlign: "center", marginTop: 18, fontSize: 14, color: C.inkSoft }}>
+                {modo === "signup" ? "¿Ya tienes cuenta? " : "¿Nuevo en Voyra? "}
+                <button onClick={() => { setModo(modo === "signup" ? "login" : "signup"); limpiar(); }}
+                  style={{ background: "none", border: "none", color: C.orange, fontWeight: 700, fontSize: 14, cursor: "pointer", padding: 0 }}>
+                  {modo === "signup" ? "Inicia sesión" : "Crea una cuenta"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function VoyraCompanion() {
   const [fase, setFase] = useState("setup");
   const [tripId, setTripId] = useState(null);
+  // ── Sesión del usuario ──
+  // auth = null (sin sesión) | { token, email, plan }. Se rehidrata del token
+  // guardado al cargar. authGate guarda la acción pendiente que disparó el
+  // login, para reanudarla automáticamente tras autenticarse ("al guardar").
+  const [auth, setAuth] = useState(null);
+  const [authGate, setAuthGate] = useState(false);   // ¿mostrar pantalla de login?
+  const pendingActionRef = useRef(null);             // () => void a reanudar tras login
   const [viaje, setViaje] = useState({ ciudad: "Bogotá", hotel: "Hotel NH Collection Bogotá Teusaquillo", inicio: "2026-07-12", fin: "2026-07-18", vueloIda: "AV245", vueloRegreso: "AV244", pais: "Colombia", gustos: ["Gastronomía local", "Historia y cultura"] });
 
   // Stream conversacional unificado: mensajes, avisos proactivos y recomendaciones
@@ -420,6 +610,58 @@ function VoyraCompanion() {
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [stream, pensando]);
+
+  // ── Rehidratar sesión al cargar + capturar 401 globales ──
+  useEffect(() => {
+    // Si una request devuelve 401 (token expirado/limpiado), cerramos sesión y
+    // mostramos el login. La acción pendiente, si la hay, se mantiene.
+    api.onUnauthorized(() => {
+      setAuth(null);
+      setAuthGate(true);
+    });
+    // ¿Hay token guardado? Validarlo con /auth/me y restaurar la sesión.
+    if (tokenStore.get()) {
+      (async () => {
+        try {
+          const u = await authApi.me();
+          setAuth({ token: tokenStore.get(), email: u.email, plan: u.plan });
+        } catch {
+          tokenStore.clear();
+        }
+      })();
+    }
+  }, []);
+
+  // requireAuth: ejecuta `accion` si hay sesión; si no, guarda la acción y abre
+  // el login. Tras autenticarse, la acción se reanuda sola. Este es el "gate"
+  // que aparece justo antes de tocar el backend ("login al guardar").
+  const requireAuth = (accion) => {
+    if (auth) return accion();
+    pendingActionRef.current = accion;
+    setAuthGate(true);
+  };
+
+  // Llamado por la pantalla de auth cuando el login fue exitoso.
+  const onAuthSuccess = (sesion) => {
+    setAuth(sesion);
+    setAuthGate(false);
+    const pend = pendingActionRef.current;
+    pendingActionRef.current = null;
+    if (pend) { try { pend(); } catch {} }
+  };
+
+  const cerrarSesion = async () => {
+    try { await authApi.logout(); } catch {}
+    tokenStore.clear();
+    setAuth(null);
+    setTripId(null);
+    setStream([]);
+    setPlanes([]);
+    setFase("setup");
+    setModoSetup(null);
+    setPaso(1);
+    setAuthGate(false);
+  };
 
   const addLog = (entry) => setLog((l) => [{ ...entry, t: new Date().toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) }, ...l]);
   const toggleGusto = (g) => setViaje((v) => ({ ...v, gustos: v.gustos.includes(g) ? v.gustos.filter((x) => x !== g) : [...v.gustos, g] }));
@@ -763,6 +1005,18 @@ function VoyraCompanion() {
     }
   };
 
+  // ════════════════ GATE DE SESIÓN ════════════════
+  // Si una acción requirió login (o expiró la sesión), mostramos la pantalla de
+  // auth por encima de todo. Al lograr sesión, se reanuda la acción pendiente.
+  if (authGate) {
+    return (
+      <AuthScreen
+        onSuccess={onAuthSuccess}
+        onCancel={() => { pendingActionRef.current = null; setAuthGate(false); }}
+      />
+    );
+  }
+
   // ════════════════ ONBOARDING ════════════════
   if (fase === "setup") {
     const paso1ok = viaje.ciudad.trim() && viaje.hotel.trim() && viaje.inicio && viaje.fin;
@@ -804,14 +1058,14 @@ function VoyraCompanion() {
       })();
     };
 
-    const activar = async () => {
+    const activar = () => requireAuth(async () => {
       try {
         const data = await api.post("/trips", { ciudad: viaje.ciudad.trim(), hotel: viaje.hotel.trim(), inicio: viaje.inicio, fin: viaje.fin, vuelo_ida: viaje.vueloIda.trim(), vuelo_regreso: viaje.vueloRegreso.trim(), pais: viaje.pais.trim() || "Colombia", gustos: viaje.gustos });
         entrarApp(data);
       } catch (e) {
-        alert("No pude conectar con tu Companion. Revisa que el backend esté arriba.");
+        alert(e.status === 429 ? e.message : "No pude conectar con tu Companion. Revisa que el backend esté arriba.");
       }
-    };
+    });
 
     // ── Camino "subir reservas": crea viaje en blanco si no existe y sube cada archivo ──
     const asegurarViaje = async () => {
@@ -821,7 +1075,7 @@ function VoyraCompanion() {
       return data.trip_id;
     };
 
-    const subirReservaOnb = async (file) => {
+    const subirReservaOnb = (file) => requireAuth(async () => {
       if (!file) return;
       const nombre = file.name.toLowerCase();
       const esPDF = file.type === "application/pdf" || nombre.endsWith(".pdf");
@@ -854,13 +1108,13 @@ function VoyraCompanion() {
         if (props.length) { try { await api.post(`/trips/${tid}/plans/confirm`, { planes: props }); } catch (e) {} }
         setDocsOnb((d) => [...d, { nombre: file.name, tipo: data.tipo, resumen: data.resumen, planes: props.length }]);
       } catch (e) {
-        setDocsOnb((d) => [...d, { nombre: file.name, error: "No pude leerlo" }]);
+        setDocsOnb((d) => [...d, { nombre: file.name, error: e.status === 429 ? e.message : "No pude leerlo" }]);
       }
       setSubiendoOnb(false);
-    };
+    });
 
     // Entrar tras subir reservas. Exige al menos ciudad + fechas (las completa el form si faltan).
-    const finalizarSubida = async () => {
+    const finalizarSubida = () => requireAuth(async () => {
       try {
         const tid = await asegurarViaje();
         const patch = {};
@@ -876,9 +1130,9 @@ function VoyraCompanion() {
         await cargarPlanes(tid);
         entrarApp({ trip_id: tid, trip, greeting: `Tu viaje a ${trip.ciudad || "tu destino"} está listo. Cualquier cosa, aquí estoy ✓` });
       } catch (e) {
-        alert("No pude terminar de armar tu viaje. Revisa la conexión.");
+        alert(e.status === 429 ? e.message : "No pude terminar de armar tu viaje. Revisa la conexión.");
       }
-    };
+    });
 
     return (
       <div style={{ minHeight: "100dvh", background: C.bg, color: C.ink, overflowY: "auto" }} className="no-scrollbar">
@@ -1171,6 +1425,8 @@ function VoyraCompanion() {
           onTraductor={() => setTraductorOpen(true)}
           onReiniciar={reiniciar}
           onDev={() => setSheet("dev")}
+          email={auth?.email}
+          onCerrarSesion={cerrarSesion}
         />
       )}
 
@@ -1789,7 +2045,7 @@ function ConfirmarPlanesSheet({ data, onConfirmar, onCancelar }) {
     </div>
   );
 }
-function MasView({ viaje, docs, vozActiva, onToggleVoz, onUbicacion, onInfo, onDocs, onSOS, onTraductor, onReiniciar, onDev, debug, pushDisponible, pushOn, onTogglePush }) {
+function MasView({ viaje, docs, vozActiva, onToggleVoz, onUbicacion, onInfo, onDocs, onSOS, onTraductor, onReiniciar, onDev, debug, pushDisponible, pushOn, onTogglePush, email, onCerrarSesion }) {
   const Item = ({ icon, label, sub, onClick, danger }) => (
     <button onClick={onClick} style={{ width: "100%", display: "flex", alignItems: "center", gap: 13, padding: "14px 14px", background: C.card, border: `1px solid ${C.line}`, borderRadius: 14, cursor: "pointer", textAlign: "left" }}>
       <span style={{ width: 24, display: "flex", justifyContent: "center", flexShrink: 0 }}>
@@ -1821,9 +2077,15 @@ function MasView({ viaje, docs, vozActiva, onToggleVoz, onUbicacion, onInfo, onD
       </div>
 
       <div style={{ fontSize: 11.5, fontWeight: 700, color: C.inkSoft, letterSpacing: "0.07em", margin: "18px 2px 8px" }}>CUENTA</div>
+      {email && (
+        <div style={{ fontSize: 13, color: C.inkSoft, margin: "0 2px 8px" }}>
+          Sesión: <b style={{ color: C.ink }}>{email}</b>
+        </div>
+      )}
       <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
         {debug && <Item icon="wrench" label="Panel de desarrollo" onClick={onDev} />}
         <Item icon="refresh" label="Reiniciar con otro viaje" onClick={onReiniciar} danger />
+        {onCerrarSesion && <Item icon="refresh" label="Cerrar sesión" onClick={onCerrarSesion} danger />}
       </div>
       <div style={{ textAlign: "center", marginTop: 22, fontSize: 11.5, color: C.inkSoft }}>Voyra · tu Companion de viaje</div>
     </div>

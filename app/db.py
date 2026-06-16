@@ -164,12 +164,31 @@ def now() -> float:
 
 
 # ── Trips ──
-def create_trip(data: dict) -> str:
+def create_trip(data: dict, user_id: str | None = None) -> str:
     tid = new_id()
     defaults = {"zona_actual": "En el hotel", "planes": [], "categorias_silenciadas": []}
     with conn() as c:
-        c.execute("INSERT INTO trips VALUES (?,?,?)", (tid, json.dumps({**defaults, **data}), now()))
+        # La tabla trips tiene 3 columnas base (id, data, created_at) y desde la
+        # migración de auth una 4ta opcional (user_id). Insertamos por nombre de
+        # columna para no romper si user_id no existe en una DB muy vieja.
+        cols = {r["name"] for r in c.execute("PRAGMA table_info(trips)").fetchall()}
+        if "user_id" in cols:
+            c.execute("INSERT INTO trips (id, data, created_at, user_id) VALUES (?,?,?,?)",
+                      (tid, json.dumps({**defaults, **data}), now(), user_id))
+        else:
+            c.execute("INSERT INTO trips (id, data, created_at) VALUES (?,?,?)",
+                      (tid, json.dumps({**defaults, **data}), now()))
     return tid
+
+
+def trip_owner(tid: str) -> str | None:
+    """Devuelve el user_id dueño del trip, o None si no tiene dueño / no existe."""
+    with conn() as c:
+        cols = {r["name"] for r in c.execute("PRAGMA table_info(trips)").fetchall()}
+        if "user_id" not in cols:
+            return None
+        r = c.execute("SELECT user_id FROM trips WHERE id=?", (tid,)).fetchone()
+    return r["user_id"] if r else None
 
 
 def get_trip(tid: str) -> dict | None:

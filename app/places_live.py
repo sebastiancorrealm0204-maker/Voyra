@@ -109,7 +109,6 @@ def detectar_busqueda_cadena(mensaje: str) -> str | None:
             if any(p in m for p in patrones[:2]):  # nombre específico de cadena
                 return query
     return None
-    return MODE == "real"
 
 
 def buscar_cerca(query: str, lat: float, lng: float,
