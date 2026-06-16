@@ -26,6 +26,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+db.init_pool()       # abre el ConnectionPool de Postgres (no-op en modo SQLite)
 db.init_db()
 auth.init_auth()
 limits.init_limits()
@@ -96,6 +97,12 @@ def _arrancar_scheduler():
     """Arranca el scheduler proactivo (check-ins por hora local del destino).
     Si APScheduler no está instalado, la app sigue normal sin modo proactivo."""
     scheduler.start()
+
+
+@app.on_event("shutdown")
+def _cerrar_pool():
+    """Cierra el ConnectionPool de Postgres al apagar la app (no-op en SQLite)."""
+    db.close_pool()
 
 
 # ── Schemas ──

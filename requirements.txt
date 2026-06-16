@@ -7,3 +7,7 @@ apscheduler>=3.10
 tzdata>=2024.1
 pywebpush>=2.0
 pypdf>=4.0
+# Postgres/Supabase (producción). Sin DATABASE_URL la app usa SQLite y estas
+# libs no se importan, así que en local/tests son opcionales.
+psycopg[binary]>=3.1
+psycopg_pool>=3.2

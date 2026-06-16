@@ -67,11 +67,14 @@ CREATE TABLE IF NOT EXISTS signup_attempts (
 
 def init_auth():
     with db.conn() as c:
-        c.executescript(SCHEMA)
-        # Migración: si 'trips' ya existe sin user_id, agregar la columna.
-        cols = {r["name"] for r in c.execute("PRAGMA table_info(trips)").fetchall()}
-        if "user_id" not in cols:
-            c.execute("ALTER TABLE trips ADD COLUMN user_id TEXT")
+        c.executescript(db._schema_for_postgres(SCHEMA) if db.IS_POSTGRES else SCHEMA)
+        # Migración suave SOLO para SQLite: si una BD local ya tenía 'trips' sin
+        # user_id, agregar la columna. En Postgres el esquema de db.py ya incluye
+        # user_id desde el inicio, y PRAGMA no existe ahí.
+        if not db.IS_POSTGRES:
+            cols = {r["name"] for r in c.execute("PRAGMA table_info(trips)").fetchall()}
+            if "user_id" not in cols:
+                c.execute("ALTER TABLE trips ADD COLUMN user_id TEXT")
 
 
 # ── Hashing de contraseña ──

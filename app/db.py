@@ -15,26 +15,118 @@ import time
 import uuid
 from contextlib import contextmanager
 
-# Ruta de la DB configurable por entorno. En Railway (y cualquier host con
-# sistema de archivos efímero) hay que apuntar a un VOLUMEN PERSISTENTE, si no
-# los trips/planes/documentos del usuario se borran en cada deploy o reinicio.
+# ─────────────────────────────────────────────────────────────────────────────
+# Capa de persistencia BILINGÜE: SQLite (local/tests) o Postgres/Supabase (prod).
 #
-# Cómo configurarlo en Railway:
-#   1. En el servicio, crea un Volume y móntalo (p. ej. en "/data").
-#   2. Agrega la variable de entorno:  DB_PATH=/data/voyra.db
-# Sin volumen, la DB vive en el contenedor efímero y se pierde al redeploy.
-DB_PATH = os.environ.get("DB_PATH", "voyra.db")
+# El motor se elige por entorno:
+#   - Si existe DATABASE_URL  -> Postgres (Supabase). Producción.
+#   - Si NO existe            -> SQLite en DB_PATH. Desarrollo y los 51 tests.
+#
+# TODO el resto del módulo (y auth.py, limits.py, main.py) sigue escribiendo SQL
+# con placeholders estilo SQLite ("?") y leyendo filas como r["columna"]. Esta
+# capa traduce eso al vuelo cuando el motor es Postgres:
+#   - "?"  ->  "%s"           (en un wrapper de execute)
+#   - filas indexables por nombre vía psycopg.rows.dict_row
+# Así, cambiar de motor NO obliga a tocar las ~40 queries del código.
+#
+# Supabase: usa la connection string del POOLER (puerto 6543, transaction mode).
+# El pool va con prepare_threshold=None porque ese pooler no soporta prepared
+# statements en modo transaction.
+# ─────────────────────────────────────────────────────────────────────────────
 
-# Si la ruta apunta a un directorio (volumen) que aún no existe, créalo.
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+IS_POSTGRES = bool(DATABASE_URL)
+
+# Ruta de la DB SQLite (solo aplica cuando NO hay DATABASE_URL).
+DB_PATH = os.environ.get("DB_PATH", "voyra.db")
 _db_dir = os.path.dirname(DB_PATH)
 if _db_dir:
     os.makedirs(_db_dir, exist_ok=True)
+
+# El pool de Postgres se crea perezosamente la primera vez que se pide una
+# conexión (o explícitamente con init_pool() en el startup de FastAPI).
+_pg_pool = None
+
+
+def init_pool():
+    """Crea el ConnectionPool de Postgres. Idempotente. Llamar en el startup de
+    FastAPI. En modo SQLite no hace nada."""
+    global _pg_pool
+    if not IS_POSTGRES or _pg_pool is not None:
+        return _pg_pool
+    from psycopg_pool import ConnectionPool
+    from psycopg.rows import dict_row
+    _pg_pool = ConnectionPool(
+        conninfo=DATABASE_URL,
+        min_size=1,
+        max_size=int(os.environ.get("PG_POOL_MAX", "10")),
+        # El pooler de Supabase (transaction mode) no soporta prepared statements.
+        kwargs={"row_factory": dict_row, "prepare_threshold": None},
+        open=True,
+    )
+    return _pg_pool
+
+
+def close_pool():
+    """Cierra el pool. Llamar en el shutdown de FastAPI."""
+    global _pg_pool
+    if _pg_pool is not None:
+        _pg_pool.close()
+        _pg_pool = None
+
+
+class _PgCursor:
+    """Envuelve un cursor de psycopg para que el resto del código siga usando
+    placeholders estilo SQLite ('?'). Traduce '?' -> '%s' en cada execute.
+
+    Ojo: solo toca los placeholders posicionales. El código de Voyra no usa '?'
+    dentro de literales de cadena en su SQL, así que la traducción es segura.
+    """
+
+    def __init__(self, cur):
+        self._cur = cur
+
+    def execute(self, sql, params=()):
+        self._cur.execute(sql.replace("?", "%s"), params)
+        return self
+
+    def executescript(self, script):
+        # psycopg ejecuta múltiples sentencias separadas por ';' en un execute.
+        self._cur.execute(script)
+        return self
+
+    def fetchone(self):
+        return self._cur.fetchone()
+
+    def fetchall(self):
+        return self._cur.fetchall()
+
+    @property
+    def rowcount(self):
+        return self._cur.rowcount
+
+
+class _PgConn:
+    """Adapta una conexión psycopg a la mini-interfaz que usa el código
+    (c.execute(...), c.executescript(...)), devolviendo cursores envueltos."""
+
+    def __init__(self, raw):
+        self._raw = raw
+
+    def execute(self, sql, params=()):
+        cur = _PgCursor(self._raw.cursor())
+        return cur.execute(sql, params)
+
+    def executescript(self, script):
+        cur = _PgCursor(self._raw.cursor())
+        return cur.executescript(script)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS trips (
   id TEXT PRIMARY KEY,
   data TEXT NOT NULL,            -- JSON: ciudad, hotel, fechas, vuelos, pais, gustos, zona_actual, planes, categorias_silenciadas
-  created_at REAL NOT NULL
+  created_at REAL NOT NULL,
+  user_id TEXT
 );
 CREATE TABLE IF NOT EXISTS events (
   id TEXT PRIMARY KEY,
@@ -83,6 +175,9 @@ CREATE TABLE IF NOT EXISTS destination_places (
   confianza TEXT NOT NULL,        -- muy_alta | alta | media_alta | media
   maps_query TEXT,                -- nombre buscable para landmarks (deep link a Maps); NULL = usar lat,lng
   dir TEXT,                       -- dirección exacta (Calle/Carrera #...) para geocodificar el deep link
+  place_id TEXT,
+  rating REAL,
+  price_level TEXT,
   created_at REAL NOT NULL
 );
 CREATE TABLE IF NOT EXISTS place_recommendations (
@@ -123,23 +218,61 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
 """
 
 
+import re as _re
+
+
+def _schema_for_postgres(sqlite_schema: str) -> str:
+    """Adapta el SCHEMA de SQLite a tipos Postgres. Una sola fuente de verdad:
+    el SCHEMA de arriba (SQLite); aquí solo se traducen los tipos que difieren.
+
+    - REAL                 -> double precision
+    Nota: 'operational' se mantiene como INTEGER (el código lo escribe y lee
+    como 0/1 en engine.py); convertirlo a boolean obligaría a tocar engine.py y
+    la query de pushes_today sin ganar nada. 'email_verified' igual: 0/1.
+    Postgres entiende TEXT, INTEGER y PRIMARY KEY igual que SQLite; el UNIQUE(...)
+    y el ON CONFLICT que usa el código son sintaxis común a ambos.
+    """
+    s = sqlite_schema
+    # REAL -> double precision (created_at, lat, lng, rating).
+    s = _re.sub(r"\bREAL\b", "double precision", s)
+    return s
+
+
+SCHEMA_PG = _schema_for_postgres(SCHEMA)
+
+
 @contextmanager
 def conn():
-    c = sqlite3.connect(DB_PATH)
-    c.row_factory = sqlite3.Row
-    try:
-        yield c
-        c.commit()
-    finally:
-        c.close()
+    """Context manager bilingüe. En Postgres toma una conexión del pool y la
+    envuelve para mantener la interfaz c.execute('... ? ...', params) y filas
+    indexables por nombre. En SQLite, comportamiento idéntico al original."""
+    if IS_POSTGRES:
+        pool = init_pool()
+        with pool.connection() as raw:   # commit/rollback y devolución al pool automáticos
+            yield _PgConn(raw)
+    else:
+        c = sqlite3.connect(DB_PATH)
+        c.row_factory = sqlite3.Row
+        try:
+            yield c
+            c.commit()
+        finally:
+            c.close()
 
 
 def init_db():
+    """Crea el esquema. En Postgres usa los tipos adaptados y NO necesita las
+    migraciones suaves por columna (PRAGMA): el esquema arranca completo. En
+    SQLite mantiene las migraciones suaves para bases locales preexistentes."""
+    if IS_POSTGRES:
+        with conn() as c:
+            c.executescript(SCHEMA_PG)
+        return
+
     with conn() as c:
         c.executescript(SCHEMA)
-        # Migración simple: si la BD ya existía con un esquema anterior,
-        # agrega columnas nuevas sin borrar datos. CREATE TABLE IF NOT EXISTS
-        # no modifica tablas que ya existen, así que esto cubre ese caso.
+        # Migración suave SOLO para SQLite: si una BD local ya existía con un
+        # esquema anterior, agrega columnas nuevas sin borrar datos.
         cols = {r["name"] for r in c.execute("PRAGMA table_info(notifications)").fetchall()}
         if "extra" not in cols:
             c.execute("ALTER TABLE notifications ADD COLUMN extra TEXT")
@@ -168,25 +301,14 @@ def create_trip(data: dict, user_id: str | None = None) -> str:
     tid = new_id()
     defaults = {"zona_actual": "En el hotel", "planes": [], "categorias_silenciadas": []}
     with conn() as c:
-        # La tabla trips tiene 3 columnas base (id, data, created_at) y desde la
-        # migración de auth una 4ta opcional (user_id). Insertamos por nombre de
-        # columna para no romper si user_id no existe en una DB muy vieja.
-        cols = {r["name"] for r in c.execute("PRAGMA table_info(trips)").fetchall()}
-        if "user_id" in cols:
-            c.execute("INSERT INTO trips (id, data, created_at, user_id) VALUES (?,?,?,?)",
-                      (tid, json.dumps({**defaults, **data}), now(), user_id))
-        else:
-            c.execute("INSERT INTO trips (id, data, created_at) VALUES (?,?,?)",
-                      (tid, json.dumps({**defaults, **data}), now()))
+        c.execute("INSERT INTO trips (id, data, created_at, user_id) VALUES (?,?,?,?)",
+                  (tid, json.dumps({**defaults, **data}), now(), user_id))
     return tid
 
 
 def trip_owner(tid: str) -> str | None:
     """Devuelve el user_id dueño del trip, o None si no tiene dueño / no existe."""
     with conn() as c:
-        cols = {r["name"] for r in c.execute("PRAGMA table_info(trips)").fetchall()}
-        if "user_id" not in cols:
-            return None
         r = c.execute("SELECT user_id FROM trips WHERE id=?", (tid,)).fetchone()
     return r["user_id"] if r else None
 
@@ -486,16 +608,19 @@ def proactive_already_sent(trip_id: str, kind: str, local_date: str) -> bool:
 
 def mark_proactive_sent(trip_id: str, kind: str, local_date: str) -> bool:
     """Registra que se envió. Devuelve True si fue el primero (insertó), False si ya existía.
-    El UNIQUE(trip_id, kind, local_date) hace esto atómico aun con corridas solapadas."""
-    try:
-        with conn() as c:
-            c.execute(
-                "INSERT INTO proactive_log (id, trip_id, kind, local_date, created_at) VALUES (?,?,?,?,?)",
-                (new_id(), trip_id, kind, local_date, now()),
-            )
-        return True
-    except sqlite3.IntegrityError:
-        return False
+    El UNIQUE(trip_id, kind, local_date) hace esto atómico aun con corridas solapadas.
+
+    Usa INSERT ... ON CONFLICT DO NOTHING y mira rowcount (1=insertó, 0=ya existía).
+    Esto funciona igual en SQLite y Postgres, y evita el viejo patrón de capturar
+    IntegrityError: en Postgres ese error ABORTA la transacción (no así en SQLite),
+    así que capturarlo dejaría la conexión envenenada. ON CONFLICT lo evita."""
+    with conn() as c:
+        cur = c.execute(
+            "INSERT INTO proactive_log (id, trip_id, kind, local_date, created_at) "
+            "VALUES (?,?,?,?,?) ON CONFLICT (trip_id, kind, local_date) DO NOTHING",
+            (new_id(), trip_id, kind, local_date, now()),
+        )
+        return cur.rowcount == 1
 
 
 # ── Suscripciones Web Push (VAPID) ──
