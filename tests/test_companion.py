@@ -517,3 +517,26 @@ def test_contexto_incluye_todos_los_lugares_curados():
     # Cada lugar curado debe aparecer nombrado en algún lugar del prompt
     faltantes = [p["name"] for p in db.places_for_city("Bogotá") if p["name"] not in block]
     assert not faltantes, f"lugares ausentes del prompt: {faltantes}"
+
+
+def test_seed_elimina_filas_viejas_erroneas():
+    """Re-sembrar borra filas curadas viejas/erróneas (aunque tengan otro
+    nombre o coordenadas malas) y deja exactamente la versión del seed."""
+    import time
+    from app import db, seed_data
+    # Insertar una fila 'El Cielo' rota: nombre distinto + coords de otra zona
+    with db.conn() as c:
+        c.execute(
+            "INSERT INTO destination_places (id,city,city_display,name,category,zona,lat,lng,descripcion,confianza,maps_query,dir,created_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (db.new_id(), "bogota", "Bogotá", "El Cielo", "restaurante", "Zona T",
+             4.6620, -74.0560, "viejo", "alta", "El Cielo restaurante Bogotá",
+             "Carrera 9 #79-04", time.time()),
+        )
+    db.seed_destination_places(seed_data.all_seeds())
+    ciel = [p for p in db.places_for_city("Bogotá") if "cielo" in p["name"].lower()]
+    # Debe quedar exactamente UNA fila de El Cielo, la correcta
+    assert len(ciel) == 1
+    assert ciel[0]["name"] == "El Cielo Bogotá"
+    assert "Calle 70" in (ciel[0].get("dir") or "")
+    assert 4.64 < ciel[0]["lat"] < 4.66  # Zona G, no Zona T

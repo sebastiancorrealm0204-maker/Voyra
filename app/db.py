@@ -9,12 +9,26 @@ Tablas:
 - messages: historial de chat por viaje
 """
 import json
+import os
 import sqlite3
 import time
 import uuid
 from contextlib import contextmanager
 
-DB_PATH = "voyra.db"
+# Ruta de la DB configurable por entorno. En Railway (y cualquier host con
+# sistema de archivos efímero) hay que apuntar a un VOLUMEN PERSISTENTE, si no
+# los trips/planes/documentos del usuario se borran en cada deploy o reinicio.
+#
+# Cómo configurarlo en Railway:
+#   1. En el servicio, crea un Volume y móntalo (p. ej. en "/data").
+#   2. Agrega la variable de entorno:  DB_PATH=/data/voyra.db
+# Sin volumen, la DB vive en el contenedor efímero y se pierde al redeploy.
+DB_PATH = os.environ.get("DB_PATH", "voyra.db")
+
+# Si la ruta apunta a un directorio (volumen) que aún no existe, créalo.
+_db_dir = os.path.dirname(DB_PATH)
+if _db_dir:
+    os.makedirs(_db_dir, exist_ok=True)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS trips (
@@ -384,48 +398,33 @@ def places_for_city(city: str) -> list[dict]:
 
 
 def seed_destination_places(places: list[dict]):
-    """Reconcilia la curación: inserta los que faltan y ACTUALIZA los que ya
-    están si cambió su dato curado (coordenadas, dirección, query, etc.).
+    """Reemplaza la curación de la ciudad por la versión autoritativa del seed.
 
-    Antes saltaba la ciudad entera si existía cualquier lugar, dejando bases
-    viejas con curaciones parciales o con datos erróneos ya corregidos en el
-    código (p. ej. dirección/coordenadas de El Cielo). Ahora hace upsert por
-    nombre normalizado. Es idempotente y seguro: solo toca destination_places,
-    nunca trips ni planes.
+    destination_places es 100% propiedad del seed (nunca lo edita el usuario),
+    así que la forma más robusta y simple es: borrar las filas curadas de la
+    ciudad y reinsertarlas desde el código. Esto garantiza que:
+      - no queden filas viejas con datos erróneos (p. ej. El Cielo con la
+        dirección/coordenadas antiguas que apuntaban a otro lugar),
+      - no se dupliquen lugares si el nombre cambió ligeramente entre versiones,
+      - la curación en la DB siempre refleje exactamente el seed.
+
+    Es seguro: solo toca destination_places. NUNCA borra trips, planes,
+    documentos ni recomendaciones (place_recommendations referencia por nombre,
+    y los nombres se conservan).
     """
     if not places:
         return
     city = norm_city(places[0]["city_display"])
     with conn() as c:
-        # name normalizado -> id, para decidir insert vs update
-        existentes = {
-            norm_place(r["name"]): r["id"]
-            for r in c.execute(
-                "SELECT id, name FROM destination_places WHERE city=?", (city,)
-            ).fetchall()
-        }
+        c.execute("DELETE FROM destination_places WHERE city=?", (city,))
         for p in places:
-            clave = norm_place(p["name"])
-            if clave in existentes:
-                # Actualiza los campos curados (no toca id ni created_at).
-                c.execute(
-                    "UPDATE destination_places SET city_display=?, name=?, category=?, "
-                    "zona=?, lat=?, lng=?, descripcion=?, confianza=?, maps_query=?, dir=? "
-                    "WHERE id=?",
-                    (p["city_display"], p["name"], p["category"], p["zona"], p["lat"],
-                     p["lng"], p["descripcion"], p["confianza"], p.get("maps_query"),
-                     p.get("dir"), existentes[clave]),
-                )
-            else:
-                nid = new_id()
-                c.execute(
-                    "INSERT INTO destination_places (id, city, city_display, name, category, zona, lat, lng, descripcion, confianza, maps_query, dir, created_at) "
-                    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                    (nid, norm_city(p["city_display"]), p["city_display"], p["name"], p["category"],
-                     p["zona"], p["lat"], p["lng"], p["descripcion"], p["confianza"],
-                     p.get("maps_query"), p.get("dir"), now()),
-                )
-                existentes[clave] = nid
+            c.execute(
+                "INSERT INTO destination_places (id, city, city_display, name, category, zona, lat, lng, descripcion, confianza, maps_query, dir, created_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (new_id(), norm_city(p["city_display"]), p["city_display"], p["name"], p["category"],
+                 p["zona"], p["lat"], p["lng"], p["descripcion"], p["confianza"],
+                 p.get("maps_query"), p.get("dir"), now()),
+            )
 
 
 # ── Dedup de /nearby: no repetir los mismos lugares dentro de la ventana ──

@@ -346,6 +346,33 @@ def destination_places(city: str):
     return db.places_for_city(city)
 
 
+@app.get("/_diag")
+def diagnostico():
+    """Diagnóstico rápido del estado de la DB en producción.
+
+    Úsalo para verificar tras un deploy si la curación quedó correcta. P. ej.
+    en Railway abre  https://TU-APP.up.railway.app/_diag  y revisa que
+    'el_cielo' apunte a Calle 70 / Zona G, no a coordenadas viejas.
+    """
+    import os
+    places = db.places_for_city("Bogotá")
+    cielo = next((p for p in places if "cielo" in p["name"].lower()), None)
+    return {
+        "db_path": db.DB_PATH,
+        "db_path_es_volumen": bool(os.path.dirname(db.DB_PATH)),
+        "total_lugares_bogota": len(places),
+        "el_cielo": {
+            "name": cielo["name"],
+            "lat": cielo["lat"],
+            "lng": cielo["lng"],
+            "zona": cielo["zona"],
+            "dir": cielo.get("dir"),
+            "maps_query": cielo.get("maps_query"),
+        } if cielo else None,
+        "ok": bool(cielo and "70" in (cielo.get("dir") or "") and 4.64 < cielo["lat"] < 4.66),
+    }
+
+
 # ── Chat ──
 @app.post("/trips/{tid}/chat")
 def chat(tid: str, c: ChatIn):
