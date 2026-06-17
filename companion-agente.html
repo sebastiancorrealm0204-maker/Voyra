@@ -596,138 +596,194 @@ function AuthScreen({ onSuccess, onCancel, modoInicial = "login" }) {
 const MAX_TRIPS = 2;
 
 function HomeScreen({ auth, onElegirViaje, onCrearViaje, onCerrarSesion, onAbrirPerfil }) {
-  const [viajes, setViajes] = React.useState(null);   // null = cargando
-  const [error, setError] = React.useState("");
-  const [borrando, setBorrando] = React.useState(null); // id en proceso de borrado
+  const [viajes, setViajes] = React.useState(null);
+  const [error, setError]   = React.useState("");
+  const [borrando, setBorrando] = React.useState(null);
 
   const cargar = React.useCallback(async () => {
     setError("");
-    try {
-      const r = await api.get("/trips");
-      setViajes(r.trips || []);
-    } catch (e) {
-      setError("No pude cargar tus viajes. Desliza para reintentar.");
-      setViajes([]);
-    }
+    try { const r = await api.get("/trips"); setViajes(r.trips || []); }
+    catch { setError("No pude cargar tus viajes. Toca para reintentar."); setViajes([]); }
   }, []);
-
   React.useEffect(() => { cargar(); }, [cargar]);
 
   const borrarViaje = async (id, e) => {
     e.stopPropagation();
     if (!window.confirm("¿Borrar este viaje? No se puede deshacer.")) return;
     setBorrando(id);
-    try {
-      await api.del(`/trips/${id}`);
-      setViajes((vs) => vs.filter((v) => v.id !== id));
-    } catch (e) {
-      alert("No pude borrar el viaje.");
-    }
+    try { await api.del(`/trips/${id}`); setViajes((vs) => vs.filter((v) => v.id !== id)); }
+    catch { alert("No pude borrar el viaje."); }
     setBorrando(null);
   };
 
-  const tope = viajes && viajes.length >= MAX_TRIPS;
+  const tope    = viajes && viajes.length >= MAX_TRIPS;
   const cargando = viajes === null;
 
   const fechaCorta = (s) => {
     if (!s) return null;
-    try {
-      const [y, m, d] = s.split("-");
-      return `${d}/${m}/${y.slice(2)}`;
-    } catch { return s; }
+    try { const [y,m,d] = s.split("-"); return `${d}/${m}/${y.slice(2)}`; }
+    catch { return s; }
+  };
+
+  // Días hasta el primer viaje próximo
+  const diasHasta = (inicio) => {
+    if (!inicio) return null;
+    const hoy  = new Date(); hoy.setHours(0,0,0,0);
+    const dest = new Date(inicio + "T00:00:00");
+    const diff = Math.round((dest - hoy) / 86400000);
+    if (diff < 0)  return null;
+    if (diff === 0) return "¡Hoy!";
+    if (diff === 1) return "Mañana";
+    return `En ${diff} días`;
   };
 
   const planLabel = auth?.plan === "free" || !auth?.plan
     ? "Explorador" : auth.plan.charAt(0).toUpperCase() + auth.plan.slice(1);
+  const inicial = (auth?.email || "?")[0].toUpperCase();
 
   return (
     <div style={{ minHeight: "100dvh", background: C.bg, color: C.ink, overflowY: "auto" }} className="no-scrollbar">
-      <div style={{ maxWidth: 460, margin: "0 auto", padding: "max(24px, env(safe-area-inset-top)) 22px 40px", boxSizing: "border-box" }}>
+      <div style={{ maxWidth: 460, margin: "0 auto", boxSizing: "border-box" }}>
 
-        {/* ── Encabezado de marca ── */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
-          <span style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Voyra</span>
-          <span style={{ fontSize: 18 }}>🛟</span>
-        </div>
+        {/* ══ HERO HEADER ══ */}
+        <div style={{ padding: "max(32px, env(safe-area-inset-top)) 24px 0", position: "relative" }}>
 
-        {/* ── Tarjeta de perfil (clickeable → abre el perfil global) ── */}
-        <button onClick={onAbrirPerfil}
-          style={{ width: "100%", textAlign: "left", background: `linear-gradient(135deg, ${C.card} 0%, #201712 100%)`, border: `1px solid ${C.line}`, borderRadius: 18, padding: "16px 18px", display: "flex", alignItems: "center", gap: 13, marginBottom: 26, cursor: "pointer", position: "relative", overflow: "hidden" }}>
-          <div style={{ position: "absolute", top: -30, right: -30, width: 110, height: 110, borderRadius: "50%", background: C.orange, opacity: 0.10, filter: "blur(8px)" }} />
-          <div style={{ width: 46, height: 46, borderRadius: "50%", background: `linear-gradient(135deg, ${C.orange}, ${C.orangeDeep})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 19, fontWeight: 800, color: "#fff", flexShrink: 0, boxShadow: `0 4px 14px ${C.orange}55`, zIndex: 1 }}>
-            {(auth?.email || "?")[0].toUpperCase()}
+          {/* glow de fondo sutil */}
+          <div style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", width: 340, height: 180, background: `radial-gradient(ellipse at 50% 0%, ${C.orange}22 0%, transparent 70%)`, pointerEvents: "none" }} />
+
+          {/* marca */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28, position: "relative" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 26, fontWeight: 900, letterSpacing: "-0.03em", background: `linear-gradient(90deg, ${C.ink} 60%, ${C.inkSoft})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Voyra</span>
+              <span style={{ fontSize: 20 }}>🛟</span>
+            </div>
+            {/* avatar pequeño como acceso rápido al perfil */}
+            <button onClick={onAbrirPerfil} title="Tu perfil"
+              style={{ width: 38, height: 38, borderRadius: "50%", background: `linear-gradient(135deg, ${C.orange}, ${C.orangeDeep})`, border: "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 800, color: "#fff", cursor: "pointer", boxShadow: `0 0 0 2px ${C.bg}, 0 0 0 3.5px ${C.orange}55` }}>
+              {inicial}
+            </button>
           </div>
-          <div style={{ flex: 1, minWidth: 0, zIndex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{auth?.email}</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 5 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: C.orange, background: C.orangeSoft, border: `1px solid ${C.orange}44`, borderRadius: 20, padding: "2px 9px", letterSpacing: "0.02em" }}>
-                Plan {planLabel}
+
+          {/* tarjeta de perfil — hero principal */}
+          <button onClick={onAbrirPerfil}
+            style={{ width: "100%", textAlign: "left", background: `linear-gradient(145deg, #1E1A17 0%, #18120D 60%, #0E0E10 100%)`, border: `1px solid ${C.orange}28`, borderRadius: 22, padding: "20px 20px 18px", display: "flex", alignItems: "center", gap: 16, marginBottom: 32, cursor: "pointer", position: "relative", overflow: "hidden", boxShadow: `0 8px 32px #00000055, 0 0 0 0.5px ${C.orange}18 inset` }}>
+            {/* halos decorativos */}
+            <div style={{ position: "absolute", top: -40, right: -40, width: 160, height: 160, borderRadius: "50%", background: C.orange, opacity: 0.07, filter: "blur(20px)", pointerEvents: "none" }} />
+            <div style={{ position: "absolute", bottom: -20, left: 40, width: 80, height: 80, borderRadius: "50%", background: C.aqua, opacity: 0.05, filter: "blur(16px)", pointerEvents: "none" }} />
+
+            {/* avatar */}
+            <div style={{ width: 54, height: 54, borderRadius: "50%", background: `linear-gradient(135deg, ${C.orange} 0%, ${C.orangeDeep} 100%)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 900, color: "#fff", flexShrink: 0, boxShadow: `0 4px 20px ${C.orange}44`, zIndex: 1 }}>
+              {inicial}
+            </div>
+
+            {/* info */}
+            <div style={{ flex: 1, minWidth: 0, zIndex: 1 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.inkSoft, letterSpacing: "0.08em", marginBottom: 4, textTransform: "uppercase" }}>Tu cuenta</div>
+              <div style={{ fontWeight: 700, fontSize: 15.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 7 }}>{auth?.email}</div>
+              <span style={{ fontSize: 11, fontWeight: 700, color: C.orange, background: `${C.orange}18`, border: `1px solid ${C.orange}35`, borderRadius: 20, padding: "3px 10px", letterSpacing: "0.03em" }}>
+                ✦ Plan {planLabel}
               </span>
-              <span style={{ fontSize: 12, color: C.inkSoft }}>Ver perfil y ajustes</span>
             </div>
-          </div>
-          <span style={{ color: C.inkSoft, fontSize: 20, flexShrink: 0, zIndex: 1 }}>›</span>
-        </button>
 
-        {/* ── Lista de viajes ── */}
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
-          <span style={{ fontSize: 11.5, fontWeight: 700, color: C.inkSoft, letterSpacing: "0.07em" }}>TUS VIAJES</span>
-          {viajes && <span style={{ fontSize: 12, color: C.inkSoft }}>{viajes.length}/{MAX_TRIPS}</span>}
+            <div style={{ flexShrink: 0, zIndex: 1, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+              <span style={{ color: C.inkSoft, fontSize: 22 }}>›</span>
+              <span style={{ fontSize: 10.5, color: C.inkSoft, fontWeight: 600 }}>Perfil</span>
+            </div>
+          </button>
         </div>
 
-        {cargando && (
-          <div style={{ textAlign: "center", color: C.inkSoft, fontSize: 14, padding: "30px 0" }}>Cargando tus viajes…</div>
-        )}
+        {/* ══ VIAJES ══ */}
+        <div style={{ padding: "0 24px 40px" }}>
 
-        {error && !cargando && (
-          <div onClick={cargar} style={{ color: C.coral, fontSize: 13.5, padding: "12px 4px", cursor: "pointer" }}>{error}</div>
-        )}
-
-        {!cargando && viajes.length === 0 && !error && (
-          <div style={{ textAlign: "center", padding: "36px 18px", background: C.card, border: `1px dashed ${C.line}`, borderRadius: 16, color: C.inkSoft, fontSize: 14, lineHeight: 1.5 }}>
-            Todavía no tienes viajes. Cuéntale al Companion a dónde vas y te acompaño desde ya.
-          </div>
-        )}
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {!cargando && viajes.map((v) => (
-            <button key={v.id} onClick={() => onElegirViaje(v)}
-              style={{ width: "100%", textAlign: "left", display: "flex", alignItems: "center", gap: 12, background: C.card, border: `1px solid ${C.line}`, borderRadius: 16, padding: "14px 16px", cursor: "pointer" }}>
-              <div style={{ flexShrink: 0 }}><Mark size={38} /></div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: 15.5 }}>{v.ciudad || "Viaje sin destino aún"}</div>
-                <div style={{ fontSize: 12.5, color: C.inkSoft, marginTop: 2 }}>
-                  {v.inicio && v.fin ? `${fechaCorta(v.inicio)} – ${fechaCorta(v.fin)}` : (v.hotel || "Completa los datos al entrar")}
-                </div>
-              </div>
-              <button onClick={(e) => borrarViaje(v.id, e)} disabled={borrando === v.id} title="Borrar viaje"
-                style={{ background: "none", border: "none", color: C.inkSoft, fontSize: 18, padding: 6, cursor: "pointer", flexShrink: 0 }}>
-                {borrando === v.id ? "…" : "✕"}
-              </button>
-              <span style={{ color: C.inkSoft, fontSize: 18, flexShrink: 0 }}>›</span>
-            </button>
-          ))}
-        </div>
-
-        {/* ── Crear viaje / tope alcanzado ── */}
-        <div style={{ marginTop: 18 }}>
-          {tope ? (
-            <div style={{ textAlign: "center", fontSize: 13, color: C.inkSoft, padding: "14px 16px", background: C.card, border: `1px solid ${C.line}`, borderRadius: 14, lineHeight: 1.5 }}>
-              Llegaste al máximo de {MAX_TRIPS} viajes activos de tu plan. Borra uno para crear otro.
+          {/* cabecera sección */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+            <div>
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: C.inkSoft, letterSpacing: "0.08em" }}>TUS VIAJES</div>
             </div>
-          ) : (
-            <button onClick={onCrearViaje} disabled={cargando}
-              style={{ width: "100%", padding: "15px", borderRadius: 14, border: "none", background: C.orange, color: "#fff", fontWeight: 700, fontSize: 15.5, cursor: cargando ? "default" : "pointer", opacity: cargando ? 0.6 : 1 }}>
-              + Crear viaje
-            </button>
+            {viajes && (
+              <span style={{ fontSize: 12, color: C.inkSoft, background: C.card, border: `1px solid ${C.line}`, borderRadius: 20, padding: "3px 10px", fontWeight: 600 }}>
+                {viajes.length} / {MAX_TRIPS}
+              </span>
+            )}
+          </div>
+
+          {cargando && (
+            <div style={{ textAlign: "center", color: C.inkSoft, fontSize: 14, padding: "36px 0" }}>Cargando…</div>
           )}
-        </div>
+          {error && !cargando && (
+            <div onClick={cargar} style={{ color: C.coral, fontSize: 13.5, padding: "12px 4px", cursor: "pointer" }}>{error}</div>
+          )}
 
-        {/* ── Salir (discreto, al final) ── */}
-        <button onClick={onCerrarSesion}
-          style={{ display: "block", margin: "24px auto 0", background: "none", border: "none", color: C.inkSoft, fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3 }}>
-          Cerrar sesión
-        </button>
+          {/* estado vacío */}
+          {!cargando && viajes.length === 0 && !error && (
+            <div style={{ padding: "32px 20px", background: C.card, border: `1px dashed ${C.line}`, borderRadius: 18, textAlign: "center" }}>
+              <div style={{ fontSize: 30, marginBottom: 10 }}>✈️</div>
+              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>Sin viajes aún</div>
+              <div style={{ color: C.inkSoft, fontSize: 13.5, lineHeight: 1.55 }}>
+                Cuéntale al Companion a dónde vas<br/>y te acompaño desde el primer día.
+              </div>
+            </div>
+          )}
+
+          {/* lista de viajes */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {!cargando && viajes.map((v) => {
+              const dias = diasHasta(v.inicio);
+              return (
+                <button key={v.id} onClick={() => onElegirViaje(v)}
+                  style={{ width: "100%", textAlign: "left", display: "flex", alignItems: "center", gap: 0, background: C.card, border: `1px solid ${C.line}`, borderRadius: 18, overflow: "hidden", cursor: "pointer", position: "relative" }}>
+                  {/* borde izquierdo acento */}
+                  <div style={{ width: 3, alignSelf: "stretch", background: `linear-gradient(180deg, ${C.orange}, ${C.orangeDeep})`, flexShrink: 0 }} />
+
+                  <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 14, padding: "16px 14px 16px 16px", minWidth: 0 }}>
+                    <Mark size={40} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 800, fontSize: 16, letterSpacing: "-0.01em" }}>{v.ciudad || "Viaje sin destino"}</div>
+                      <div style={{ fontSize: 12.5, color: C.inkSoft, marginTop: 3 }}>
+                        {v.inicio && v.fin ? `${fechaCorta(v.inicio)} → ${fechaCorta(v.fin)}` : (v.hotel || "Completa los datos al entrar")}
+                      </div>
+                      {dias && (
+                        <div style={{ marginTop: 6 }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: C.aqua, background: `${C.aqua}18`, border: `1px solid ${C.aqua}30`, borderRadius: 20, padding: "2px 8px" }}>
+                            {dias}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 2, paddingRight: 12, flexShrink: 0 }}>
+                    <button onClick={(e) => borrarViaje(v.id, e)} disabled={borrando === v.id}
+                      style={{ background: "none", border: "none", color: C.inkSoft, fontSize: 16, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", borderRadius: 8, opacity: 0.7 }}>
+                      {borrando === v.id ? "…" : "✕"}
+                    </button>
+                    <span style={{ color: C.inkSoft, fontSize: 20 }}>›</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* ── Crear viaje ── */}
+          <div style={{ marginTop: viajes && viajes.length > 0 ? 16 : 14 }}>
+            {tope ? (
+              <div style={{ textAlign: "center", fontSize: 13, color: C.inkSoft, padding: "14px 16px", background: C.card, border: `1px solid ${C.line}`, borderRadius: 14, lineHeight: 1.55 }}>
+                Máximo de {MAX_TRIPS} viajes activos alcanzado.<br/>Borra uno para crear otro.
+              </div>
+            ) : (
+              <button onClick={onCrearViaje} disabled={cargando}
+                style={{ width: "100%", padding: "17px", borderRadius: 16, border: "none", background: `linear-gradient(135deg, ${C.orange} 0%, ${C.orangeDeep} 100%)`, color: "#fff", fontWeight: 800, fontSize: 16, letterSpacing: "-0.01em", cursor: cargando ? "default" : "pointer", opacity: cargando ? 0.5 : 1, boxShadow: cargando ? "none" : `0 4px 24px ${C.orange}55` }}>
+                + Crear viaje
+              </button>
+            )}
+          </div>
+
+          {/* ── Cerrar sesión ── */}
+          <button onClick={onCerrarSesion}
+            style={{ display: "block", margin: "22px auto 0", background: "none", border: "none", color: C.inkSoft, fontSize: 12.5, fontWeight: 600, cursor: "pointer", letterSpacing: "0.02em" }}>
+            Cerrar sesión
+          </button>
+        </div>
       </div>
     </div>
   );
