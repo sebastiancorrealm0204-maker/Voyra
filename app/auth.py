@@ -18,6 +18,7 @@ borran en cada deploy igual que los trips.
 """
 import hashlib
 import hmac
+import json
 import os
 import re
 import secrets
@@ -43,7 +44,18 @@ CREATE TABLE IF NOT EXISTS users (
   email_verified INTEGER NOT NULL DEFAULT 0,
   plan TEXT NOT NULL DEFAULT 'free',   -- free | viajero | companion (futuro)
   created_at REAL NOT NULL,
-  signup_ip TEXT
+  signup_ip TEXT,
+  -- Datos globales del viajero (JSON de texto): nombre, contacto de emergencia,
+  -- alergias, preferencias, nº de pasaporte… Sirven en TODOS sus viajes.
+  profile TEXT,
+  -- Límites diarios POR USUARIO. NULL = usar el default del plan (env var).
+  -- Un número aquí MANDA para ese usuario. Editable desde el Table Editor de
+  -- Supabase: cambias el número, guardas, y aplica al instante sin redeploy.
+  limit_maps INTEGER,
+  limit_chat INTEGER,
+  limit_document INTEGER,
+  limit_scan INTEGER,
+  limit_trips INTEGER
 );
 CREATE TABLE IF NOT EXISTS sessions (
   token TEXT PRIMARY KEY,
@@ -68,13 +80,28 @@ CREATE TABLE IF NOT EXISTS signup_attempts (
 def init_auth():
     with db.conn() as c:
         c.executescript(db._schema_for_postgres(SCHEMA) if db.IS_POSTGRES else SCHEMA)
-        # Migración suave SOLO para SQLite: si una BD local ya tenía 'trips' sin
-        # user_id, agregar la columna. En Postgres el esquema de db.py ya incluye
-        # user_id desde el inicio, y PRAGMA no existe ahí.
-        if not db.IS_POSTGRES:
-            cols = {r["name"] for r in c.execute("PRAGMA table_info(trips)").fetchall()}
-            if "user_id" not in cols:
+        if db.IS_POSTGRES:
+            # En Postgres, CREATE TABLE IF NOT EXISTS no modifica tablas existentes.
+            # Agregamos las columnas nuevas con ALTER TABLE ... IF NOT EXISTS,
+            # que es seguro de correr múltiples veces (no falla si ya existe).
+            for col, decl in (("profile", "TEXT"), ("limit_maps", "INTEGER"),
+                              ("limit_chat", "INTEGER"), ("limit_document", "INTEGER"),
+                              ("limit_scan", "INTEGER"), ("limit_trips", "INTEGER")):
+                c.execute(
+                    f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} {decl}"
+                )
+        else:
+            # Migración suave para SQLite local preexistente (PRAGMA + IF NOT EXISTS
+            # no existe en SQLite, hay que consultar la tabla primero).
+            trip_cols = {r["name"] for r in c.execute("PRAGMA table_info(trips)").fetchall()}
+            if "user_id" not in trip_cols:
                 c.execute("ALTER TABLE trips ADD COLUMN user_id TEXT")
+            user_cols = {r["name"] for r in c.execute("PRAGMA table_info(users)").fetchall()}
+            for col, decl in (("profile", "TEXT"), ("limit_maps", "INTEGER"),
+                              ("limit_chat", "INTEGER"), ("limit_document", "INTEGER"),
+                              ("limit_scan", "INTEGER"), ("limit_trips", "INTEGER")):
+                if col not in user_cols:
+                    c.execute(f"ALTER TABLE users ADD COLUMN {col} {decl}")
 
 
 # ── Hashing de contraseña ──
@@ -161,6 +188,37 @@ def create_user(email: str, password: str, ip: str = "") -> dict:
 def mark_email_verified(user_id: str):
     with db.conn() as c:
         c.execute("UPDATE users SET email_verified=1 WHERE id=?", (user_id,))
+
+
+# ── Perfil global del viajero (datos de texto reutilizables en todos los viajes) ──
+# Campos permitidos. Cualquier otra clave que mande el cliente se ignora (evita
+# que se inyecten campos arbitrarios en el JSON).
+PROFILE_FIELDS = (
+    "nombre", "telefono", "contacto_emergencia", "alergias",
+    "condiciones_medicas", "preferencias", "pasaporte", "notas",
+)
+
+
+def get_profile(user_id: str) -> dict:
+    u = get_user(user_id)
+    if not u:
+        return {}
+    raw = u.get("profile")
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw) if isinstance(raw, str) else raw
+        return {k: data.get(k, "") for k in PROFILE_FIELDS}
+    except Exception:
+        return {}
+
+
+def set_profile(user_id: str, data: dict) -> dict:
+    """Guarda solo los campos permitidos, como JSON de texto. Devuelve el perfil."""
+    limpio = {k: str(data.get(k, "") or "").strip() for k in PROFILE_FIELDS}
+    with db.conn() as c:
+        c.execute("UPDATE users SET profile=? WHERE id=?", (json.dumps(limpio), user_id))
+    return limpio
 
 
 # ── Verificación de email ──

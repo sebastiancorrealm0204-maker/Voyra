@@ -49,6 +49,42 @@ FREE_LIMITS = {
     "scan":     _env_int("LIMIT_SCAN_PER_DAY", 5),     # scans Tavily
 }
 
+# Mapea cada recurso a su columna de override por-usuario en la tabla `users`.
+_LIMIT_COLUMN = {
+    "maps": "limit_maps", "chat": "limit_chat",
+    "document": "limit_document", "scan": "limit_scan",
+}
+
+
+def effective_limit(user_id: str, resource: str) -> int | None:
+    """Límite que aplica a ESTE usuario para ESTE recurso.
+
+    Prioridad: el número en su columna de `users` (editable desde Supabase) y,
+    si está en NULL, el default del plan (env var FREE_LIMITS). Devuelve None si
+    el recurso no está controlado.
+
+    Esto es lo que hace que ajustar un límite en el Table Editor de Supabase
+    aplique al instante: cada chequeo de cuota lee el valor vigente del usuario.
+    """
+    default = FREE_LIMITS.get(resource)
+    col = _LIMIT_COLUMN.get(resource)
+    if not col:
+        return default
+    with db.conn() as c:
+        r = c.execute(f"SELECT {col} v FROM users WHERE id=?", (user_id,)).fetchone()
+    if r and r["v"] is not None:
+        return int(r["v"])
+    return default
+
+
+def effective_trip_limit(user_id: str) -> int:
+    """Tope de trips activos para este usuario (override por-usuario o default)."""
+    with db.conn() as c:
+        r = c.execute("SELECT limit_trips v FROM users WHERE id=?", (user_id,)).fetchone()
+    if r and r["v"] is not None:
+        return int(r["v"])
+    return MAX_TRIPS_PER_USER
+
 # Tope de trips ACTIVOS simultáneos por usuario (no es diario; es un total vivo).
 MAX_TRIPS_PER_USER = _env_int("LIMIT_TRIPS_PER_USER", 2)
 
@@ -70,7 +106,7 @@ CREATE INDEX IF NOT EXISTS idx_usage_day ON usage_log(resource, day);
 
 def init_limits():
     with db.conn() as c:
-        c.executescript(SCHEMA)
+        c.executescript(db._schema_for_postgres(SCHEMA) if db.IS_POSTGRES else SCHEMA)
 
 
 # ── Conteo ──
@@ -120,7 +156,7 @@ def check_and_consume(user_id: str, resource: str):
             raise QuotaError("maps", GLOBAL_MAPS_PER_DAY, global_used_today("maps"),
                              global_block=True)
 
-    limit = FREE_LIMITS.get(resource)
+    limit = effective_limit(user_id, resource)
     if limit is None:
         # Recurso no controlado: no bloquear, pero igual registrar para métricas.
         record_use(user_id, resource)
@@ -133,21 +169,22 @@ def check_and_consume(user_id: str, resource: str):
 
 
 def remaining(user_id: str, resource: str) -> int:
-    limit = FREE_LIMITS.get(resource)
+    limit = effective_limit(user_id, resource)
     if limit is None:
         return -1  # ilimitado / no controlado
     return max(0, limit - used_today(user_id, resource))
 
 
 def usage_summary(user_id: str) -> dict:
-    """Resumen para mostrarle al usuario cuánto le queda hoy."""
+    """Resumen para mostrarle al usuario cuánto le queda hoy.
+    Usa el límite EFECTIVO de cada usuario (override por-usuario o default)."""
     return {
         res: {
             "usado": used_today(user_id, res),
-            "limite": limit,
+            "limite": effective_limit(user_id, res),
             "restante": remaining(user_id, res),
         }
-        for res, limit in FREE_LIMITS.items()
+        for res in FREE_LIMITS
     }
 
 
@@ -159,4 +196,4 @@ def trips_count(user_id: str) -> int:
 
 
 def can_create_trip(user_id: str) -> bool:
-    return trips_count(user_id) < MAX_TRIPS_PER_USER
+    return trips_count(user_id) < effective_trip_limit(user_id)

@@ -278,22 +278,47 @@ def logout(authorization: str | None = Header(default=None)):
 
 @app.get("/auth/me")
 def me(user: dict = Depends(current_user)):
-    """Datos del usuario + cuánto le queda de cada cuota hoy."""
+    """Datos del usuario + perfil global + cuánto le queda de cada cuota hoy."""
     return {"id": user["id"], "email": user["email"], "plan": user["plan"],
             "email_verified": bool(user["email_verified"]),
+            "perfil": auth.get_profile(user["id"]),
             "cuotas": limits.usage_summary(user["id"]),
             "trips": {"usados": limits.trips_count(user["id"]),
-                      "limite": limits.MAX_TRIPS_PER_USER}}
+                      "limite": limits.effective_trip_limit(user["id"])}}
+
+
+class ProfileIn(BaseModel):
+    nombre: str = ""
+    telefono: str = ""
+    contacto_emergencia: str = ""
+    alergias: str = ""
+    condiciones_medicas: str = ""
+    preferencias: str = ""
+    pasaporte: str = ""
+    notas: str = ""
+
+
+@app.get("/profile")
+def get_profile(user: dict = Depends(current_user)):
+    """Perfil global del viajero (datos de texto reutilizables en todos los viajes)."""
+    return {"perfil": auth.get_profile(user["id"])}
+
+
+@app.put("/profile")
+def put_profile(p: ProfileIn, user: dict = Depends(current_user)):
+    """Guarda el perfil global. Solo el propio usuario edita su perfil."""
+    return {"perfil": auth.set_profile(user["id"], p.model_dump())}
 
 
 # ── Trips ──
 @app.post("/trips")
 def create_trip(t: TripIn, user: dict = Depends(verified_user)):
     if not limits.can_create_trip(user["id"]):
+        tope = limits.effective_trip_limit(user["id"])
         raise HTTPException(429, {
             "error": "trip_limit",
-            "limite": limits.MAX_TRIPS_PER_USER,
-            "mensaje": f"Tu plan permite {limits.MAX_TRIPS_PER_USER} viajes activos. "
+            "limite": tope,
+            "mensaje": f"Tu plan permite {tope} viajes activos. "
                        "Borra uno para crear otro."})
     tid = db.create_trip(t.model_dump(), user_id=user["id"])
     if t.ciudad.strip():

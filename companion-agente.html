@@ -595,7 +595,7 @@ function AuthScreen({ onSuccess, onCancel, modoInicial = "login" }) {
 // entra al Companion de ese viaje (la vista que ya existía, sin cambios).
 const MAX_TRIPS = 2;
 
-function HomeScreen({ auth, onElegirViaje, onCrearViaje, onCerrarSesion }) {
+function HomeScreen({ auth, onElegirViaje, onCrearViaje, onCerrarSesion, onAbrirPerfil }) {
   const [viajes, setViajes] = React.useState(null);   // null = cargando
   const [error, setError] = React.useState("");
   const [borrando, setBorrando] = React.useState(null); // id en proceso de borrado
@@ -637,32 +637,37 @@ function HomeScreen({ auth, onElegirViaje, onCrearViaje, onCerrarSesion }) {
     } catch { return s; }
   };
 
+  const planLabel = auth?.plan === "free" || !auth?.plan
+    ? "Explorador" : auth.plan.charAt(0).toUpperCase() + auth.plan.slice(1);
+
   return (
     <div style={{ minHeight: "100dvh", background: C.bg, color: C.ink, overflowY: "auto" }} className="no-scrollbar">
       <div style={{ maxWidth: 460, margin: "0 auto", padding: "max(24px, env(safe-area-inset-top)) 22px 40px", boxSizing: "border-box" }}>
 
         {/* ── Encabezado de marca ── */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 22 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
           <span style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>Voyra</span>
           <span style={{ fontSize: 18 }}>🛟</span>
         </div>
 
-        {/* ── Tarjeta de perfil ── */}
-        <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 16, padding: "16px 18px", display: "flex", alignItems: "center", gap: 12, marginBottom: 26 }}>
-          <div style={{ width: 42, height: 42, borderRadius: "50%", background: C.orangeSoft, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 800, color: C.orange, flexShrink: 0 }}>
+        {/* ── Tarjeta de perfil (clickeable → abre el perfil global) ── */}
+        <button onClick={onAbrirPerfil}
+          style={{ width: "100%", textAlign: "left", background: `linear-gradient(135deg, ${C.card} 0%, #201712 100%)`, border: `1px solid ${C.line}`, borderRadius: 18, padding: "16px 18px", display: "flex", alignItems: "center", gap: 13, marginBottom: 26, cursor: "pointer", position: "relative", overflow: "hidden" }}>
+          <div style={{ position: "absolute", top: -30, right: -30, width: 110, height: 110, borderRadius: "50%", background: C.orange, opacity: 0.10, filter: "blur(8px)" }} />
+          <div style={{ width: 46, height: 46, borderRadius: "50%", background: `linear-gradient(135deg, ${C.orange}, ${C.orangeDeep})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 19, fontWeight: 800, color: "#fff", flexShrink: 0, boxShadow: `0 4px 14px ${C.orange}55`, zIndex: 1 }}>
             {(auth?.email || "?")[0].toUpperCase()}
           </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ flex: 1, minWidth: 0, zIndex: 1 }}>
             <div style={{ fontWeight: 700, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{auth?.email}</div>
-            <div style={{ fontSize: 12.5, color: C.inkSoft, marginTop: 2 }}>
-              Plan {auth?.plan === "free" ? "Explorador (gratis)" : auth?.plan || "Explorador"}
+            <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 5 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: C.orange, background: C.orangeSoft, border: `1px solid ${C.orange}44`, borderRadius: 20, padding: "2px 9px", letterSpacing: "0.02em" }}>
+                Plan {planLabel}
+              </span>
+              <span style={{ fontSize: 12, color: C.inkSoft }}>Ver perfil y ajustes</span>
             </div>
           </div>
-          <button onClick={onCerrarSesion} title="Cerrar sesión"
-            style={{ background: "none", border: `1px solid ${C.line}`, borderRadius: 10, padding: "7px 12px", color: C.inkSoft, fontSize: 12.5, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>
-            Salir
-          </button>
-        </div>
+          <span style={{ color: C.inkSoft, fontSize: 20, flexShrink: 0, zIndex: 1 }}>›</span>
+        </button>
 
         {/* ── Lista de viajes ── */}
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
@@ -717,6 +722,176 @@ function HomeScreen({ auth, onElegirViaje, onCrearViaje, onCerrarSesion }) {
             </button>
           )}
         </div>
+
+        {/* ── Salir (discreto, al final) ── */}
+        <button onClick={onCerrarSesion}
+          style={{ display: "block", margin: "24px auto 0", background: "none", border: "none", color: C.inkSoft, fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3 }}>
+          Cerrar sesión
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ════════════════ PERFIL GLOBAL ════════════════
+// Datos del viajero que sirven en TODOS sus viajes (contacto de emergencia,
+// alergias, etc.), su plan, y sus límites de uso (solo lectura — los ajusta el
+// admin desde Supabase). Los documentos como ARCHIVO llegan en una fase futura.
+function ProfileScreen({ auth, onVolver, onCerrarSesion }) {
+  const [perfil, setPerfil] = React.useState(null);   // null = cargando
+  const [cuotas, setCuotas] = React.useState(null);
+  const [plan, setPlan] = React.useState(auth?.plan || "free");
+  const [guardando, setGuardando] = React.useState(false);
+  const [guardado, setGuardado] = React.useState(false);
+  const [error, setError] = React.useState("");
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const u = await authApi.me();
+        const p = u.perfil || {};
+        setPerfil({
+          nombre: p.nombre || "", telefono: p.telefono || "",
+          contacto_emergencia: p.contacto_emergencia || "", alergias: p.alergias || "",
+          condiciones_medicas: p.condiciones_medicas || "", preferencias: p.preferencias || "",
+          pasaporte: p.pasaporte || "", notas: p.notas || "",
+        });
+        setCuotas(u.cuotas || {});
+        setPlan(u.plan || "free");
+      } catch {
+        setError("No pude cargar tu perfil.");
+        setPerfil({});
+      }
+    })();
+  }, []);
+
+  const set = (k, v) => { setPerfil((p) => ({ ...p, [k]: v })); setGuardado(false); };
+
+  const guardar = async () => {
+    setGuardando(true); setError("");
+    try {
+      await api.put("/profile", perfil);
+      setGuardado(true);
+    } catch {
+      setError("No pude guardar. Intenta de nuevo.");
+    }
+    setGuardando(false);
+  };
+
+  const planLabel = plan === "free" ? "Explorador (gratis)"
+    : plan.charAt(0).toUpperCase() + plan.slice(1);
+
+  const Campo = ({ label, k, ph, multiline }) => (
+    <div style={{ marginBottom: 14 }}>
+      <label style={{ fontSize: 11.5, fontWeight: 600, color: C.inkSoft, letterSpacing: "0.03em", display: "block", marginBottom: 5 }}>{label}</label>
+      {multiline ? (
+        <textarea value={perfil[k] || ""} onChange={(e) => set(k, e.target.value)} placeholder={ph} rows={2}
+          style={{ width: "100%", border: `1px solid ${C.line}`, borderRadius: 12, padding: "11px 14px", fontSize: 15, background: C.bg, color: C.ink, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit" }} />
+      ) : (
+        <input value={perfil[k] || ""} onChange={(e) => set(k, e.target.value)} placeholder={ph}
+          style={{ width: "100%", border: `1px solid ${C.line}`, borderRadius: 12, padding: "11px 14px", fontSize: 15, background: C.bg, color: C.ink, outline: "none", boxSizing: "border-box" }} />
+      )}
+    </div>
+  );
+
+  const NOMBRES = { maps: "Lugares cercanos", chat: "Mensajes al Companion", document: "Documentos", scan: "Escaneos de destino" };
+
+  return (
+    <div style={{ minHeight: "100dvh", background: C.bg, color: C.ink, overflowY: "auto" }} className="no-scrollbar">
+      <div style={{ maxWidth: 460, margin: "0 auto", padding: "max(24px, env(safe-area-inset-top)) 22px 40px", boxSizing: "border-box" }}>
+
+        {/* ── Encabezado con volver ── */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22 }}>
+          <button onClick={onVolver} title="Volver"
+            style={{ background: "none", border: `1px solid ${C.line}`, borderRadius: 10, width: 36, height: 36, color: C.ink, fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>‹</button>
+          <span style={{ fontSize: 19, fontWeight: 800, letterSpacing: "-0.02em" }}>Tu perfil</span>
+        </div>
+
+        {perfil === null && (
+          <div style={{ textAlign: "center", color: C.inkSoft, fontSize: 14, padding: "30px 0" }}>Cargando…</div>
+        )}
+
+        {perfil !== null && (
+          <React.Fragment>
+            {/* ── Tarjeta de identidad + plan ── */}
+            <div style={{ background: `linear-gradient(135deg, ${C.card} 0%, #201712 100%)`, border: `1px solid ${C.line}`, borderRadius: 18, padding: "18px", marginBottom: 22, position: "relative", overflow: "hidden" }}>
+              <div style={{ position: "absolute", top: -30, right: -30, width: 120, height: 120, borderRadius: "50%", background: C.orange, opacity: 0.10, filter: "blur(8px)" }} />
+              <div style={{ display: "flex", alignItems: "center", gap: 13, zIndex: 1, position: "relative" }}>
+                <div style={{ width: 48, height: 48, borderRadius: "50%", background: `linear-gradient(135deg, ${C.orange}, ${C.orangeDeep})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 800, color: "#fff", flexShrink: 0, boxShadow: `0 4px 14px ${C.orange}55` }}>
+                  {(auth?.email || "?")[0].toUpperCase()}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{auth?.email}</div>
+                  <div style={{ fontSize: 12.5, color: C.inkSoft, marginTop: 3 }}>Plan {planLabel}</div>
+                </div>
+              </div>
+              {plan === "free" && (
+                <button disabled title="Pronto"
+                  style={{ width: "100%", marginTop: 14, padding: "11px", borderRadius: 12, border: `1px solid ${C.orange}55`, background: "transparent", color: C.orange, fontWeight: 700, fontSize: 13.5, cursor: "default", opacity: 0.85, zIndex: 1, position: "relative" }}>
+                  Mejorar plan · Próximamente
+                </button>
+              )}
+            </div>
+
+            {/* ── Datos del viajero ── */}
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: C.inkSoft, letterSpacing: "0.07em", marginBottom: 4 }}>DATOS DEL VIAJERO</div>
+            <div style={{ fontSize: 12.5, color: C.inkSoft, marginBottom: 14, lineHeight: 1.45 }}>
+              El Companion usa esto en todos tus viajes para ayudarte mejor (y en emergencias).
+            </div>
+
+            <Campo label="Nombre" k="nombre" ph="Como quieres que te llame" />
+            <Campo label="Teléfono" k="telefono" ph="Tu número de contacto" />
+            <Campo label="Contacto de emergencia" k="contacto_emergencia" ph="Nombre y teléfono de alguien de confianza" />
+            <Campo label="Alergias" k="alergias" ph="Ej: maní, mariscos, penicilina" />
+            <Campo label="Condiciones médicas" k="condiciones_medicas" ph="Algo que el Companion deba saber" multiline />
+            <Campo label="Preferencias de viaje" k="preferencias" ph="Ej: vegetariano, evito escaleras, viajo con niños" multiline />
+            <Campo label="Nº de pasaporte / documento" k="pasaporte" ph="Opcional" />
+            <Campo label="Notas" k="notas" ph="Cualquier otra cosa" multiline />
+
+            {error && <div style={{ color: C.coral, fontSize: 13, marginBottom: 10 }}>{error}</div>}
+
+            <button onClick={guardar} disabled={guardando}
+              style={{ width: "100%", padding: "14px", borderRadius: 14, border: "none", background: guardado ? C.aqua : C.orange, color: "#fff", fontWeight: 700, fontSize: 15, cursor: guardando ? "default" : "pointer", opacity: guardando ? 0.6 : 1, transition: "background .2s" }}>
+              {guardando ? "Guardando…" : guardado ? "✓ Guardado" : "Guardar cambios"}
+            </button>
+
+            {/* ── Documentos (archivos) — fase futura ── */}
+            <div style={{ marginTop: 26, padding: "16px 18px", background: C.card, border: `1px dashed ${C.line}`, borderRadius: 16, color: C.inkSoft, fontSize: 13, lineHeight: 1.5 }}>
+              📎 Pronto podrás subir aquí tus documentos como archivo (pasaporte, seguro, reservas) para tenerlos a mano en todos tus viajes.
+            </div>
+
+            {/* ── Límites de uso (solo lectura) ── */}
+            {cuotas && Object.keys(cuotas).length > 0 && (
+              <div style={{ marginTop: 26 }}>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: C.inkSoft, letterSpacing: "0.07em", marginBottom: 4 }}>TU USO DE HOY</div>
+                <div style={{ fontSize: 12.5, color: C.inkSoft, marginBottom: 14, lineHeight: 1.45 }}>
+                  Se renueva cada día. Estos topes los gestiona el equipo de Voyra.
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {Object.entries(cuotas).map(([res, q]) => {
+                    const pct = q.limite > 0 ? Math.min(100, Math.round((q.usado / q.limite) * 100)) : 0;
+                    return (
+                      <div key={res} style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 14, padding: "13px 15px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+                          <span style={{ fontSize: 13.5, fontWeight: 600 }}>{NOMBRES[res] || res}</span>
+                          <span style={{ fontSize: 12.5, color: C.inkSoft }}>{q.usado} / {q.limite}</span>
+                        </div>
+                        <div style={{ height: 6, background: C.bg, borderRadius: 6, overflow: "hidden" }}>
+                          <div style={{ height: "100%", width: `${pct}%`, background: pct >= 100 ? C.coral : C.aqua, borderRadius: 6, transition: "width .3s" }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <button onClick={onCerrarSesion}
+              style={{ display: "block", margin: "28px auto 0", background: "none", border: "none", color: C.inkSoft, fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3 }}>
+              Cerrar sesión
+            </button>
+          </React.Fragment>
+        )}
       </div>
     </div>
   );
@@ -1283,6 +1458,18 @@ function VoyraCompanion() {
         auth={auth}
         onElegirViaje={abrirViaje}
         onCrearViaje={() => { setTripId(null); setViaje((v) => ({ ...v, ciudad: "", hotel: "", inicio: "", fin: "", vueloIda: "", vueloRegreso: "" })); setPaso(1); setModoSetup(null); setDocsOnb([]); setFase("setup"); }}
+        onCerrarSesion={cerrarSesion}
+        onAbrirPerfil={() => setFase("perfil")}
+      />
+    );
+  }
+
+  // ════════════════ PERFIL GLOBAL ════════════════
+  if (fase === "perfil") {
+    return (
+      <ProfileScreen
+        auth={auth}
+        onVolver={() => setFase("home")}
         onCerrarSesion={cerrarSesion}
       />
     );
