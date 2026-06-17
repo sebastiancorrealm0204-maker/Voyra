@@ -762,7 +762,7 @@ function HomeScreen({ auth, onElegirViaje, onCrearViaje, onCerrarSesion, onAbrir
                   <div style={{ width: 3, alignSelf: "stretch", background: `linear-gradient(180deg, ${C.orange}, ${C.orangeDeep})`, flexShrink: 0 }} />
 
                   <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 14, padding: "16px 14px 16px 16px", minWidth: 0 }}>
-                    <Mark size={40} />
+                    <BrandMark size={36} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 800, fontSize: 16, letterSpacing: "-0.01em" }}>{v.ciudad || "Viaje sin destino"}</div>
                       <div style={{ fontSize: 12.5, color: C.inkSoft, marginTop: 3 }}>
@@ -1682,7 +1682,7 @@ function VoyraCompanion() {
 
           {/* héroe: el personaje */}
           <div className="rise" style={{ textAlign: "center", marginTop: modoSetup ? 14 : 26 }}>
-            <Mark size={modoSetup ? 78 : 104} pulse />
+            <BrandMark size={modoSetup ? 78 : 104} live />
           </div>
 
           {/* ── PANTALLA DE IMPACTO + ELECCIÓN ── */}
@@ -1893,7 +1893,7 @@ function VoyraCompanion() {
       <div style={{ paddingTop: "env(safe-area-inset-top)", background: C.card, borderBottom: `1px solid ${C.line}`, flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-            <Mark size={42} />
+            <BrandMark size={38} />
             <div>
               <div style={{ fontWeight: 800, fontSize: 16, letterSpacing: "-0.02em", lineHeight: 1 }}>Voyra</div>
               <div style={{ fontSize: 11, color: C.teal, fontWeight: 600, marginTop: 2 }}>● activo en {viaje.ciudad}</div>
@@ -1969,7 +1969,7 @@ function VoyraCompanion() {
       <div ref={scrollRef} className="no-scrollbar" style={{ flex: 1, overflowY: "auto", padding: "16px 14px", display: "flex", flexDirection: "column", gap: 12 }}>
         {stream.length === 0 && (
           <div style={{ color: C.inkSoft, fontSize: 14, textAlign: "center", margin: "auto", padding: "0 24px", lineHeight: 1.5 }}>
-            <Mark size={40} pulse />
+            <BrandMark size={40} live />
             <div style={{ marginTop: 12 }}>Estoy despierto y siguiendo tu viaje. Pregúntame lo que quieras o toca <b>“Qué hay cerca”</b>.</div>
           </div>
         )}
@@ -1984,7 +1984,7 @@ function VoyraCompanion() {
           if (m.type === "companion")
             return (
               <div key={m.seq} className="rise" style={{ alignSelf: "flex-start", display: "flex", gap: 8, maxWidth: "90%" }}>
-                <div style={{ flexShrink: 0, marginTop: 2 }}><Mark size={34} /></div>
+                <div style={{ flexShrink: 0, marginTop: 2 }}><BrandMark size={32} /></div>
                 <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: "16px 16px 16px 4px", padding: "10px 13px", fontSize: 14.5, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{m.texto}</div>
               </div>
             );
@@ -1998,7 +1998,7 @@ function VoyraCompanion() {
             const op = m.operativo;
             return (
               <div key={m.seq} className="rise" style={{ alignSelf: "stretch", display: "flex", gap: 8 }}>
-                <div style={{ flexShrink: 0, marginTop: 2 }}><Mark size={34} bg={op ? C.coral : C.teal} /></div>
+                <div style={{ flexShrink: 0, marginTop: 2 }}><BrandMark size={32} /></div>
                 <div style={{ flex: 1, background: op ? C.coralSoft : C.tealSoft, border: `1px solid ${op ? C.coral : C.teal}33`, borderLeft: `3px solid ${op ? C.coral : C.teal}`, borderRadius: 14, padding: "11px 13px" }}>
                   <div style={{ fontSize: 10.5, fontWeight: 700, color: op ? C.coral : C.teal, letterSpacing: "0.07em" }}>{op ? "ALERTA DE VIAJE" : "TU COMPANION"}</div>
                   <div style={{ fontWeight: 700, fontSize: 14.5, marginTop: 3 }}>{m.titulo}</div>
@@ -2022,7 +2022,7 @@ function VoyraCompanion() {
           if (m.type === "card")
             return (
               <div key={m.seq} className="rise" style={{ alignSelf: "stretch", display: "flex", gap: 8 }}>
-                <div style={{ flexShrink: 0, marginTop: 2 }}><Mark size={34} bg={C.amber} /></div>
+                <div style={{ flexShrink: 0, marginTop: 2 }}><BrandMark size={32} /></div>
                 <div style={{ flex: 1, background: C.card, border: `1px solid ${C.line}`, borderLeft: `3px solid ${C.amber}`, borderRadius: 14, padding: "11px 13px" }}>
                   <div style={{ fontSize: 10.5, fontWeight: 700, color: C.amber, letterSpacing: "0.07em" }}>PARA TI</div>
                   <div style={{ fontWeight: 700, fontSize: 14.5, marginTop: 3 }}>{m.titulo}</div>
@@ -2037,7 +2037,7 @@ function VoyraCompanion() {
           if (m.type === "recos")
             return (
               <div key={m.seq} className="rise" style={{ alignSelf: "stretch", display: "flex", gap: 8 }}>
-                <div style={{ flexShrink: 0, marginTop: 2 }}><Mark size={34} /></div>
+                <div style={{ flexShrink: 0, marginTop: 2 }}><BrandMark size={32} /></div>
                 <div style={{ flex: 1, background: C.card, border: `1px solid ${C.line}`, borderRadius: "16px 16px 16px 4px", padding: "11px 13px" }}>
                   <div style={{ fontSize: 10.5, fontWeight: 700, color: C.teal, letterSpacing: "0.07em" }}>CERCA DE TI · {(m.zona || "").toUpperCase()}</div>
                   <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 10 }}>
@@ -2057,7 +2057,7 @@ function VoyraCompanion() {
           if (m.type === "chain_recos")
             return (
               <div key={m.seq} className="rise" style={{ alignSelf: "stretch", display: "flex", gap: 8 }}>
-                <div style={{ flexShrink: 0, marginTop: 2 }}><Mark size={34} /></div>
+                <div style={{ flexShrink: 0, marginTop: 2 }}><BrandMark size={32} /></div>
                 <div style={{ flex: 1, background: C.card, border: `1px solid ${C.line}`, borderRadius: "16px 16px 16px 4px", padding: "11px 13px" }}>
                   <div style={{ fontSize: 10.5, fontWeight: 700, color: C.aqua, letterSpacing: "0.07em", marginBottom: 8 }}>
                     📍 {(m.query || "CERCA DE TI").toUpperCase()}
@@ -2091,7 +2091,7 @@ function VoyraCompanion() {
 
         {(pensando || cargandoCerca) && (
           <div style={{ alignSelf: "flex-start", display: "flex", gap: 8, alignItems: "center" }}>
-            <div style={{ flexShrink: 0 }}><Mark size={34} /></div>
+            <div style={{ flexShrink: 0 }}><BrandMark size={32} /></div>
             <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: "16px 16px 16px 4px", padding: "10px 13px" }}><Typing /></div>
           </div>
         )}
@@ -2274,7 +2274,7 @@ function HomeView({ viaje, zonaActual, airport, diasViaje, pushDisponible, pushO
     <div className="no-scrollbar" style={{ flex: 1, overflowY: "auto", padding: "20px 16px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Primicia: el Companion está contigo. Personaje mediano + saludo cálido. */}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", paddingTop: 8 }}>
-        <Mark size={84} pulse />
+        <BrandMark size={84} live />
         <div style={{ fontSize: 13, color: C.inkSoft, fontWeight: 600, marginTop: 14 }}>{saludo}</div>
         <div style={{ fontSize: 21, fontWeight: 800, marginTop: 4, lineHeight: 1.2, letterSpacing: "-0.02em" }}>
           Estoy contigo en {viaje.ciudad}
@@ -2537,7 +2537,7 @@ function ConfirmarPlanesSheet({ data, onConfirmar, onCancelar }) {
     <div style={{ position: "absolute", inset: 0, zIndex: 85, background: "rgba(0,0,0,.7)", display: "flex", alignItems: "flex-end" }} onClick={onCancelar}>
       <div className="rise" onClick={(e) => e.stopPropagation()} style={{ width: "100%", background: C.card, borderRadius: "24px 24px 0 0", padding: "22px 20px calc(20px + env(safe-area-inset-bottom))", maxWidth: 480, margin: "0 auto", maxHeight: "82vh", overflowY: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 4 }}>
-          <Mark size={38} />
+          <BrandMark size={34} />
           <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: "-0.02em", flex: 1 }}>{titulo}</div>
         </div>
         <div style={{ fontSize: 13, color: C.inkSoft, marginBottom: 14, lineHeight: 1.45 }}>
@@ -2801,7 +2801,7 @@ function MiniGuia({ onClose }) {
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
           {/* el personaje presente en cada paso, con el ícono del paso como acento */}
           <div style={{ position: "relative" }}>
-            <Mark size={76} pulse />
+            <BrandMark size={76} live />
             <div style={{ position: "absolute", bottom: -4, right: -8, background: C.orange, borderRadius: 999, width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", border: `3px solid ${C.card}` }}>
               <Icon name={paso.icon} size={17} color="#fff" />
             </div>
@@ -2865,7 +2865,7 @@ function AirportView({ data, onClose }) {
 
       <div className="no-scrollbar" style={{ flex: 1, overflowY: "auto", padding: "16px", paddingBottom: "calc(24px + env(safe-area-inset-bottom))" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 4 }}>
-          <Mark size={34} />
+          <BrandMark size={32} />
           <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.35 }}>
             Estoy contigo en <b>{data.name}</b>. Sígueme paso a paso y sales sin enredos.
             {data.tiempo_total_estimado_min ? <span style={{ color: C.inkSoft }}> Estimado hasta la salida: <b style={{ color: C.ink }}>~{data.tiempo_total_estimado_min} min</b>{data.tiempos_modo === "en_vivo" ? " (en vivo)" : ""}.</span> : null}
