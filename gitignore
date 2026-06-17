@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Base de datos
+*.db
+
+# Variables de entorno
+.env
+
+# Virtual environment
+venv/
+.venv/
+echo "private_key.pem" >> .gitignore
+echo "public_key.pem" >> .gitignore
