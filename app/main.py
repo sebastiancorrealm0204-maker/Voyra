@@ -6,13 +6,13 @@ Docs:    http://localhost:8000/docs
 import json
 import urllib.parse
 
-from fastapi import FastAPI, HTTPException, Depends, Header, Request
+from fastapi import FastAPI, HTTPException, Depends, Header, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
 from . import (context, db, engine, geo, llm, push, scheduler, search, seed_data,
-               watchers, auth, limits, email_send)
+               watchers, auth, limits, email_send, waitlist)
 
 app = FastAPI(title="Voyra Companion", version="0.2.0")
 
@@ -28,6 +28,7 @@ app.add_middleware(
 
 db.init_pool()       # abre el ConnectionPool de Postgres (no-op en modo SQLite)
 db.init_db()
+waitlist.init_waitlist()
 auth.init_auth()
 limits.init_limits()
 db.seed_destination_places(seed_data.all_seeds())
@@ -789,6 +790,90 @@ def feedback(nid: str, f: FeedbackIn, user: dict = Depends(current_user)):
 def decisions(tid: str, user: dict = Depends(current_user)):
     own_trip(tid, user)
     return db.rows("decisions", tid)
+
+
+# ── Waitlist (landing page de Companion) ──
+class WaitlistIn(BaseModel):
+    email: str
+    name: str = ""
+    phone: str = ""
+    source: str = ""
+    city: str = ""
+
+
+@app.post("/waitlist")
+def waitlist_signup(body: WaitlistIn, request: Request):
+    """Alta pública de un lead en la waitlist. Lo llama la landing page."""
+    ua = request.headers.get("user-agent", "")
+    ref = request.headers.get("referer", "")
+    try:
+        res = waitlist.add(
+            email=body.email, name=body.name, phone=body.phone,
+            source=body.source or "landing", city=body.city,
+            user_agent=ua, referer=ref,
+        )
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Correo inválido")
+    return {**res, "total": waitlist.count()}
+
+
+def _require_admin(token: str | None):
+    import os as _os
+    if not waitlist.admin_ok(token):
+        code = 503 if not _os.environ.get("ADMIN_TOKEN") else 401
+        raise HTTPException(status_code=code,
+                            detail="No autorizado (configura ADMIN_TOKEN y pasa ?token=...)")
+
+
+@app.get("/admin/waitlist")
+def admin_waitlist(token: str | None = Query(default=None),
+                   x_admin_token: str | None = Header(default=None)):
+    _require_admin(token or x_admin_token)
+    return {"total": waitlist.count(), "rows": waitlist.all_rows()}
+
+
+@app.get("/admin/waitlist.csv")
+def admin_waitlist_csv(token: str | None = Query(default=None),
+                       x_admin_token: str | None = Header(default=None)):
+    _require_admin(token or x_admin_token)
+    return PlainTextResponse(
+        waitlist.to_csv(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=waitlist.csv"},
+    )
+
+
+@app.get("/admin/waitlist/panel", response_class=HTMLResponse)
+def admin_waitlist_panel(token: str | None = Query(default=None)):
+    _require_admin(token)
+    rows = waitlist.all_rows()
+    trs = "".join(
+        f"<tr><td>{i+1}</td><td><b>{r['email']}</b></td><td>{r['name']}</td>"
+        f"<td>{r['phone']}</td><td>{r['source']}</td><td>{r['fecha']}</td></tr>"
+        for i, r in enumerate(rows)
+    ) or "<tr><td colspan=6 style='text-align:center;color:#888'>Aún no hay registros</td></tr>"
+    html = f"""<!doctype html><html lang=es><head><meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>Waitlist · Companion</title>
+<style>
+body{{font-family:system-ui,sans-serif;background:#0E0E10;color:#F5F3EF;margin:0;padding:32px}}
+h1{{font-size:20px;margin:0 0 4px}} .sub{{color:#9A968E;margin:0 0 24px}}
+.big{{font-size:44px;font-weight:800;color:#FF5A1F}}
+table{{width:100%;border-collapse:collapse;margin-top:16px;font-size:14px}}
+th,td{{text-align:left;padding:10px 12px;border-bottom:1px solid #2A2A30}}
+th{{color:#9A968E;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em}}
+tr:hover td{{background:#1A1A1E}}
+a.btn{{display:inline-block;margin-top:16px;background:#FF5A1F;color:#fff;text-decoration:none;
+padding:10px 18px;border-radius:10px;font-weight:600;font-size:14px}}
+</style></head><body>
+<h1>Waitlist del Companion</h1>
+<p class=sub>Registros capturados desde la landing page</p>
+<div class=big>{len(rows)}</div>
+<a class=btn href="/admin/waitlist.csv?token={token}">⬇ Descargar CSV</a>
+<table><thead><tr><th>#</th><th>Email</th><th>Nombre</th><th>Teléfono</th><th>Origen</th><th>Fecha</th></tr></thead>
+<tbody>{trs}</tbody></table>
+</body></html>"""
+    return HTMLResponse(html)
 
 
 @app.get("/health")
