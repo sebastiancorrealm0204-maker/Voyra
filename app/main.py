@@ -6,13 +6,13 @@ Docs:    http://localhost:8000/docs
 import json
 import urllib.parse
 
-from fastapi import FastAPI, HTTPException, Depends, Header, Request, Query
+from fastapi import FastAPI, HTTPException, Depends, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, Field
 
 from . import (context, db, engine, geo, llm, push, scheduler, search, seed_data,
-               watchers, auth, limits, email_send, waitlist)
+               watchers, auth, limits, email_send)
 
 app = FastAPI(title="Voyra Companion", version="0.2.0")
 
@@ -28,7 +28,6 @@ app.add_middleware(
 
 db.init_pool()       # abre el ConnectionPool de Postgres (no-op en modo SQLite)
 db.init_db()
-waitlist.init_waitlist()
 auth.init_auth()
 limits.init_limits()
 db.seed_destination_places(seed_data.all_seeds())
@@ -658,56 +657,74 @@ def chat(tid: str, c: ChatIn, user: dict = Depends(verified_user)):
         _consume_or_429(user, "chat")
     db.insert("messages", {"trip_id": tid, "role": "user", "content": c.message})
     history = [{"role": m["role"], "content": m["content"]} for m in db.rows("messages", tid)]
-    reply = llm.chat(context.build(trip), history)
+
+    # ── ROUTER DE INTENCIÓN ──
+    # Una sola llamada BARATA (sin el system prompt grande) clasifica el mensaje.
+    # Con eso decidimos qué llamadas caras hacer DESPUÉS. Antes corrían SIEMPRE
+    # las tres (chat + extracción de planes + cadenas), lo que reventaba el límite
+    # de tokens/min de Groq (los 429 del dashboard). Ahora cada subtarea corre
+    # solo cuando la intención la pide.
+    from . import router as router_mod
+    intent = router_mod.clasificar(c.message, trip) if not es_tap else {"intencion": "charla"}
+    intencion = intent["intencion"]
+
+    # La conversación es el producto: una falla transitoria del proveedor LLM
+    # (timeout, 429 tras failover, corte de red) NO debe tumbar el endpoint ni
+    # mostrar "se me cruzaron los cables". Si falla, degradamos con un mensaje
+    # honesto en vez de devolver un 500.
+    try:
+        reply = llm.chat(context.build(trip), history)
+    except llm.RateLimited:
+        reply = ("Ahora mismo tengo mucha demanda y no alcancé a responderte. "
+                 "Dame unos segundos y reenvíame el mensaje.")
+    except Exception:
+        reply = ("Se me trabó la conexión un momento y no alcancé a procesar eso. "
+                 "Mándamelo de nuevo y lo retomo al instante.")
     db.insert("messages", {"trip_id": tid, "role": "companion", "content": reply})
-    # Detectar planes en el mensaje del usuario SIN guardarlos: el frontend
-    # preguntará "¿lo anoto en tu calendario?" antes de persistir.
+
+    # Extracción de planes: SOLO si el router dice que el usuario está agendando.
+    # Antes corría en CADA mensaje (una llamada LLM extra siempre). Ahora se salta
+    # por completo en navegación, búsqueda, recomendación y charla → menos tokens
+    # y, de paso, mata el bug de "quiero volver al hotel" → "¿lo anoto?".
     propuestas = []
-    # Los mensajes entre corchetes son taps de notificaciones, no planes.
-    if not es_tap:
+    if not es_tap and intencion == "agendar_plan":
         from . import plans as plans_mod, timeutil
         propuestas = plans_mod.normalizar_lista(
             llm.extract_plans_from_chat(c.message, trip), origen="chat")
-        # No dejar la ciudad como "lugar" (rompe el match y manda a sitios random)
         propuestas = plans_mod.limpiar_lugar_ciudad(propuestas, trip.get("ciudad", ""))
-        # Si el plan coincide con un lugar curado, corrige tipo (ícono) y lugar
         propuestas = plans_mod.enriquecer_con_curacion(
             propuestas, db.places_for_city(trip.get("ciudad", "")), db.best_place_match)
-        # Red de seguridad: si el LLM no puso fecha pero el mensaje dice
-        # "mañana", "el viernes", etc., la deducimos aquí.
         try:
             ahora = timeutil.now_local(trip)
             propuestas = plans_mod.rellenar_fechas(propuestas, c.message, ahora)
         except Exception:
             pass
-    # Búsqueda en vivo de cadenas: detectar si el usuario pide algo cerca.
+
+    # Búsqueda en vivo de cadenas: SOLO si el router la pidió (no en cada mensaje).
     chain_results = None
-    from . import places_live
-    cadena_q = places_live.detectar_busqueda_cadena(c.message)
-    if cadena_q and places_live.disponible():
-        olat = trip.get("lat_actual")
-        olng = trip.get("lng_actual")
-        if olat is None or olng is None:
-            coords = geo.zone_coords(trip.get("ciudad", ""), trip.get("zona_actual", ""))
-            if coords:
-                olat, olng = coords
-        if olat and olng:
-            # Esta búsqueda SÍ pega a Google Maps → consume cuota "maps".
-            # Si el usuario ya no tiene cuota (o saltó el circuit breaker), no
-            # rompemos el chat: simplemente omitimos la búsqueda en vivo y
-            # avisamos suave. La respuesta del Companion ya se generó.
-            try:
-                limits.check_and_consume(user["id"], "maps")
-                resultados = places_live.buscar_cerca(cadena_q, olat, olng)
-                if resultados:
-                    chain_results = {"query": cadena_q, "items": resultados}
-            except limits.QuotaError:
-                chain_results = {"query": cadena_q, "items": [],
-                                 "nota": "Llegaste a tu límite de búsquedas en vivo por hoy. "
-                                         "Se renueva mañana."}
+    if not es_tap and intencion == "buscar_cadena":
+        from . import places_live
+        cadena_q = places_live.detectar_busqueda_cadena(c.message)
+        if cadena_q and places_live.disponible():
+            olat = trip.get("lat_actual")
+            olng = trip.get("lng_actual")
+            if olat is None or olng is None:
+                coords = geo.zone_coords(trip.get("ciudad", ""), trip.get("zona_actual", ""))
+                if coords:
+                    olat, olng = coords
+            if olat and olng:
+                try:
+                    limits.check_and_consume(user["id"], "maps")
+                    resultados = places_live.buscar_cerca(cadena_q, olat, olng)
+                    if resultados:
+                        chain_results = {"query": cadena_q, "items": resultados}
+                except limits.QuotaError:
+                    chain_results = {"query": cadena_q, "items": [],
+                                     "nota": "Llegaste a tu límite de búsquedas en vivo por hoy. "
+                                             "Se renueva mañana."}
 
     return {"reply": reply, "planes_propuestos": propuestas, "chain_results": chain_results,
-            "restante_chat": limits.remaining(user["id"], "chat")}
+            "intencion": intencion, "restante_chat": limits.remaining(user["id"], "chat")}
 
 
 # ── Documentos ──
@@ -790,90 +807,6 @@ def feedback(nid: str, f: FeedbackIn, user: dict = Depends(current_user)):
 def decisions(tid: str, user: dict = Depends(current_user)):
     own_trip(tid, user)
     return db.rows("decisions", tid)
-
-
-# ── Waitlist (landing page de Companion) ──
-class WaitlistIn(BaseModel):
-    email: str
-    name: str = ""
-    phone: str = ""
-    source: str = ""
-    city: str = ""
-
-
-@app.post("/waitlist")
-def waitlist_signup(body: WaitlistIn, request: Request):
-    """Alta pública de un lead en la waitlist. Lo llama la landing page."""
-    ua = request.headers.get("user-agent", "")
-    ref = request.headers.get("referer", "")
-    try:
-        res = waitlist.add(
-            email=body.email, name=body.name, phone=body.phone,
-            source=body.source or "landing", city=body.city,
-            user_agent=ua, referer=ref,
-        )
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Correo inválido")
-    return {**res, "total": waitlist.count()}
-
-
-def _require_admin(token: str | None):
-    import os as _os
-    if not waitlist.admin_ok(token):
-        code = 503 if not _os.environ.get("ADMIN_TOKEN") else 401
-        raise HTTPException(status_code=code,
-                            detail="No autorizado (configura ADMIN_TOKEN y pasa ?token=...)")
-
-
-@app.get("/admin/waitlist")
-def admin_waitlist(token: str | None = Query(default=None),
-                   x_admin_token: str | None = Header(default=None)):
-    _require_admin(token or x_admin_token)
-    return {"total": waitlist.count(), "rows": waitlist.all_rows()}
-
-
-@app.get("/admin/waitlist.csv")
-def admin_waitlist_csv(token: str | None = Query(default=None),
-                       x_admin_token: str | None = Header(default=None)):
-    _require_admin(token or x_admin_token)
-    return PlainTextResponse(
-        waitlist.to_csv(),
-        media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=waitlist.csv"},
-    )
-
-
-@app.get("/admin/waitlist/panel", response_class=HTMLResponse)
-def admin_waitlist_panel(token: str | None = Query(default=None)):
-    _require_admin(token)
-    rows = waitlist.all_rows()
-    trs = "".join(
-        f"<tr><td>{i+1}</td><td><b>{r['email']}</b></td><td>{r['name']}</td>"
-        f"<td>{r['phone']}</td><td>{r['source']}</td><td>{r['fecha']}</td></tr>"
-        for i, r in enumerate(rows)
-    ) or "<tr><td colspan=6 style='text-align:center;color:#888'>Aún no hay registros</td></tr>"
-    html = f"""<!doctype html><html lang=es><head><meta charset=utf-8>
-<meta name=viewport content="width=device-width,initial-scale=1">
-<title>Waitlist · Companion</title>
-<style>
-body{{font-family:system-ui,sans-serif;background:#0E0E10;color:#F5F3EF;margin:0;padding:32px}}
-h1{{font-size:20px;margin:0 0 4px}} .sub{{color:#9A968E;margin:0 0 24px}}
-.big{{font-size:44px;font-weight:800;color:#FF5A1F}}
-table{{width:100%;border-collapse:collapse;margin-top:16px;font-size:14px}}
-th,td{{text-align:left;padding:10px 12px;border-bottom:1px solid #2A2A30}}
-th{{color:#9A968E;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em}}
-tr:hover td{{background:#1A1A1E}}
-a.btn{{display:inline-block;margin-top:16px;background:#FF5A1F;color:#fff;text-decoration:none;
-padding:10px 18px;border-radius:10px;font-weight:600;font-size:14px}}
-</style></head><body>
-<h1>Waitlist del Companion</h1>
-<p class=sub>Registros capturados desde la landing page</p>
-<div class=big>{len(rows)}</div>
-<a class=btn href="/admin/waitlist.csv?token={token}">⬇ Descargar CSV</a>
-<table><thead><tr><th>#</th><th>Email</th><th>Nombre</th><th>Teléfono</th><th>Origen</th><th>Fecha</th></tr></thead>
-<tbody>{trs}</tbody></table>
-</body></html>"""
-    return HTMLResponse(html)
 
 
 @app.get("/health")

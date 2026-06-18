@@ -55,34 +55,42 @@ SINONIMOS = {
 
 
 
-# ── Detección de intención de búsqueda de cadena ──
-# Palabras clave que indican que el usuario quiere encontrar algo cerca.
-# Formato: (patrones_en_mensaje, query_para_google)
+# Detección de intención de búsqueda de cadena.
+# Cada entrada: (patrones_genericos, query_google, nombres_de_cadena_especificos)
+#  - patrones_genericos: palabras/frases que, CON intención de proximidad, disparan.
+#  - especificos: nombres de cadena que pueden disparar SIN proximidad.
+# Todos los tokens van normalizados (sin acentos, minúsculas) y se matchean por
+# palabra completa (\b...\b), así que NO uses espacios al final ni fragmentos.
 _INTENCIONES = [
-    # Supermercados
-    (["carulla", "carulla cerca"], "Carulla supermercado"),
-    (["éxito", "exito", "almacenes éxito"], "Éxito supermercado"),
-    (["d1", "tienda d1", "d uno"], "D1 tienda descuento"),
-    (["ara ", " ara,", "supermercado ara"], "Ara supermercado"),
-    (["jumbo", "tienda jumbo"], "Jumbo supermercado"),
-    (["supermercado cerca", "mercado cerca", "súper cerca", "super cerca",
-      "dónde comprar", "donde comprar", "comprar comida", "comprar agua",
-      "comprar cosas", "tienda cerca"], "supermercado"),
+    # Supermercados (cadenas específicas + genérico)
+    (["carulla"], "Carulla supermercado", ["carulla"]),
+    (["exito", "almacenes exito"], "Éxito supermercado", ["exito"]),
+    (["d1", "tienda d1"], "D1 tienda descuento", ["d1"]),
+    (["ara", "supermercado ara"], "Ara supermercado", ["ara"]),
+    (["jumbo", "tienda jumbo"], "Jumbo supermercado", ["jumbo"]),
+    (["olimpica"], "Olímpica supermercado", ["olimpica"]),
+    (["supermercado", "mercado", "super", "comprar comida", "comprar agua",
+      "comprar cosas", "donde comprar"], "supermercado", []),
     # Farmacias
-    (["farmacia", "droguería", "drogueria", "medicamento", "pastilla",
-      "cruz verde", "farmacenter", "drogas la rebaja"], "farmacia droguería"),
+    (["farmacia", "drogueria", "medicamento", "pastilla", "cruz verde",
+      "farmacenter", "drogas la rebaja"], "farmacia droguería",
+     ["cruz verde", "farmacenter"]),
     # Cajeros / bancos
-    (["cajero", "cajeros", "atm", "plata en efectivo", "retirar plata",
-      "sacar plata", "efectivo", "bancolombia", "davivienda"], "cajero automático ATM"),
+    (["cajero", "cajeros", "atm", "retirar plata", "sacar plata", "efectivo",
+      "bancolombia", "davivienda"], "cajero automático ATM",
+     ["bancolombia", "davivienda"]),
     # Comida rápida / cadenas colombianas
-    (["crepes", "crepes & waffles", "crepes y waffles"], "Crepes & Waffles restaurante"),
-    (["juan valdez", "café juan valdez"], "Juan Valdez Café"),
-    (["el corral", "hamburguesa cerca", "hamburguesas cerca"], "El Corral hamburguesas"),
-    (["frisby", "pollo frito cerca"], "Frisby pollo"),
+    (["crepes", "crepes & waffles", "crepes y waffles"], "Crepes & Waffles restaurante",
+     ["crepes"]),
+    (["juan valdez"], "Juan Valdez Café", ["juan valdez"]),
+    (["el corral", "hamburguesa", "hamburguesas"], "El Corral hamburguesas",
+     ["el corral"]),
+    (["frisby"], "Frisby pollo", ["frisby"]),
     # Gasolina / movilidad
-    (["gasolina", "combustible", "gasolinera", "estación de servicio"], "estación de gasolina"),
+    (["gasolina", "combustible", "gasolinera", "estacion de servicio"],
+     "estación de gasolina", []),
     # Café genérico
-    (["café cerca", "cafetería cerca", "cafe cerca"], "café"),
+    (["cafeteria"], "café", []),
 ]
 
 
@@ -92,23 +100,48 @@ def disponible() -> bool:
 
 def detectar_busqueda_cadena(mensaje: str) -> str | None:
     """Devuelve la query de búsqueda si el mensaje pide encontrar una cadena/servicio.
-    Devuelve None si es charla general."""
-    m = mensaje.lower().strip()
-    # Palabras de proximidad — si no aparece ninguna, probablemente no está buscando
-    proximidad = ["cerca", "aquí", "aqui", "hay un", "hay una", "dónde hay",
-                  "donde hay", "encuentro", "busca", "buscame", "encuéntrame",
-                  "encuentrame", "necesito", "quiero ir", "quiero comprar"]
+    Devuelve None si es charla general.
+
+    IMPORTANTE: el matching es por PALABRA COMPLETA (regex con \\b), no por
+    substring. Antes 'ara ' hacía match dentro de 'para', 'comprara', 'llegara',
+    etc., y disparaba una búsqueda de supermercados Ara de la nada. Ahora 'ara'
+    solo matchea la palabra 'ara' aislada. Además, las categorías genéricas
+    (supermercado, farmacia, cajero) SOLO se activan si hay intención real de
+    proximidad/compra en el mensaje; mencionar el nombre de una cadena específica
+    se acepta sin proximidad solo si no es claramente una pregunta informativa.
+    """
+    import re
+    m = _normaliza(mensaje)
+
+    proximidad = ["cerca", "aqui", "por aca", "por aqui", "hay un", "hay una",
+                  "hay algun", "donde hay", "donde queda", "donde puedo",
+                  "encuentro", "buscame", "encuentrame", "necesito",
+                  "quiero ir a un", "quiero comprar", "donde compro", "como llego a un"]
     tiene_proximidad = any(p in m for p in proximidad)
-    for patrones, query in _INTENCIONES:
-        if any(p in m for p in patrones):
-            # Con palabras de proximidad: seguro que está buscando
-            if tiene_proximidad:
+
+    # Es una pregunta informativa sobre el lugar, no un "encuéntrame uno cerca".
+    # Ej: "¿qué venden en Carulla?", "¿a qué hora abre Éxito?". No buscar.
+    es_pregunta_info = any(p in m for p in (
+        "que venden", "que tiene", "que hay en", "a que hora", "horario de",
+        "cuanto cuesta", "es bueno", "como es", "que es "))
+
+    for patrones, query, especificos in _INTENCIONES:
+        # match por palabra completa de cualquiera de los patrones
+        if any(re.search(rf"\b{re.escape(p)}\b", m) for p in patrones):
+            if tiene_proximidad and not es_pregunta_info:
                 return query
-            # Sin palabras de proximidad pero menciona la cadena específica:
-            # solo activar si NO es una pregunta sobre el lugar (p.ej. "¿qué tiene Carulla?")
-            if any(p in m for p in patrones[:2]):  # nombre específico de cadena
+            # Sin proximidad: solo si nombra una CADENA específica (no categoría
+            # genérica) y no es una pregunta informativa.
+            if especificos and not es_pregunta_info and any(
+                    re.search(rf"\b{re.escape(p)}\b", m) for p in especificos):
                 return query
     return None
+
+
+def _normaliza(s: str) -> str:
+    import unicodedata
+    return unicodedata.normalize("NFKD", (s or "").lower().strip()) \
+        .encode("ascii", "ignore").decode()
 
 
 def buscar_cerca(query: str, lat: float, lng: float,

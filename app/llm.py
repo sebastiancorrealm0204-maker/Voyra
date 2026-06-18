@@ -89,29 +89,125 @@ def _vision_provider() -> str:
 MODE = "mock" if not _available() else f"scoring={SCORING_PROVIDER}, chat={CHAT_PROVIDER}, extract={EXTRACT_PROVIDER}"
 
 
-def _call(provider: str, system: str, messages: list[dict], max_tokens: int = 800) -> str:
+# Timeouts cortos + reintentos que RESPETAN el rate limit del proveedor.
+#
+# El problema real detrás de "se me cruzaron los cables" resultó ser doble:
+#  1) Cold-start / timeout sin reintento (lo que arreglamos antes).
+#  2) MÁS IMPORTANTE: 429 de Groq por exceder tokens-por-minuto (TPM). El free
+#     tier de Groq da ~12K TPM, y el system prompt del Companion es grande, así
+#     que un par de llamadas por turno revientan el minuto. El dashboard de Groq
+#     lo confirma: picos de 17K tokens contra una línea roja de 12K.
+#
+# Por eso un backoff fijo de 0.6s no basta para un 429 de TPM: hay que esperar a
+# que el proveedor diga cuándo (header 'retry-after'), o saltar a otro proveedor.
+_TIMEOUT = httpx.Timeout(connect=8.0, read=45.0, write=10.0, pool=8.0)
+_REINTENTOS = 2  # 3 intentos en total
+_STATUS_REINTENTABLES = {408, 409, 429, 500, 502, 503, 504, 529}
+# Tope de espera por reintento: nunca bloqueamos al usuario más de esto. Si el
+# proveedor pide esperar más, mejor fallar/saltar de proveedor que congelar el chat.
+_MAX_ESPERA_429 = 6.0
+
+
+def _espera_tras_429(resp: httpx.Response, intento: int) -> float:
+    """Cuánto esperar antes de reintentar. Prioriza el header 'retry-after' del
+    proveedor (Groq lo manda en sus 429); si no está, backoff exponencial. Topado
+    a _MAX_ESPERA_429 para no congelar el chat."""
+    ra = resp.headers.get("retry-after") or resp.headers.get("x-ratelimit-reset-tokens")
+    if ra:
+        try:
+            return min(float(ra), _MAX_ESPERA_429)
+        except ValueError:
+            pass
+    return min(0.6 * (2 ** intento), _MAX_ESPERA_429)
+
+
+class RateLimited(Exception):
+    """El proveedor devolvió 429 y se agotaron los reintentos. La capa de arriba
+    puede capturarla para intentar OTRO proveedor (failover)."""
+
+
+def _post_con_reintentos(url: str, headers: dict, payload: dict) -> httpx.Response:
+    """POST con reintentos ante errores transitorios. Lanza la última excepción
+    si se agotan los intentos. En 429 persistente lanza RateLimited para permitir
+    failover de proveedor arriba."""
+    import time as _time
+    ultima_exc: Exception | None = None
+    for intento in range(_REINTENTOS + 1):
+        try:
+            resp = httpx.post(url, headers=headers, json=payload, timeout=_TIMEOUT)
+            if resp.status_code == 429:
+                if intento < _REINTENTOS:
+                    _time.sleep(_espera_tras_429(resp, intento))
+                    continue
+                raise RateLimited("429 tras reintentos")
+            if resp.status_code in _STATUS_REINTENTABLES and intento < _REINTENTOS:
+                _time.sleep(min(0.6 * (2 ** intento), _MAX_ESPERA_429))
+                continue
+            resp.raise_for_status()
+            return resp
+        except (httpx.TimeoutException, httpx.TransportError) as e:
+            ultima_exc = e
+            if intento < _REINTENTOS:
+                _time.sleep(0.6 * (intento + 1))
+                continue
+            raise
+        except httpx.HTTPStatusError as e:
+            # 4xx no reintentables (400, 401, 403): fallan de inmediato.
+            ultima_exc = e
+            raise
+    if ultima_exc:
+        raise ultima_exc
+    raise RuntimeError("post sin respuesta")  # inalcanzable
+
+
+def _call_one(provider: str, system: str, messages: list[dict], max_tokens: int = 800) -> str:
     cfg = PROVIDERS[provider]
     if cfg["style"] == "anthropic":
-        resp = httpx.post(
+        resp = _post_con_reintentos(
             cfg["url"],
-            headers={"x-api-key": cfg["key"], "anthropic-version": "2023-06-01",
-                     "content-type": "application/json"},
-            json={"model": cfg["model"], "max_tokens": max_tokens, "system": system,
-                  "messages": messages},
-            timeout=90,
+            {"x-api-key": cfg["key"], "anthropic-version": "2023-06-01",
+             "content-type": "application/json"},
+            {"model": cfg["model"], "max_tokens": max_tokens, "system": system,
+             "messages": messages},
         )
-        resp.raise_for_status()
         return "".join(b.get("text", "") for b in resp.json()["content"] if b.get("type") == "text")
     # estilo OpenAI (DeepSeek, Groq): el system va como primer mensaje
-    resp = httpx.post(
+    resp = _post_con_reintentos(
         cfg["url"],
-        headers={"Authorization": f"Bearer {cfg['key']}", "Content-Type": "application/json"},
-        json={"model": cfg["model"], "max_tokens": max_tokens,
-              "messages": [{"role": "system", "content": system}] + messages},
-        timeout=90,
+        {"Authorization": f"Bearer {cfg['key']}", "Content-Type": "application/json"},
+        {"model": cfg["model"], "max_tokens": max_tokens,
+         "messages": [{"role": "system", "content": system}] + messages},
     )
-    resp.raise_for_status()
     return resp.json()["choices"][0]["message"]["content"]
+
+
+def _orden_failover(primario: str) -> list[str]:
+    """Proveedor primario primero, luego el resto de los disponibles como respaldo.
+    Así, si Groq está rate-limited (429 de TPM), el chat salta a DeepSeek/Anthropic
+    en vez de mostrarle un error al usuario."""
+    resto = [p for p in _available() if p != primario]
+    return ([primario] if primario in PROVIDERS and PROVIDERS[primario]["key"] else []) + resto
+
+
+def _call(provider: str, system: str, messages: list[dict], max_tokens: int = 800) -> str:
+    """Llama al proveedor con FAILOVER: si el primario está rate-limited, intenta
+    con el siguiente disponible. Solo hacemos failover ante RateLimited (429), no
+    ante errores de credenciales (no tendría sentido reintentar un 401 en otro)."""
+    cadena = _orden_failover(provider)
+    if not cadena:
+        # sin keys: caemos al comportamiento mock de cada función de arriba
+        return _call_one(provider, system, messages, max_tokens)
+    ultima: Exception | None = None
+    for p in cadena:
+        try:
+            return _call_one(p, system, messages, max_tokens)
+        except RateLimited as e:
+            ultima = e
+            continue  # proveedor saturado → probar el siguiente
+    # todos saturados
+    if ultima:
+        raise ultima
+    raise RuntimeError("sin proveedores")
 
 
 def _call_vision(provider: str, system: str, prompt: str, image_data_url: str,
@@ -214,7 +310,14 @@ def score_event(system: str, source: str, payload: str, category: str,
         '"mensaje": "<máx 2 frases, específico, con datos del contexto>", '
         '"accion": "<botón 1 tap máx 4 palabras o null>"}\n'
         "Criterios: vuelo/seguridad = score alto siempre. Recomendaciones = alto solo si cruzan "
-        "con gustos y ubicación. ≥70 push, 40-69 feed, <40 silencio."
+        "con gustos y ubicación. ≥70 push, 40-69 feed, <40 silencio.\n"
+        "REGLA DE HONESTIDAD (CRÍTICA): en 'mensaje' describe el lugar SOLO con lo que dice la "
+        "SEÑAL/descripción curada. NO afirmes que el lugar encaja con un gusto del usuario salvo "
+        "que la descripción lo respalde de verdad. Por ejemplo, NO digas 'perfecto para tu gusto "
+        "de gastronomía local' sobre un restaurante español, italiano o internacional — eso NO es "
+        "comida local. Si el lugar coincide con un gusto, nómbralo con precisión ('cocina española', "
+        "'historia y cultura'); si no coincide claramente con ningún gusto declarado, simplemente "
+        "describe el lugar por lo que es, sin inventar un match. Inventar afinidades destruye la confianza."
     )
     out = _parse_json(_call(SCORING_PROVIDER, system, [{"role": "user", "content": prompt}]))
     out["_mode"] = SCORING_PROVIDER
@@ -384,13 +487,22 @@ def extract_plans_from_chat(message: str, trip: dict | None = None) -> list[dict
     prompt = (
         f"Mensaje del usuario en el chat:\n\"{message}\"\n"
         f"{_trip_ctx_block(trip)}"
-        "¿El usuario está contando un PLAN o RESERVA futura concreta (algo que va a hacer, "
-        "con o sin fecha/hora)? Si SÍ, extráelo. Si es una PREGUNTA, una duda, o charla general "
-        "SIN un plan concreto, devuelve lista vacía.\n"
+        "¿El usuario está CONTANDO un PLAN o RESERVA futura concreta que YA decidió hacer "
+        "(algo que va a hacer, idealmente con fecha/hora)? Si SÍ, extráelo. \n"
+        "NO extraigas nada (devuelve lista vacía) si el mensaje es cualquiera de estos casos:\n"
+        "- Una PREGUNTA o pedido de ayuda/indicaciones: '¿cómo llego a X?', '¿qué hay cerca?', "
+        "'¿dónde queda Y?', 'llévame a', 'quiero ir al hotel/aeropuerto', 'quiero regresar al hotel', "
+        "'estoy perdido', 'recomiéndame'. Pedir CÓMO llegar a un sitio NO es agendar un plan, es navegación.\n"
+        "- Una necesidad inmediata o logística del momento (volver al hotel ahora, pedir un taxi, "
+        "buscar un cajero/farmacia/supermercado). Eso se resuelve en el chat, NO se agenda.\n"
+        "- Charla general, dudas, o comentarios sin un plan concreto.\n"
+        "Solo cuenta como plan algo como: 'el viernes tengo tour a las 9', 'reservé cena en El Cielo el sábado', "
+        "'mañana voy al Museo del Oro'. Es decir: una actividad/reserva con intención de agenda, no una pregunta.\n"
         "REGLAS para los campos:\n"
         "- \"lugar\": el NOMBRE ESPECÍFICO del sitio (ej. \"El Cielo\", \"Andrés Carne de Res\", "
         "\"Museo del Oro\"). NUNCA pongas la ciudad ni una zona genérica. Si el usuario no "
-        "menciona un sitio concreto, usa null. JAMÁS pongas \"Bogotá\" como lugar.\n"
+        "menciona un sitio concreto, usa null. JAMÁS pongas \"Bogotá\" como lugar. "
+        "El hotel del usuario NO es un plan agendable: si dice que quiere ir/volver al hotel, NO lo agendes.\n"
         "- \"tipo\": clasifica por la actividad — una cena/almuerzo en un sitio = \"restaurante\"; "
         "un tour/museo/parque/paseo = \"actividad\"; un vuelo = \"vuelo\"; check-in de hotel = \"hotel\"; "
         "un traslado/taxi = \"transporte\". Solo usa \"otro\" si de verdad no encaja en ninguno.\n"
@@ -404,6 +516,47 @@ def extract_plans_from_chat(message: str, trip: dict | None = None) -> list[dict
         out = _parse_json(_call(EXTRACT_PROVIDER, "Eres el detector de planes de viaje de Voyra.",
                                 [{"role": "user", "content": prompt}], max_tokens=600))
         planes = out.get("planes", [])
-        return planes if isinstance(planes, list) else []
+        planes = planes if isinstance(planes, list) else []
+        return _descartar_no_planes(planes, message)
     except Exception:
         return []
+
+
+# Frases de navegación/ayuda que el extractor a veces marca como "plan" por error.
+# Si el mensaje del usuario es una de estas intenciones, descartamos cualquier
+# plan propuesto: pedir cómo llegar a un sitio NO es agendarlo. Esto evita el bug
+# de "quiero volver al hotel" → "¿lo anoto en tu calendario?".
+_INTENCIONES_NAVEGACION = (
+    "como llego", "cómo llego", "como llegar", "cómo llegar", "como voy", "cómo voy",
+    "como vuelvo", "cómo vuelvo", "como regreso", "cómo regreso", "llevame", "llévame",
+    "quiero ir al hotel", "quiero volver al hotel", "quiero regresar al hotel",
+    "volver al hotel", "regresar al hotel", "ir al hotel", "al aeropuerto",
+    "estoy perdido", "donde queda", "dónde queda", "donde esta", "dónde está",
+    "que hay cerca", "qué hay cerca", "recomiendame", "recomiéndame", "donde hay",
+    "dónde hay", "pedir un taxi", "pedir taxi", "como pido", "cómo pido",
+)
+
+
+def _descartar_no_planes(planes: list[dict], message: str) -> list[dict]:
+    """Red de seguridad determinística: si el mensaje del usuario es claramente
+    una pregunta de navegación o ayuda inmediata, NO proponemos agendar nada,
+    aunque el LLM lo haya intentado. Pedir indicaciones no es crear un plan."""
+    import unicodedata
+
+    def _norm(s: str) -> str:
+        return unicodedata.normalize("NFKD", (s or "").lower()).encode("ascii", "ignore").decode()
+
+    m = _norm(message)
+    if any(_norm(frase) in m for frase in _INTENCIONES_NAVEGACION):
+        return []
+    # También: si el único "plan" es básicamente ir al hotel, descártalo.
+    filtrados = []
+    for p in planes:
+        titulo = _norm(p.get("titulo", ""))
+        lugar = _norm(p.get("lugar", ""))
+        if "hotel" in titulo and any(v in titulo for v in ("volver", "regresar", "ir al", "vuelta")):
+            continue
+        if "aeropuerto" in titulo and p.get("tipo") == "transporte" and not p.get("hora"):
+            continue
+        filtrados.append(p)
+    return filtrados
