@@ -311,13 +311,18 @@ def score_event(system: str, source: str, payload: str, category: str,
         '"accion": "<botón 1 tap máx 4 palabras o null>"}\n'
         "Criterios: vuelo/seguridad = score alto siempre. Recomendaciones = alto solo si cruzan "
         "con gustos y ubicación. ≥70 push, 40-69 feed, <40 silencio.\n"
-        "REGLA DE HONESTIDAD (CRÍTICA): en 'mensaje' describe el lugar SOLO con lo que dice la "
-        "SEÑAL/descripción curada. NO afirmes que el lugar encaja con un gusto del usuario salvo "
-        "que la descripción lo respalde de verdad. Por ejemplo, NO digas 'perfecto para tu gusto "
-        "de gastronomía local' sobre un restaurante español, italiano o internacional — eso NO es "
-        "comida local. Si el lugar coincide con un gusto, nómbralo con precisión ('cocina española', "
-        "'historia y cultura'); si no coincide claramente con ningún gusto declarado, simplemente "
-        "describe el lugar por lo que es, sin inventar un match. Inventar afinidades destruye la confianza."
+        "REGLA DE HONESTIDAD (CRÍTICA): en 'mensaje' describe el lugar SOLO con lo que dice "
+        "TEXTUALMENTE la SEÑAL/descripción curada. PROHIBIDO mencionar cualquier plato, "
+        "ingrediente o especialidad que NO esté escrito ahí, aunque tu conocimiento general "
+        "sobre ese lugar sugiera que probablemente lo tiene — tu conocimiento general NO es "
+        "fuente válida aquí. Por ejemplo: si la descripción de 'Crepes & Waffles' dice 'crepes "
+        "dulces y salados, ensaladas y helados', NO digas que ahí venden bandeja paisa u otro "
+        "plato típico que no esté en esas palabras, aunque sepas que es una cadena colombiana. "
+        "Tampoco digas 'perfecto para tu gusto de gastronomía local' sobre un restaurante "
+        "español, italiano o internacional — eso NO es comida local. Si el lugar coincide con "
+        "un gusto, nómbralo con precisión ('cocina española', 'historia y cultura'); si no "
+        "coincide claramente, simplemente describe el lugar por lo que es, sin inventar nada. "
+        "Inventar platos o afinidades destruye la confianza."
     )
     out = _parse_json(_call(SCORING_PROVIDER, system, [{"role": "user", "content": prompt}]))
     out["_mode"] = SCORING_PROVIDER

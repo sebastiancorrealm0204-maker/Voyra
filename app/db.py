@@ -299,7 +299,8 @@ def now() -> float:
 # ── Trips ──
 def create_trip(data: dict, user_id: str | None = None) -> str:
     tid = new_id()
-    defaults = {"zona_actual": "En el hotel", "planes": [], "categorias_silenciadas": []}
+    defaults = {"zona_actual": "En el hotel", "planes": [], "categorias_silenciadas": [],
+                "guia_vista": False}
     with conn() as c:
         c.execute("INSERT INTO trips (id, data, created_at, user_id) VALUES (?,?,?,?)",
                   (tid, json.dumps({**defaults, **data}), now(), user_id))

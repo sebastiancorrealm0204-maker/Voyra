@@ -127,6 +127,10 @@ class TripPatchIn(BaseModel):
     vuelo_regreso: str | None = None
     pais: str | None = None
     gustos: list[str] | None = None
+    # True una vez que el usuario vio/cerró la MiniGuia de bienvenida de ESTE
+    # viaje. Por viaje (no por usuario): cada viaje nuevo la muestra una vez,
+    # pero reabrir el mismo viaje —en este dispositivo o en otro— no la repite.
+    guia_vista: bool | None = None
 
 
 class SignalIn(BaseModel):
@@ -681,6 +685,16 @@ def chat(tid: str, c: ChatIn, user: dict = Depends(verified_user)):
         reply = ("Se me trabó la conexión un momento y no alcancé a procesar eso. "
                  "Mándamelo de nuevo y lo retomo al instante.")
     db.insert("messages", {"trip_id": tid, "role": "companion", "content": reply})
+
+    # Red de seguridad: ¿el chat inventó un plato que no está en la descripción
+    # curada del lugar que mencionó? (caso real: "Crepes & Waffles" + "bandeja
+    # paisa"). No bloqueamos la respuesta — solo lo dejamos en logs para poder
+    # ver si el prompt sigue fallando y reforzarlo o ajustar la curación.
+    try:
+        from . import food_guard
+        food_guard.verificar_respuesta(reply, db.places_for_city(trip.get("ciudad", "")))
+    except Exception:
+        pass
 
     # Extracción de planes: SOLO si el router dice que el usuario está agendando.
     # Antes corría en CADA mensaje (una llamada LLM extra siempre). Ahora se salta
