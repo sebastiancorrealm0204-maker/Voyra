@@ -56,13 +56,33 @@ FIELD_MASK = ",".join([
 ])
 
 
+# Configuración por ciudad. Añadir aquí si se incorpora una nueva ciudad.
+# lat/lng: centro del locationBias. radius en metros (cubre el área metropolitana).
+# region_code: ISO 3166-1 alpha-2. pais: string para la query de búsqueda.
+CITY_CONFIG = {
+    "Bogotá": {
+        "lat": 4.6533, "lng": -74.0836, "radius": 25000.0,
+        "region_code": "CO", "pais": "Colombia",
+    },
+    "Guadalajara": {
+        "lat": 20.6736, "lng": -103.3440, "radius": 30000.0,
+        "region_code": "MX", "pais": "México",
+    },
+}
+
+
 def buscar(nombre: str, ciudad: str = "Bogotá", direccion: str = "") -> dict | None:
     """Text Search del lugar. Devuelve el primer resultado o None.
     Reintenta automáticamente si Google devuelve 429 (rate limit)."""
-    if direccion and direccion.lower() not in ("bogotá, colombia", "bogota, colombia"):
+    cfg = CITY_CONFIG.get(ciudad, CITY_CONFIG["Bogotá"])
+    dir_lower = (direccion or "").lower()
+    if direccion and ciudad.lower() in dir_lower:
+        # La dirección ya menciona la ciudad — úsala directamente
         query = f"{nombre}, {direccion}"
+    elif direccion:
+        query = f"{nombre}, {direccion}, {cfg['pais']}"
     else:
-        query = f"{nombre}, {ciudad}, Colombia"
+        query = f"{nombre}, {ciudad}, {cfg['pais']}"
 
     for intento in range(4):  # máximo 4 intentos (1 normal + 3 retry)
         resp = requests.post(
@@ -75,11 +95,11 @@ def buscar(nombre: str, ciudad: str = "Bogotá", direccion: str = "") -> dict | 
             json={
                 "textQuery": query,
                 "languageCode": "es",
-                "regionCode": "CO",
+                "regionCode": cfg["region_code"],
                 "locationBias": {
                     "circle": {
-                        "center": {"latitude": 4.6533, "longitude": -74.0836},
-                        "radius": 25000.0,
+                        "center": {"latitude": cfg["lat"], "longitude": cfg["lng"]},
+                        "radius": cfg["radius"],
                     }
                 },
                 "maxResultCount": 1,
@@ -134,15 +154,27 @@ def main():
         sys.exit(1)
 
     from app import seed_data
-    lugares = seed_data.BOGOTA
+
+    # Elegir la lista correcta según --city
+    city_to_list = {
+        "Bogotá": seed_data.BOGOTA,
+        "Guadalajara": seed_data.GUADALAJARA,
+    }
+    if args.city not in city_to_list:
+        print(f"ERROR: ciudad '{args.city}' no reconocida. Opciones: {list(city_to_list)}")
+        sys.exit(1)
+    lugares = city_to_list[args.city]
+
+    # Archivo de respaldo por ciudad para no mezclar resultados
+    json_file = f"places_enriched_{args.city.lower().replace('á','a')}.json"
 
     # Cargar resultados previos si existen (para no reprocesar lo ya hecho)
     prev = {}
-    if os.path.exists("places_enriched.json"):
+    if os.path.exists(json_file):
         try:
-            with open("places_enriched.json", encoding="utf-8") as f:
+            with open(json_file, encoding="utf-8") as f:
                 prev = json.load(f)
-            print(f"📂 Cargados {len(prev)} resultados previos de places_enriched.json")
+            print(f"📂 Cargados {len(prev)} resultados previos de {json_file}")
         except Exception:
             pass
 
@@ -204,16 +236,16 @@ def main():
         print(f"OK {nombre:<42}{(str(r) if r else '-'):>7}  {info['place_id'][:18]}{flag}")
 
         # Guardar progreso parcial en cada request (por si se vuelve a cortar)
-        with open("places_enriched.json", "w", encoding="utf-8") as f:
+        with open(json_file, "w", encoding="utf-8") as f:
             json.dump(resultados, f, ensure_ascii=False, indent=2)
 
         time.sleep(args.sleep)  # más lento = sin 429
 
-    with open("places_enriched.json", "w", encoding="utf-8") as f:
+    with open(json_file, "w", encoding="utf-8") as f:
         json.dump(resultados, f, ensure_ascii=False, indent=2)
     nuevos = len(resultados) - len(prev)
     print(f"\nEncontrados esta sesión: {nuevos} · Total acumulado: {len(resultados)}/{len(lugares)}")
-    print("Respaldo escrito en places_enriched.json")
+    print(f"Respaldo escrito en {json_file}")
 
     if faltantes:
         print(f"\n✗ NO encontrados ({len(faltantes)}) — revisar nombre/dirección a mano:")
