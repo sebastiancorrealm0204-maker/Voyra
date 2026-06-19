@@ -20,13 +20,8 @@ def _lugares_block(trip: dict) -> str:
     if not places:
         return ""
 
-    # Ordenar por distancia si hay origen conocido
-    origin = None
-    if trip.get("lat_actual") is not None and trip.get("lng_actual") is not None:
-        origin = (trip["lat_actual"], trip["lng_actual"])
-    else:
-        zona = trip.get("zona_actual", "")
-        origin = geo.zone_coords(city, zona)
+    # Ordenar por distancia si hay origen conocido (GPS, hotel geocodificado o zona)
+    origin = geo.resolve_origin(trip)
 
     if origin:
         places = sorted(
@@ -136,7 +131,7 @@ REGLA ANTI-ALUCINACIÓN — CRÍTICA: cuando el usuario pida recomendaciones de 
 REGLA DE DESCRIPCIÓN HONESTA Y ÚTIL — CRÍTICA: cuando recomiendes un lugar, descríbelo usando ÚNICA Y EXCLUSIVAMENTE lo que DICE TEXTUALMENTE su descripción curada (el tipo de cocina, los platos que menciona, su especialidad, su ambiente). PROHIBIDO mencionar cualquier plato, ingrediente, o especialidad que NO esté escrito en esa descripción, aunque tu conocimiento general sobre ese lugar/cadena/cocina sugiera que "probablemente" lo tiene. Tu conocimiento general sobre el mundo NO es una fuente válida aquí — la descripción curada es la ÚNICA fuente de verdad, incluso si crees saber más sobre ese sitio.
 Ejemplo real de este error (NUNCA lo repitas): la descripción curada de "Crepes & Waffles" dice textualmente "crepes dulces y salados, ensaladas y helados". Decir que ahí "se puede pedir bandeja paisa" es INVENTAR — bandeja paisa no aparece en esa descripción, así no exista o no exista ahí. Aunque sepas que es una cadena colombiana muy conocida, eso NO te autoriza a rellenar con platos típicos colombianos que no están escritos. Igual de inválido es llamar "comida local/gastronomía local" a algo cuya descripción diga otra cocina (un restaurante español con paellas es cocina ESPAÑOLA, no local).
 Si recomiendas 2-3 restaurantes, di QUÉ sirve cada uno citando solo lo de su descripción, para que el usuario elija con datos reales. Y NUNCA afirmes que un lugar "es perfecto para tu gusto de X" salvo que la descripción del lugar lo respalde de verdad; si encaja, nómbralo con precisión; si no, describe el lugar bien sin inventar una afinidad. Regla de auto-chequeo antes de responder: cada plato/ingrediente/especialidad que vayas a nombrar debe poder señalarse, palabra por palabra, dentro de la descripción curada de ese lugar. Si no puedes señalarlo ahí, no lo digas.
-EMERGENCIAS Colombia: 123 (único número). Farmacias 24h: Cruz Verde Calle 127 norte. Domicilios Cruz Verde: 486-5000.
+EMERGENCIAS: {city_knowledge.emergency_line(trip['ciudad'])}
 
 CÓMO USAR LA GUÍA LOCAL DE LA CIUDAD: para todo lo que NO sea "qué lugar específico recomiendas" — o sea transporte, cómo moverse, qué zona es qué, seguridad, dinero, propinas, clima, qué llevar, costumbres — apóyate en la "GUÍA LOCAL" de arriba y responde con seguridad y detalle concreto, como un local. Da rangos de precio reales, nombres de apps reales, tiempos realistas. Si la guía no cubre un dato puntual, dilo con honestidad en vez de inventar cifras; nunca te quedes en respuestas vagas tipo "toma un taxi" cuando la guía te da el detalle para ser preciso.
 

@@ -244,9 +244,7 @@ def nearby_recommendations(trip_id: str, limit: int = 3) -> dict:
         return {"city": city, "zona_actual": zona, "candidatos": 0, "resultados": [],
                 "nota": f"Sin lugares curados para '{city}' todavía."}
 
-    origin = (trip["lat_actual"], trip["lng_actual"]) \
-        if trip.get("lat_actual") is not None and trip.get("lng_actual") is not None \
-        else geo.zone_coords(city, zona)
+    origin = geo.resolve_origin(trip)
 
     enriquecidos = []
     for p in places:

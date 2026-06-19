@@ -163,6 +163,40 @@ def zone_coords(city: str, zona: str) -> tuple[float, float] | None:
     return None
 
 
+def resolve_origin(trip: dict) -> tuple[float, float] | None:
+    """Mejor punto de origen del usuario para calcular distancias, en orden de
+    prioridad:
+
+    1. lat_actual/lng_actual — GPS real del celular (vía update_location).
+    2. lat_hotel/lng_hotel — el hotel geocodificado al crear el viaje. Es el
+       fallback clave cuando el usuario NO activó el GPS pero indicó que está
+       "En el hotel" (o cualquier zona sin coordenadas propias): el hotel ya se
+       geocodificó al armar el viaje, así que tenemos un punto real aunque no
+       haya GPS. Sin esto, una ciudad sin ZONE_COORDS (ej. Guadalajara) daba
+       siempre "distancia desconocida".
+    3. geo.zone_coords(ciudad, zona_actual) — centroide de la zona conocida.
+
+    Devuelve None solo si no hay ninguna de las tres fuentes.
+    """
+    if trip.get("lat_actual") is not None and trip.get("lng_actual") is not None:
+        return (trip["lat_actual"], trip["lng_actual"])
+
+    zona = (trip.get("zona_actual") or "").lower()
+    lat_h, lng_h = trip.get("lat_hotel"), trip.get("lng_hotel")
+    # Si la zona conocida tiene coordenadas propias, esas mandan sobre el hotel
+    # (el usuario eligió a mano "Usaquén" estando lejos del hotel → respétalo).
+    coords_zona = zone_coords(trip.get("ciudad", ""), trip.get("zona_actual", ""))
+    en_hotel = ("hotel" in zona) or not coords_zona
+    if en_hotel and lat_h is not None and lng_h is not None:
+        return (lat_h, lng_h)
+    if coords_zona:
+        return coords_zona
+    # Último recurso: si hay hotel geocodificado, úsalo aunque la zona no calce.
+    if lat_h is not None and lng_h is not None:
+        return (lat_h, lng_h)
+    return None
+
+
 def nearest_known_label(city: str, lat: float, lng: float) -> str | None:
     """Reverse-geocode gratis: dado un punto GPS, devuelve el nombre de zona/
     lugar conocido más cercano — para que el Companion hable en términos

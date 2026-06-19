@@ -624,8 +624,8 @@ def nearby_chain(tid: str, q: str, orig_lat: float | None = None,
     olat = orig_lat or trip.get("lat_actual")
     olng = orig_lng or trip.get("lng_actual")
     if olat is None or olng is None:
-        # sin GPS, intenta con coords de la zona conocida
-        coords = geo.zone_coords(trip.get("ciudad", ""), trip.get("zona_actual", ""))
+        # sin GPS, intenta con el hotel geocodificado o la zona conocida
+        coords = geo.resolve_origin(trip)
         if coords:
             olat, olng = coords
     if olat is None or olng is None:
@@ -759,7 +759,7 @@ def chat(tid: str, c: ChatIn, user: dict = Depends(verified_user)):
             olat = trip.get("lat_actual")
             olng = trip.get("lng_actual")
             if olat is None or olng is None:
-                coords = geo.zone_coords(trip.get("ciudad", ""), trip.get("zona_actual", ""))
+                coords = geo.resolve_origin(trip)
                 if coords:
                     olat, olng = coords
             if olat and olng:
