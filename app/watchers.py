@@ -36,8 +36,24 @@ def update_location(trip_id: str, zona: str, disparar_geofence: bool = False,
     patch: dict = {}
 
     if lat is not None and lng is not None:
-        label = geo.nearest_known_label(trip["ciudad"], lat, lng)
-        zona = label or zona
+        # ── Detección "estás en tu hotel" ──────────────────────────────────
+        # Si el trip tiene coordenadas del hotel (geocodificadas al crearlo) y
+        # el GPS dice que el usuario está a ≤150m, la zona pasa a ser el hotel.
+        # 150m: radio conservador que cubre el lobby, la piscina y los accesos
+        # sin activarse cuando el usuario está en el restaurante de enfrente.
+        lat_h = trip.get("lat_hotel")
+        lng_h = trip.get("lng_hotel")
+        nombre_hotel = trip.get("hotel", "").strip()
+        if lat_h and lng_h and nombre_hotel:
+            dist_m = geo.haversine_km(lat, lng, lat_h, lng_h) * 1000
+            if dist_m <= 150:
+                zona = f"En tu hotel — {nombre_hotel}"
+            else:
+                label = geo.nearest_known_label(trip["ciudad"], lat, lng)
+                zona = label or zona
+        else:
+            label = geo.nearest_known_label(trip["ciudad"], lat, lng)
+            zona = label or zona
         patch["lat_actual"] = lat
         patch["lng_actual"] = lng
 

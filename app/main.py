@@ -315,6 +315,31 @@ def put_profile(p: ProfileIn, user: dict = Depends(current_user)):
 
 
 # ── Trips ──
+def _geocodificar_hotel_bg(tid: str, nombre_hotel: str, ciudad: str, pais: str = "") -> None:
+    """Lanza la geocodificación del hotel en un thread daemon para no bloquear
+    la respuesta del onboarding. Cuando Google responde, guarda lat_hotel,
+    lng_hotel y place_id_hotel en el trip. Si falla (sin key, hotel no
+    encontrado, timeout), no hace nada — el trip sigue funcionando sin estos
+    campos, solo pierde la detección 'estás en tu hotel'."""
+    import threading
+
+    def _run():
+        try:
+            coords = places_live.geocodificar_hotel(nombre_hotel, ciudad, pais)
+            if coords and coords.get("lat") and coords.get("lng"):
+                db.update_trip(tid, {
+                    "lat_hotel": coords["lat"],
+                    "lng_hotel": coords["lng"],
+                    "place_id_hotel": coords.get("place_id", ""),
+                    "dir_hotel": coords.get("dir", ""),
+                    "google_name_hotel": coords.get("google_name", ""),
+                })
+        except Exception:
+            pass  # silencioso — el trip sigue funcionando sin coordenadas del hotel
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
 @app.post("/trips")
 def create_trip(t: TripIn, user: dict = Depends(verified_user)):
     if not limits.can_create_trip(user["id"]):
@@ -332,6 +357,13 @@ def create_trip(t: TripIn, user: dict = Depends(verified_user)):
         saludo = ("¡Hola! Soy tu Companion. Sube tus reservas (vuelo, hotel, tours) y armo tu "
                   "viaje contigo. También puedes contarme a dónde vas y cuándo.")
     db.insert("messages", {"trip_id": tid, "role": "companion", "content": saludo})
+
+    # Geocodificar el hotel en background para no demorar la respuesta del
+    # onboarding. Cuando termine, guarda lat_hotel/lng_hotel/place_id_hotel en
+    # el trip — el Companion los usa para detectar si el usuario está en su hotel.
+    if t.hotel.strip() and t.ciudad.strip():
+        _geocodificar_hotel_bg(tid, t.hotel, t.ciudad, t.pais)
+
     return {"trip_id": tid, "greeting": saludo, "trip": db.get_trip(tid)}
 
 
@@ -350,7 +382,11 @@ def patch_trip(tid: str, p: TripPatchIn, user: dict = Depends(current_user)):
     patch = {k: v for k, v in p.model_dump().items() if v is not None}
     if patch:
         db.update_trip(tid, patch)
-    return db.get_trip(tid)
+    # Si se actualizó el hotel o la ciudad, re-geocodificar el hotel en background.
+    trip = db.get_trip(tid)
+    if (p.hotel is not None or p.ciudad is not None) and trip.get("hotel") and trip.get("ciudad"):
+        _geocodificar_hotel_bg(tid, trip["hotel"], trip["ciudad"], trip.get("pais", ""))
+    return trip
 
 
 @app.get("/trips/{tid}")

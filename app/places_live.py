@@ -212,3 +212,57 @@ def _maps_link(dest_lat, dest_lng, place_id, orig_lat, orig_lng) -> str:
     if place_id:
         params["destination_place_id"] = place_id
     return "https://www.google.com/maps/dir/?" + urllib.parse.urlencode(params)
+
+
+def geocodificar_hotel(nombre_hotel: str, ciudad: str, pais: str = "") -> dict | None:
+    """Geocodifica el nombre del hotel contra Google Places API una sola vez
+    al crear/actualizar el trip. Devuelve {lat, lng, place_id, dir} o None.
+
+    Se llama en background (no bloquea el onboarding). Con estos datos, el
+    Companion puede detectar automáticamente cuando el usuario está en su hotel
+    comparando su GPS con las coordenadas devueltas aquí.
+
+    Si no hay API key (modo dev/test), devuelve None sin lanzar excepción.
+    """
+    if not API_KEY or not nombre_hotel.strip():
+        return None
+
+    sufijo_pais = pais or ""
+    query = f"{nombre_hotel}, {ciudad}"
+    if sufijo_pais and sufijo_pais.lower() not in query.lower():
+        query += f", {sufijo_pais}"
+
+    try:
+        resp = httpx.post(
+            SEARCH_URL,
+            headers={
+                "Content-Type": "application/json",
+                "X-Goog-Api-Key": API_KEY,
+                "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location",
+            },
+            json={
+                "textQuery": query,
+                "languageCode": "es",
+                "maxResultCount": 1,
+                # Sin locationBias: el hotel puede estar en cualquier zona de la ciudad
+                # y una restricción geográfica podría descartar el resultado correcto.
+                "includedType": "lodging",
+            },
+            timeout=12,
+        )
+        if resp.status_code != 200:
+            return None
+        places = resp.json().get("places", [])
+        if not places:
+            return None
+        p = places[0]
+        loc = p.get("location", {})
+        return {
+            "lat": round(loc.get("latitude", 0.0), 7),
+            "lng": round(loc.get("longitude", 0.0), 7),
+            "place_id": p.get("id", ""),
+            "dir": p.get("formattedAddress", ""),
+            "google_name": (p.get("displayName") or {}).get("text", ""),
+        }
+    except Exception:
+        return None
