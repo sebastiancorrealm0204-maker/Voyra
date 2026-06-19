@@ -117,6 +117,28 @@ ZONE_COORDS: dict[str, dict[str, tuple[float, float]]] = {
         "playa / malecon": (10.3995, -75.5547),
         "en el hotel": (10.4236, -75.5482),
     },
+    "guadalajara": {
+        "centro": (20.6767, -103.3475),
+        "centro historico": (20.6767, -103.3475),
+        "chapultepec": (20.6736, -103.3680),
+        "colonia americana": (20.6736, -103.3680),
+        "lafayette": (20.6700, -103.3700),
+        "americana": (20.6736, -103.3680),
+        "santa tere": (20.6829, -103.3652),
+        "santa teresita": (20.6829, -103.3652),
+        "zapopan": (20.7211, -103.3917),
+        "andares": (20.7095, -103.4110),
+        "providencia": (20.7000, -103.3850),
+        "tlaquepaque": (20.6400, -103.3120),
+        "tonala": (20.6240, -103.2340),
+        "vallarta": (20.6794, -103.3898),
+        "vallarta norte": (20.6794, -103.3898),
+        "jardines del bosque": (20.6680, -103.3950),
+        "aeropuerto": (20.5218, -103.3112),
+        # Default razonable cuando solo dice "en el hotel" y no se pudo
+        # geocodificar: el centro de la zona turística (Chapultepec/Americana).
+        "en el hotel": (20.6736, -103.3680),
+    },
 }
 
 
@@ -194,7 +216,25 @@ def resolve_origin(trip: dict) -> tuple[float, float] | None:
     # Último recurso: si hay hotel geocodificado, úsalo aunque la zona no calce.
     if lat_h is not None and lng_h is not None:
         return (lat_h, lng_h)
+    # Sin GPS, sin hotel y sin zona mapeada: usa el centroide de los lugares
+    # curados de la ciudad. No es exacto, pero da distancias relativas útiles
+    # entre lugares y evita el feo "distancia desconocida" cuando sí tenemos
+    # curación para la ciudad (ej. una ciudad nueva sin ZONE_COORDS todavía).
+    centro = _city_places_centroid(trip.get("ciudad", ""))
+    if centro:
+        return centro
     return None
+
+
+def _city_places_centroid(city: str) -> tuple[float, float] | None:
+    """Promedio de las coordenadas de los lugares curados de la ciudad.
+    None si la ciudad no tiene curación."""
+    pts = [(p["lat"], p["lng"]) for p in places_for_city(city)
+           if p.get("lat") is not None and p.get("lng") is not None]
+    if not pts:
+        return None
+    return (sum(la for la, _ in pts) / len(pts),
+            sum(ln for _, ln in pts) / len(pts))
 
 
 def nearest_known_label(city: str, lat: float, lng: float) -> str | None:
