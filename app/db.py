@@ -420,9 +420,44 @@ import unicodedata
 
 
 def norm_city(city: str) -> str:
-    """'Bogotá' / 'bogota' / 'BOGOTA' -> 'bogota'. Para que el matching no dependa de tildes/mayúsculas."""
-    s = unicodedata.normalize("NFKD", city).encode("ascii", "ignore").decode()
-    return s.strip().lower()
+    """Normaliza el nombre de ciudad para matching robusto.
+
+    Maneja todos los formatos que puede devolver el LLM al parsear una reserva:
+      - 'Bogotá', 'bogota', 'BOGOTA'         → 'bogota'
+      - 'Guadalajara, México'                 → 'guadalajara'
+      - 'Guadalajara, Jalisco, México'        → 'guadalajara'
+      - 'GDL' (código IATA)                  → 'guadalajara'
+      - 'Ciudad de México' / 'CDMX'          → 'ciudad de mexico'
+    """
+    # Resolver códigos IATA y alias comunes ANTES de normalizar
+    _ALIAS: dict[str, str] = {
+        # México
+        "gdl": "guadalajara", "mex": "ciudad de mexico", "cdmx": "ciudad de mexico",
+        "cun": "cancun", "mty": "monterrey", "pbc": "puebla", "gro": "acapulco",
+        "sjd": "los cabos", "zlo": "manzanillo", "pxm": "puerto escondido",
+        # Colombia
+        "bog": "bogota", "mde": "medellin", "clo": "cali", "ctg": "cartagena",
+        "baq": "barranquilla", "pei": "pereira", "aoh": "armenia",
+        # Argentina
+        "eze": "buenos aires", "bue": "buenos aires",
+        # Perú
+        "lim": "lima",
+        # Chile
+        "scl": "santiago",
+        # Aliases textuales comunes
+        "ciudad de mexico": "ciudad de mexico",
+        "mexico city": "ciudad de mexico",
+        "cdmx": "ciudad de mexico",
+    }
+    raw = city.strip()
+    s = unicodedata.normalize("NFKD", raw).encode("ascii", "ignore").decode().strip().lower()
+    # Si viene con coma ("Guadalajara, México"), quedarse solo con la primera parte
+    if "," in s:
+        s = s.split(",")[0].strip()
+    # Resolver alias/IATA después de quitar el sufijo de país
+    if s in _ALIAS:
+        return _ALIAS[s]
+    return s
 
 
 def norm_place(name: str) -> str:
