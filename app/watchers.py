@@ -220,14 +220,30 @@ def scan_destination(trip_id: str) -> dict:
     # devuelva resultados directamente relevantes al perfil — el LLM de scoring
     # luego los cruza con el contexto completo del viaje. Si no hay gustos
     # declarados, una búsqueda general de "qué hacer" sirve de fallback.
+    # Mantén estas claves EXACTAMENTE iguales a las etiquetas del frontend
+    # (constants.ts → GUSTOS). Si no coincide una clave, cae al fallback genérico
+    # de abajo, así que igual funciona, pero pierde precisión de búsqueda.
     GUSTO_QUERY: dict[str, str] = {
-        "Gastronomía local":   f"{lugar} restaurantes comida local imperdible {rango}",
-        "Vida nocturna":       f"{lugar} bares vida nocturna eventos noche {rango}",
-        "Playas":              f"{lugar} playas actividades acuáticas {rango}",
-        "Historia y cultura":  f"{lugar} museos monumentos historia exposición {rango}",
-        "Café de especialidad":f"{lugar} cafés especialidad café tercera ola {rango}",
-        "Fotografía":          f"{lugar} miradores spots fotográficos {rango}",
-        "Planes tranquilos":   f"{lugar} parques jardines mercados tranquilos {rango}",
+        "Gastronomía local":            f"{lugar} restaurantes comida local típica imperdible {rango}",
+        "Comida callejera":             f"{lugar} comida callejera tacos antojitos mercado {rango}",
+        "Cocina de autor":              f"{lugar} restaurantes alta cocina chef autor {rango}",
+        "Mariscos":                     f"{lugar} mariscos marisquería pescado fresco {rango}",
+        "Opciones veganas/vegetarianas":f"{lugar} restaurantes veganos vegetarianos {rango}",
+        "Café de especialidad":         f"{lugar} cafés especialidad café tercera ola {rango}",
+        "Mezcal y tequila":             f"{lugar} mezcalería bar tequila cata destilados {rango}",
+        "Vida nocturna":                f"{lugar} bares vida nocturna eventos noche {rango}",
+        "Música en vivo":               f"{lugar} música en vivo conciertos mariachi shows {rango}",
+        "Historia y cultura":           f"{lugar} museos monumentos historia exposición {rango}",
+        "Arte y diseño":                f"{lugar} arte galerías murales diseño {rango}",
+        "Mercados y artesanías":        f"{lugar} mercados artesanías tianguis local {rango}",
+        "Naturaleza y aire libre":      f"{lugar} parques naturaleza senderismo aire libre {rango}",
+        "Fotografía":                   f"{lugar} miradores spots fotográficos {rango}",
+        "Planes tranquilos":           f"{lugar} parques jardines planes tranquilos {rango}",
+        "Bienestar y relax":            f"{lugar} spa bienestar relax termales {rango}",
+        "Compras":                      f"{lugar} compras tiendas centros comerciales {rango}",
+        "En familia / con niños":       f"{lugar} actividades familia niños qué hacer {rango}",
+        "Aventura":                     f"{lugar} aventura actividades al aire libre tours {rango}",
+        "Playas":                       f"{lugar} playas actividades acuáticas {rango}",
     }
     gustos = trip.get("gustos") or []
     gustos_a_buscar = gustos[:3] if gustos else []  # máx 3 búsquedas de cuota
