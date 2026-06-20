@@ -15,7 +15,7 @@ local. Así, aunque el tick corra varias veces dentro de la ventana, no repite.
 import traceback
 from datetime import date, datetime, timedelta
 
-from . import db, geo, timeutil, watchers
+from . import db, geo, search, timeutil, watchers
 
 MATUTINO  = (8.0, 10.0)
 NOCTURNO  = (20.0, 22.0)
@@ -153,6 +153,13 @@ def tick() -> dict:
             if _en_ventana(h, MATUTINO):
                 _disparar(tid, "matutino", ld,
                           lambda t: disparos.append(("matutino", t, watchers.check_in_matutino(t))))
+                # Destination Scanner (Tavily): una pasada diaria por viaje en la
+                # ventana matutina. Solo corre si Tavily está configurado (en mock
+                # devuelve lista vacía, así que no gasta ni ensucia). El dedup por
+                # fecha local evita que se repita aunque el tick corra varias veces.
+                if search.MODE == "real":
+                    _disparar(tid, "scan", ld,
+                              lambda t: disparos.append(("scan", t, watchers.scan_destination(t))))
 
             if _en_ventana(h, NOCTURNO):
                 _disparar(tid, "nocturno", ld,

@@ -185,22 +185,66 @@ def scan_destination(trip_id: str) -> dict:
     """
     trip = db.get_trip(trip_id)
     ciudad = trip["ciudad"]
+    from . import city_knowledge, timeutil
+    from datetime import datetime
 
+    pais  = city_knowledge.country_for_city(ciudad)
+    lugar = f"{ciudad} {pais}".strip()
+
+    # Fechas del viaje en español para las queries.
+    try:
+        inicio = datetime.strptime(trip["inicio"], "%Y-%m-%d")
+        fin    = datetime.strptime(trip["fin"],    "%Y-%m-%d")
+        meses  = ["enero","febrero","marzo","abril","mayo","junio",
+                  "julio","agosto","septiembre","octubre","noviembre","diciembre"]
+        rango  = (f"{inicio.day} al {fin.day} de {meses[fin.month-1]} {fin.year}"
+                  if inicio.month == fin.month
+                  else f"{inicio.day} de {meses[inicio.month-1]} al "
+                       f"{fin.day} de {meses[fin.month-1]} {fin.year}")
+    except Exception:
+        rango = "2026"
+
+    # ── Búsqueda 1: Seguridad / alertas operativas (siempre, 1 búsqueda) ──
     noticias = search.search(
-        f"{ciudad} Colombia noticias hoy manifestación cierre vial clima",
+        f"{lugar} manifestación cierre vial huelga alerta seguridad turista",
         max_results=3, topic="news",
     )
-    recomendaciones = search.search(
-        f"{ciudad} eventos restaurantes recomendados blog 2026",
-        max_results=3, topic="general",
-    )
+
+    # ── Búsquedas 2-N: Una por gusto del usuario (máx 3 para no quemar cuota) ──
+    # Cada gusto se traduce a términos de búsqueda concretos para que Tavily
+    # devuelva resultados directamente relevantes al perfil — el LLM de scoring
+    # luego los cruza con el contexto completo del viaje. Si no hay gustos
+    # declarados, una búsqueda general de "qué hacer" sirve de fallback.
+    GUSTO_QUERY: dict[str, str] = {
+        "Gastronomía local":   f"{lugar} restaurantes comida local imperdible {rango}",
+        "Vida nocturna":       f"{lugar} bares vida nocturna eventos noche {rango}",
+        "Playas":              f"{lugar} playas actividades acuáticas {rango}",
+        "Historia y cultura":  f"{lugar} museos monumentos historia exposición {rango}",
+        "Café de especialidad":f"{lugar} cafés especialidad café tercera ola {rango}",
+        "Fotografía":          f"{lugar} miradores spots fotográficos {rango}",
+        "Planes tranquilos":   f"{lugar} parques jardines mercados tranquilos {rango}",
+    }
+    gustos = trip.get("gustos") or []
+    gustos_a_buscar = gustos[:3] if gustos else []  # máx 3 búsquedas de cuota
+
+    recomendaciones: list[dict] = []
+    if gustos_a_buscar:
+        for gusto in gustos_a_buscar:
+            query = GUSTO_QUERY.get(gusto, f"{lugar} {gusto.lower()} {rango}")
+            recomendaciones += search.search(query, max_results=2, topic="general")
+    else:
+        # Sin gustos: fallback genérico de qué hacer en las fechas del viaje.
+        recomendaciones = search.search(
+            f"{lugar} qué hacer eventos festivales {rango}",
+            max_results=3, topic="general",
+        )
 
     resultados = []
     for item in noticias:
         if not item["content"]:
             continue
         payload = f"{item['title']}: {item['content'][:400]}"
-        r = engine.ingest(trip_id, source=f"News watcher (Google News) — {item['url']}",
+        r = engine.ingest(trip_id, source=f"News watcher — {item['url']}",
                           category="seguridad", operational=False, payload=payload)
         resultados.append({"tipo": "noticia", "fuente": item["url"], **r})
 
@@ -208,7 +252,7 @@ def scan_destination(trip_id: str) -> dict:
         if not item["content"]:
             continue
         payload = f"{item['title']}: {item['content'][:400]}"
-        r = engine.ingest(trip_id, source=f"Destination Scanner (blogs) — {item['url']}",
+        r = engine.ingest(trip_id, source=f"Destination Scanner — {item['url']}",
                           category="recomendacion", operational=False, payload=payload)
         resultados.append({"tipo": "recomendacion", "fuente": item["url"], **r})
 

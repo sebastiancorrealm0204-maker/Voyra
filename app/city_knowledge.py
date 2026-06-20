@@ -351,3 +351,27 @@ def emergency_line(city: str) -> str:
         "usuario (no inventes uno). Si no lo conoces con certeza, dile que lo "
         "confirme con su hotel o recepción."
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# País del DESTINO por ciudad — NO confundir con trip["pais"], que es la
+# nacionalidad/origen del usuario (para emergencias y consulado). Esto es para
+# armar bien las búsquedas del Destination Scanner (Tavily): "Guadalajara
+# México noticias", no "Guadalajara Colombia".
+# ─────────────────────────────────────────────────────────────────────────────
+CITY_COUNTRY: dict[str, str] = {
+    "bogota": "Colombia",
+    "cartagena": "Colombia",
+    "medellin": "Colombia",
+    "cali": "Colombia",
+    "guadalajara": "México",
+    "ciudad de mexico": "México",
+    "cancun": "México",
+    "monterrey": "México",
+}
+
+
+def country_for_city(city: str) -> str:
+    """País del DESTINO (no del usuario). Cadena vacía si no se conoce — en ese
+    caso el scanner usa solo el nombre de la ciudad."""
+    return CITY_COUNTRY.get(norm_city(city), "")
