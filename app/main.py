@@ -686,6 +686,25 @@ def diagnostico():
 
 
 # ── Chat ──
+@app.get("/trips/{tid}/messages")
+def get_messages(tid: str, user: dict = Depends(current_user)):
+    """Historial del chat para este viaje, en orden cronológico.
+
+    El frontend lo llama al abrir el chat para restaurar la conversación: el
+    backend ya persistía cada mensaje en la tabla `messages`, pero no había
+    forma de leerlos de vuelta, así que el chat se veía vacío al reabrir.
+    Los mensajes-tap (que empiezan con '[') son señales internas de UI/sistema,
+    no conversación real, así que los ocultamos del historial visible.
+    """
+    own_trip(tid, user)
+    msgs = [
+        {"role": m["role"], "content": m["content"], "ts": m.get("created_at")}
+        for m in db.rows("messages", tid)
+        if not (m["role"] == "user" and m["content"].strip().startswith("["))
+    ]
+    return {"messages": msgs}
+
+
 @app.post("/trips/{tid}/chat")
 def chat(tid: str, c: ChatIn, user: dict = Depends(verified_user)):
     trip = own_trip(tid, user)

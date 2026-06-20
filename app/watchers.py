@@ -110,7 +110,7 @@ def check_in(trip_id: str) -> dict:
     )})
     texto = llm.chat(context.build(trip), history)
     db.insert("messages", {"trip_id": trip_id, "role": "companion", "content": texto})
-    _push_checkin(trip_id, "Tu Companion 🌙", texto)
+    _push_checkin(trip_id, "Prepara mañana 🌙", texto)
     return {"message": texto}
 
 
@@ -127,17 +127,22 @@ def check_in_matutino(trip_id: str) -> dict:
     )})
     texto = llm.chat(context.build(trip), history)
     db.insert("messages", {"trip_id": trip_id, "role": "companion", "content": texto})
-    _push_checkin(trip_id, "Tu Companion ☀️", texto)
+    _push_checkin(trip_id, "Revisa tu día ☀️", texto)
     return {"message": texto}
 
 
 def _push_checkin(trip_id: str, title: str, texto: str) -> None:
-    """Manda el check-in al celular como push (si hay VAPID). Recorta el cuerpo
-    para que quepa bien en la notificación. Nunca rompe el flujo."""
+    """Manda el check-in al celular como push (si hay VAPID). El cuerpo va corto
+    a propósito: la notificación es solo el 'gancho' para abrir la app, donde el
+    mensaje completo ya quedó guardado en el chat. Nunca rompe el flujo."""
     try:
         from . import push
-        cuerpo = texto if len(texto) <= 140 else texto[:137].rstrip() + "…"
-        push.send_to_trip(trip_id, title, cuerpo, data={"kind": "checkin"})
+        # Cuerpo breve para la notificación (1 línea). El texto completo vive en
+        # el chat (tabla messages), que la app carga al abrirse.
+        cuerpo = texto if len(texto) <= 90 else texto[:87].rstrip() + "…"
+        # data.kind="checkin" + open_chat le dice al service worker / la app que
+        # al tocar debe abrir directamente la conversación.
+        push.send_to_trip(trip_id, title, cuerpo, data={"kind": "checkin", "open": "chat"})
     except Exception:
         pass
 
