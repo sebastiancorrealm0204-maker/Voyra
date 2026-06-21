@@ -37,7 +37,7 @@ def _lugares_block(trip: dict) -> str:
         if origin:
             km = geo.haversine_km(origin[0], origin[1], p["lat"], p["lng"])
             dist = f" (~{km:.1f} km)"
-        lineas.append(f"- {p['name']} [{p['category']}]{dist} · {p['zona']} · {p['descripcion']}")
+        lineas.append(f"- {p['name']} [{p['category']}]{dist} · {p['zona']} · {p['descripcion']}" + (f" · GUSTOS: {', '.join(p['tags'])}" if p.get("tags") else ""))
 
     bloque = (
         "\nLUGARES CURADOS DE VOYRA PARA " + city.upper() + " "
@@ -91,6 +91,19 @@ def _gustos_block(trip: dict) -> str:
             "• Si en la conversación el usuario revela un gusto o disgusto nuevo (p.ej. 'odio los "
             "lugares ruidosos', 'amo los mariscos'), tómalo en cuenta de inmediato para el resto del "
             "viaje, aunque no estuviera en la lista.\n"
+            "• CRUCE FINO GUSTO↔LUGAR: cada lugar curado trae una etiqueta 'GUSTOS: …' que lista "
+            "exactamente con qué gustos calza (usan los mismos nombres que el perfil del viajero). Esa "
+            "etiqueta es tu señal PRIMARIA de match: si un gusto del usuario aparece en los GUSTOS de un "
+            "lugar, ese lugar es una recomendación directa para él, priorízalo y dilo ('como te gusta "
+            "X, este sitio te encaja'). Si un lugar no tiene la etiqueta o el gusto no aparece, puedes "
+            "apoyarte en su descripción, pero NUNCA inventes una afinidad que ni la etiqueta ni la "
+            "descripción respaldan.\n"
+            "• GUSTOS EN TENSIÓN: si el usuario marcó gustos que pueden chocar (p.ej. 'Planes "
+            "tranquilos' + 'Vida nocturna', o 'Lujo y premium' + 'Económico / mochilero'), NO promedies "
+            "ni ignores uno: ofrécele ambas vías según el momento del día o el ánimo ('para el día algo "
+            "tranquilo como X; si quieres salir de noche, Y'), y si hace falta, pregunta cuál aplica ahora.\n"
+            "• Cuando el usuario tenga VARIOS gustos, no satures: arma la recomendación combinando 2–3 "
+            "que encajen con el momento (hora, zona, clima, itinerario) en vez de listar uno por cada gusto.\n"
         )
     # Sin gustos declarados: el Companion debe APRENDERLOS, no operar a ciegas.
     return (

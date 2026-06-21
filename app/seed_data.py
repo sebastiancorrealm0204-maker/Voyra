@@ -30,6 +30,38 @@ diccionarios aquí (y re-sembrar: rm voyra.db).
 """
 from . import geo
 
+# ════════════════════════════════════════════════════════════════════════════
+# VOCABULARIO CONTROLADO DE TAGS
+# ════════════════════════════════════════════════════════════════════════════
+# Cada lugar puede llevar `"tags": [...]` con valores SOLO de este conjunto.
+# Mapean 1:1 con los GUSTOS del onboarding (frontend constants.ts → GUSTOS), de
+# modo que el cruce gusto↔lugar sea inequívoco y barato: el Companion compara el
+# gusto declarado contra los tags del lugar SIN tener que interpretar la prosa.
+# Si agregas un gusto en el frontend, agrégalo aquí y a watchers.GUSTO_QUERY.
+#
+# El string del tag es idéntico al string del gusto (mismo texto exacto). Un
+# lugar puede tener varios tags. Mantener esta lista sincronizada es lo que hace
+# fiable la personalización.
+TAG_VOCAB: set[str] = {
+    # Comer y beber
+    "Gastronomía local", "Comida callejera", "Cocina de autor", "Mariscos",
+    "Tacos y antojitos", "Dulces y repostería", "Opciones veganas/vegetarianas",
+    "Café de especialidad", "Mezcal y tequila", "Cervecerías y vino",
+    "Brunch y desayunos",
+    # Salir
+    "Vida nocturna", "Bares de coctelería", "Antros y baile", "Música en vivo",
+    "Eventos deportivos",
+    # Cultura
+    "Historia y cultura", "Museos y galerías", "Arte y diseño", "Arquitectura",
+    "Cine y teatro", "Mercados y artesanías",
+    # Aire libre y bienestar
+    "Naturaleza y aire libre", "Senderismo", "Aventura", "Playas",
+    "Bienestar y relax", "Aguas termales",
+    # Estilo de viaje
+    "Fotografía", "Planes tranquilos", "Compras", "En familia / con niños",
+    "Pet-friendly", "Joyas escondidas", "Lujo y premium", "Económico / mochilero",
+}
+
 BOGOTA = [
     # ════════════ ALTA COCINA — rankings internacionales ════════════
     {
@@ -1782,6 +1814,7 @@ GUADALAJARA = [
         "lat": 20.6794, "lng": -103.3898,
         "descripcion": "Estrella Michelin 2026. Del chef Francisco 'Paco' Ruano (formado en Mugaritz, El Celler de Can Roca y Noma): 'cocina franca', reinterpretación moderna y honesta de los sabores tradicionales de Jalisco con ingredientes de temporada. Menú degustación y a la carta. Reservar indispensable.",
         "confianza": "muy_alta",
+        "tags": ["Cocina de autor", "Gastronomía local", "Historia y cultura", "Lujo y premium"],
     },
     {
         "city_display": "Guadalajara", "name": "Xokol", "category": "restaurante", "zona": "Santa Teresita / Santa Tere",
@@ -1790,6 +1823,7 @@ GUADALAJARA = [
         "lat": 20.6829, "lng": -103.3652,
         "descripcion": "Estrella Michelin + Estrella Verde 2026 (sostenibilidad). De los chefs Óscar Segundo y Xrysw Ruelas: cocina mexicana ancestral con el maíz nixtamalizado como protagonista, técnicas prehispánicas y fermentados de la casa. Mesa comunal, horno de leña y comal. Menú degustación o a la carta. Reservar.",
         "confianza": "muy_alta",
+        "tags": ["Cocina de autor", "Gastronomía local", "Lujo y premium"],
     },
     {
         "city_display": "Guadalajara", "name": "Lula Bistro", "category": "restaurante", "zona": "Jardines del Bosque",
@@ -1798,6 +1832,7 @@ GUADALAJARA = [
         "lat": 20.7085, "lng": -103.4180,
         "descripcion": "Alta cocina de autor con influencias mexicanas y francesas, uno de los restaurantes más renombrados de la ciudad. Menús degustación de 8 y 12 tiempos con platos de presentación artística (lechón con mole de naranja, pulpo, postres como key lime pie). Reservar.",
         "confianza": "muy_alta",
+        "tags": ["Cocina de autor", "Dulces y repostería", "Gastronomía local", "Naturaleza y aire libre", "Planes tranquilos"],
     },
     # ════════════ COCINA MEXICANA CONTEMPORÁNEA / DE AUTOR ════════════
     {
@@ -1807,6 +1842,7 @@ GUADALAJARA = [
         "lat": 20.6788, "lng": -103.3870,
         "descripcion": "Cocina mexicana en entorno elegante sobre la Av. México, con extensa carta de tequilas. Platillos mexicanos tradicionales bien ejecutados y ambiente sofisticado; buena puerta de entrada a la cocina del país para visitantes.",
         "confianza": "alta",
+        "tags": ["Gastronomía local", "Historia y cultura", "Mezcal y tequila"],
     },
     {
         "city_display": "Guadalajara", "name": "Pímu", "category": "restaurante", "zona": "Colonia Americana",
@@ -1815,6 +1851,7 @@ GUADALAJARA = [
         "lat": 20.6736, "lng": -103.3680,
         "descripcion": "Cocina mexicana de autor del chef Antonio Miranda en espacio íntimo de 26 comensales en la Colonia Americana. Recetas tradicionales reinterpretadas con ingredientes endémicos y de temporada. Su recomendación es el omakase (menú de 5 tiempos) con coctelería y destilados mexicanos. Reservar.",
         "confianza": "alta",
+        "tags": ["Bares de coctelería", "Cocina de autor", "Gastronomía local", "Historia y cultura", "Mezcal y tequila"],
     },
     {
         "city_display": "Guadalajara", "name": "Hueso", "category": "restaurante", "zona": "Lafayette / Colonia Americana",
@@ -1823,6 +1860,7 @@ GUADALAJARA = [
         "lat": 20.6680, "lng": -103.3780,
         "descripcion": "Restaurante de autor del chef Alfonso Cadena en un edificio cubierto de huesos blancos, uno de los interiores más fotograﬁados de la ciudad. Cocina de mercado con menú que cambia a diario; filosofía de aprovechamiento total del producto. Diseño espectacular y propuesta arriesgada. Reservar.",
         "confianza": "alta",
+        "tags": ["Arte y diseño", "Cine y teatro", "Cocina de autor", "Gastronomía local"],
     },
     # ════════════ COCINA TAPATÍA TRADICIONAL ════════════
     {
@@ -1832,6 +1870,7 @@ GUADALAJARA = [
         "lat": 20.6845, "lng": -103.3637,
         "descripcion": "Templo de la 'carne en su jugo', platillo inventado en Guadalajara: tiras de res guisadas en su jugo con tocino, frijoles de la olla y cilantro, servidas con tortillas, cebolla y limón. Tiene récord Guinness por el servicio más rápido del mundo (órdenes en menos de 13 segundos). Institución tapatía imperdible.",
         "confianza": "muy_alta",
+        "tags": ["Gastronomía local"],
     },
     {
         "city_display": "Guadalajara", "name": "Tortas Toño", "category": "restaurante", "zona": "Chapalita / varias sedes",
@@ -1840,6 +1879,7 @@ GUADALAJARA = [
         "lat": 20.6537, "lng": -103.4017,
         "descripcion": "La cadena de torta ahogada más conocida de Guadalajara. La torta ahogada es el platillo insignia tapatío: birote salado relleno de carnitas, bañado en salsa de jitomate y chile de árbol bien picante. Calidad consistente, salsa que sí pica (no ajustada para turistas). El punto de entrada más confiable.",
         "confianza": "alta",
+        "tags": ["Gastronomía local"],
     },
     {
         "city_display": "Guadalajara", "name": "La Chata", "category": "restaurante", "zona": "Centro Histórico",
@@ -1848,6 +1888,7 @@ GUADALAJARA = [
         "lat": 20.6745, "lng": -103.3470,
         "descripcion": "Cocina tradicional jalisciense en el Centro Histórico desde hace décadas: tortas ahogadas, pozole, birria y platillos típicos de la región en ambiente casero. Clásico para comer comida tapatía de toda la vida cerca de la Catedral.",
         "confianza": "alta",
+        "tags": ["Gastronomía local", "Historia y cultura", "Tacos y antojitos"],
     },
     {
         "city_display": "Guadalajara", "name": "Birriería Las Nueve Esquinas", "category": "restaurante", "zona": "Las Nueve Esquinas / Centro",
@@ -1856,6 +1897,7 @@ GUADALAJARA = [
         "lat": 20.6700, "lng": -103.3490,
         "descripcion": "Barrio histórico dedicado a la birria, el guiso jalisciense de carne (clásicamente de chivo) cocida lentamente en adobo de chiles, servida en caldo o en tacos con consomé. Varias birrierías de larga tradición concentradas en esta zona pintoresca del Centro.",
         "confianza": "alta",
+        "tags": ["Gastronomía local", "Historia y cultura", "Tacos y antojitos"],
     },
     # ════════════ MARISCOS ════════════
     {
@@ -1865,6 +1907,7 @@ GUADALAJARA = [
         "lat": 20.7012, "lng": -103.3905,
         "descripcion": "Oyster bar y grill del chef Tomás Bermúdez (desde 2012), reconocido en los 50 Best de Latinoamérica. Ostras frescas del Pacífico, almejas chocolatas, aguachile tatemado y pescado a la brasa con guiño a la cocina cajún. Ambiente vibrante e informal. También en Plaza Andares (Zapopan).",
         "confianza": "muy_alta",
+        "tags": ["Cocina de autor", "Compras", "Gastronomía local", "Lujo y premium", "Mariscos"],
     },
     {
         "city_display": "Guadalajara", "name": "Campomar", "category": "restaurante", "zona": "Providencia / varias sedes",
@@ -1873,6 +1916,7 @@ GUADALAJARA = [
         "lat": 20.7030, "lng": -103.3960,
         "descripcion": "Mariscos de sazón nayarita en ambiente moderno: pescado zarandeado con especias secretas (su clásico), camarones, tostadas y tacos de mar, con su famoso pan brioche. Muy concurrido — suele haber fila. Cocina costera del Pacífico bien ejecutada. Varias sedes en la ciudad.",
         "confianza": "alta",
+        "tags": ["Gastronomía local", "Mariscos", "Tacos y antojitos"],
     },
     # ════════════ COCINA JAPONESA DESTACADA ════════════
     {
@@ -1882,6 +1926,7 @@ GUADALAJARA = [
         "lat": 20.6760, "lng": -103.3900,
         "descripcion": "Restaurante japonés del chef Daisuke Maeda: barra de 10 asientos donde el chef prepara cada bocado a la vista. Carta en la comida, omakase (elección del chef) en la cena con dos turnos. Producto muy fresco. Una de las mejores experiencias japonesas de la ciudad. Reservar.",
         "confianza": "alta",
+        "tags": ["Cocina de autor", "Gastronomía local"],
     },
     {
         "city_display": "Guadalajara", "name": "Bombona", "category": "restaurante", "zona": "Providencia",
@@ -1890,6 +1935,7 @@ GUADALAJARA = [
         "lat": 20.7050, "lng": -103.3870,
         "descripcion": "Cocina japonesa en ambiente elegante: menú omakase, barra de sushi, teppanyaki (plancha a la vista) y mixología. Producto de alto nivel; una vez al mes hacen el ronqueo de atún con reservación. Para una cena japonesa especial.",
         "confianza": "media",
+        "tags": ["Bares de coctelería", "Gastronomía local"],
     },
     {
         "city_display": "Guadalajara", "name": "Geisha Gitana", "category": "restaurante", "zona": "Providencia",
@@ -1898,6 +1944,7 @@ GUADALAJARA = [
         "lat": 20.7040, "lng": -103.3900,
         "descripcion": "Cocina japonesa contemporánea en Providencia, popular para cenas y ocasiones especiales. Sushi y platos japoneses con buena coctelería en ambiente animado.",
         "confianza": "media",
+        "tags": ["Bares de coctelería", "Gastronomía local"],
     },
     # ════════════ BIB GOURMAND MICHELIN ════════════
     {
@@ -1907,6 +1954,7 @@ GUADALAJARA = [
         "lat": 20.6688, "lng": -103.3712,
         "descripcion": "Bib Gourmand Michelin 2026. Café-restaurante relajado en la Colonia Americana con cocina de día, brunch y coctelería, además de café de especialidad. Patio con vegetación y terraza; conocido por su ambiente y su comida (tortillas de maíz azul, plato de chorizo). Ideal para desayunar o brunch.",
         "confianza": "alta",
+        "tags": ["Bares de coctelería", "Brunch y desayunos", "Café de especialidad", "Planes tranquilos"],
     },
     {
         "city_display": "Guadalajara", "name": "Icú", "category": "restaurante", "zona": "Colonia Americana",
@@ -1915,6 +1963,7 @@ GUADALAJARA = [
         "lat": 20.6720, "lng": -103.3690,
         "descripcion": "Bib Gourmand Michelin 2026 — comida de excelente calidad a precio moderado. Cocina contemporánea en la Colonia Americana. Buena relación calidad-precio para comer bien sin gastar de más.",
         "confianza": "alta",
+        "tags": ["Gastronomía local"],
     },
     {
         "city_display": "Guadalajara", "name": "Tacos y Gorditas Elvira", "category": "restaurante", "zona": "Guadalajara",
@@ -1923,6 +1972,7 @@ GUADALAJARA = [
         "lat": 20.6760, "lng": -103.3500,
         "descripcion": "Bib Gourmand Michelin 2026. Puesto de tacos y gorditas reconocido por la guía por su calidad a precio accesible. Comida callejera tapatía auténtica.",
         "confianza": "alta",
+        "tags": ["Comida callejera", "Económico / mochilero", "Gastronomía local", "Tacos y antojitos"],
     },
     # ════════════ CAFÉS DE ESPECIALIDAD ════════════
     {
@@ -1932,6 +1982,7 @@ GUADALAJARA = [
         "lat": 20.6695, "lng": -103.3705,
         "descripcion": "Puesto #96 en The World's 100 Best Coffee Shops 2026 — la cafetería mejor posicionada de Guadalajara en el ranking, por segundo año consecutivo. Tostado propio (Café Colonias), espresso y métodos de filtrado, más brunch popular los fines de semana (el sándwich de tocino y cuatro quesos es famoso). En el corazón de la Americana.",
         "confianza": "muy_alta",
+        "tags": ["Brunch y desayunos", "Café de especialidad"],
     },
     {
         "city_display": "Guadalajara", "name": "Taller de Espresso", "category": "cafe", "zona": "Colonia Americana",
@@ -1940,6 +1991,7 @@ GUADALAJARA = [
         "lat": 20.6705, "lng": -103.3760,
         "descripcion": "Microtostador y café de especialidad fundado por baristas, con tueste propio de varios orígenes (muchos mexicanos) que rotan cada pocas semanas. Métodos de filtrado y espresso preparados con cuidado; baristas muy conocedores y pequeña terraza en la banqueta.",
         "confianza": "alta",
+        "tags": ["Brunch y desayunos", "Café de especialidad"],
     },
     {
         "city_display": "Guadalajara", "name": "Café Estudio", "category": "cafe", "zona": "Lafayette / Colonia Americana",
@@ -1948,6 +2000,7 @@ GUADALAJARA = [
         "lat": 20.6680, "lng": -103.3740,
         "descripcion": "Café de especialidad de referencia en la zona Lafayette/Americana, apreciado por la calidad de su preparación y su ambiente para trabajar o conversar.",
         "confianza": "media",
+        "tags": ["Brunch y desayunos", "Café de especialidad"],
     },
     # ════════════ ATRACCIONES — Centro Histórico y cultura ════════════
     {
@@ -1957,6 +2010,7 @@ GUADALAJARA = [
         "lat": 20.6766, "lng": -103.3370,
         "descripcion": "Patrimonio de la Humanidad UNESCO (1997) y joya del neoclásico. Antiguo hospicio del siglo XIX hoy convertido en centro cultural; alberga los murales más importantes de José Clemente Orozco, incluido 'El Hombre de Fuego' en la cúpula de la capilla. Entrada general ~$120 MXN, martes a domingo. Imperdible.",
         "confianza": "muy_alta",
+        "tags": ["Arquitectura", "Arte y diseño", "Historia y cultura", "Joyas escondidas"],
     },
     {
         "city_display": "Guadalajara", "name": "Catedral de Guadalajara", "category": "atraccion", "zona": "Centro Histórico",
@@ -1965,6 +2019,7 @@ GUADALAJARA = [
         "lat": 20.6772, "lng": -103.3496,
         "descripcion": "El símbolo de la ciudad: catedral del siglo XVI-XVII con dos torres neogóticas gemelas, rodeada por cuatro plazas (Plaza de Armas, Rotonda, Plaza Guadalajara, Plaza de la Liberación). Centro neurálgico del Centro Histórico y punto de partida para recorrer las principales atracciones a pie.",
         "confianza": "muy_alta",
+        "tags": ["Arquitectura", "Historia y cultura"],
     },
     {
         "city_display": "Guadalajara", "name": "Teatro Degollado", "category": "atraccion", "zona": "Centro Histórico",
@@ -1973,6 +2028,7 @@ GUADALAJARA = [
         "lat": 20.6766, "lng": -103.3464,
         "descripcion": "Teatro neoclásico del siglo XIX, sede de la Orquesta Filarmónica de Jalisco y del Ballet Folclórico de la Universidad de Guadalajara. Fachada con frontón escultórico y techo interior con escenas de la Divina Comedia. Vale verlo por fuera; si hay función, una experiencia cultural de primera.",
         "confianza": "alta",
+        "tags": ["Cine y teatro", "Historia y cultura"],
     },
     {
         "city_display": "Guadalajara", "name": "Mercado San Juan de Dios (Mercado Libertad)", "category": "mercado", "zona": "Centro Histórico",
@@ -1981,6 +2037,7 @@ GUADALAJARA = [
         "lat": 20.6759, "lng": -103.3382,
         "descripcion": "El mercado techado más grande de América Latina, en tres niveles junto a la Plaza Tapatía. Artesanías y ropa arriba; en la planta de comida se prueban platillos tapatíos económicos (carne en su jugo, birria, tortas ahogadas) por poco dinero. Abre todos los días. Inmersión total en la vida local.",
         "confianza": "muy_alta",
+        "tags": ["Económico / mochilero", "Mercados y artesanías", "Tacos y antojitos"],
     },
     {
         "city_display": "Guadalajara", "name": "Plaza Tapatía", "category": "atraccion", "zona": "Centro Histórico",
@@ -1989,6 +2046,7 @@ GUADALAJARA = [
         "lat": 20.6770, "lng": -103.3420,
         "descripcion": "Gran explanada peatonal que conecta el Teatro Degollado con el Hospicio Cabañas, con la fuente de la Inmolación de Quetzalcóatl. Eje para caminar el Centro Histórico enlazando sus principales monumentos.",
         "confianza": "alta",
+        "tags": ["Cine y teatro", "Historia y cultura"],
     },
     {
         "city_display": "Guadalajara", "name": "Palacio de Gobierno de Jalisco", "category": "atraccion", "zona": "Centro Histórico",
@@ -1997,6 +2055,7 @@ GUADALAJARA = [
         "lat": 20.6764, "lng": -103.3478,
         "descripcion": "Palacio barroco frente a la Plaza de Armas. En su escalera principal está uno de los murales más imponentes de Orozco, con Miguel Hidalgo como figura central. Entrada gratuita; rápido de visitar y a pasos de la Catedral.",
         "confianza": "alta",
+        "tags": ["Arte y diseño", "Económico / mochilero", "Historia y cultura"],
     },
     {
         "city_display": "Guadalajara", "name": "Basílica de Zapopan", "category": "atraccion", "zona": "Zapopan Centro",
@@ -2005,6 +2064,7 @@ GUADALAJARA = [
         "lat": 20.7204, "lng": -103.3897,
         "descripcion": "Santuario del siglo XVIII en el centro de Zapopan, hogar de la venerada Virgen de Zapopan. Sitio religioso e icono de identidad jalisciense; el andador que lo rodea tiene restaurantes y vida de pueblo dentro de la metrópoli.",
         "confianza": "media",
+        "tags": ["Historia y cultura"],
     },
     # ════════════ BARRIOS Y EXPERIENCIAS DE ZONA ════════════
     {
@@ -2014,6 +2074,7 @@ GUADALAJARA = [
         "lat": 20.6409, "lng": -103.3120,
         "descripcion": "Barrio artesanal y bohemio a ~20 min del centro, con calles empedradas, casonas coloniales, galerías, talleres de cerámica y vidrio soplado. El andador Independencia concentra tiendas y restaurantes con terraza; el Jardín Hidalgo es el corazón. Vale medio día; llegar también de noche por la iluminación y el ambiente.",
         "confianza": "muy_alta",
+        "tags": ["Arquitectura", "Compras", "Historia y cultura", "Mercados y artesanías", "Museos y galerías", "Planes tranquilos"],
     },
     {
         "city_display": "Guadalajara", "name": "Avenida Chapultepec (Colonia Americana)", "category": "experiencia", "zona": "Colonia Americana",
@@ -2022,6 +2083,7 @@ GUADALAJARA = [
         "lat": 20.6720, "lng": -103.3690,
         "descripcion": "Corredor del barrio más de moda de la ciudad (la Colonia Americana, premiada como uno de los barrios más cool del mundo). Camellón arbolado rodeado de bares de cerveza artesanal, mezcalerías, restaurantes de autor y terrazas; el público local aparece desde las 21:00. Epicentro de la vida nocturna tapatía.",
         "confianza": "alta",
+        "tags": ["Cervecerías y vino", "Cocina de autor"],
     },
     {
         "city_display": "Guadalajara", "name": "Plaza de los Mariachis", "category": "experiencia", "zona": "Centro Histórico",
@@ -2030,6 +2092,7 @@ GUADALAJARA = [
         "lat": 20.6740, "lng": -103.3390,
         "descripcion": "Plaza histórica junto al Mercado San Juan de Dios donde nació la tradición del mariachi como espectáculo. Se puede contratar una canción a los mariachis en vivo. Ícono cultural tapatío; visitarla de día o temprano en la noche.",
         "confianza": "media",
+        "tags": ["Cine y teatro", "Historia y cultura", "Mariscos", "Música en vivo"],
     },
     {
         "city_display": "Guadalajara", "name": "Providencia (zona)", "category": "experiencia", "zona": "Providencia",
@@ -2038,6 +2101,7 @@ GUADALAJARA = [
         "lat": 20.7040, "lng": -103.3920,
         "descripcion": "Zona arbolada y acomodada al poniente con una de las mejores concentraciones de restaurantes, cafés y bares (La Docena, Campomar, japoneses de autor). Alternativa más tranquila y refinada a la Americana para salir a comer.",
         "confianza": "media",
+        "tags": ["Cocina de autor", "Planes tranquilos"],
     },
     # ════════════ BARES Y VIDA NOCTURNA ════════════
     {
@@ -2047,6 +2111,7 @@ GUADALAJARA = [
         "lat": 20.6403, "lng": -103.3128,
         "descripcion": "Conjunto de cantinas y restaurantes en arcadas alrededor de un kiosco central donde el mariachi toca en vivo. El sitio por excelencia para escuchar mariachi mientras se toma tequila o se come birria en Tlaquepaque. Muy festivo; ambiente al máximo de tarde-noche.",
         "confianza": "alta",
+        "tags": ["Mezcal y tequila", "Música en vivo", "Tacos y antojitos", "Vida nocturna"],
     },
     {
         "city_display": "Guadalajara", "name": "La Fuente (cantina histórica)", "category": "bar", "zona": "Centro Histórico",
@@ -2055,6 +2120,7 @@ GUADALAJARA = [
         "lat": 20.6770, "lng": -103.3460,
         "descripcion": "Cantina tradicional del Centro fundada en 1921, una de las más antiguas y queridas de la ciudad. Ambiente de época, botanas, tequila y cerveza, con la leyenda de la bicicleta colgada sobre la barra. La cantina tapatía clásica.",
         "confianza": "alta",
+        "tags": ["Cervecerías y vino", "Historia y cultura", "Mezcal y tequila", "Vida nocturna"],
     },
     # ════════════ EXCURSIONES ════════════
     {
@@ -2064,6 +2130,7 @@ GUADALAJARA = [
         "lat": 20.8830, "lng": -103.8360,
         "descripcion": "Pueblo Mágico a ~1h rodeado de campos de agave azul (Paisaje Agavero, Patrimonio UNESCO). Cuna del tequila: destilerías históricas con tours y catas. Se puede ir en auto, en tour o en el tren turístico (Tequila Express) con mariachi, comida y ballet folclórico. Reservar con anticipación los fines de semana.",
         "confianza": "muy_alta",
+        "tags": ["Arquitectura", "Aventura", "Mezcal y tequila", "Música en vivo"],
     },
     {
         "city_display": "Guadalajara", "name": "Lago de Chapala y Ajijic", "category": "excursion", "zona": "Chapala / Ajijic (afueras, ~45 min)",
@@ -2072,6 +2139,7 @@ GUADALAJARA = [
         "lat": 20.2944, "lng": -103.2400,
         "descripcion": "El lago más grande de México, a ~45 min. Escapada tranquila de un día: el pueblo de Ajijic tiene calles empedradas, malecón, murales y una nutrida comunidad de expatriados, con boutiques y cafés. Plan relajado fuera del ruido de la ciudad.",
         "confianza": "alta",
+        "tags": ["Arte y diseño", "Aventura", "Compras", "Planes tranquilos"],
     },
     # ════════════ PARQUES / AIRE LIBRE ════════════
     {
@@ -2081,6 +2149,7 @@ GUADALAJARA = [
         "lat": 20.7160, "lng": -103.3920,
         "descripcion": "Gran pulmón verde con senderos arbolados, manantiales y un sereno Jardín Japonés. Ideal para caminar, correr o un picnic; muy frecuentado por familias y corredores los fines de semana.",
         "confianza": "alta",
+        "tags": ["Naturaleza y aire libre", "Planes tranquilos", "Senderismo"],
     },
     {
         "city_display": "Guadalajara", "name": "Mirador Barranca de Huentitán", "category": "mirador", "zona": "Huentitán (norte)",
@@ -2089,6 +2158,7 @@ GUADALAJARA = [
         "lat": 20.7430, "lng": -103.3110,
         "descripcion": "Mirador sobre la imponente Barranca de Huentitán, un cañón profundo al norte de la ciudad con vistas amplias del paisaje y el río Verde. Punto panorámico y, para quien quiere caminar, acceso a senderos de bajada exigentes. Mejor de día.",
         "confianza": "media",
+        "tags": ["Fotografía", "Senderismo"],
     },
     # ════════════ COMPRAS / ARTESANÍA ════════════
     {
@@ -2098,6 +2168,7 @@ GUADALAJARA = [
         "lat": 20.6240, "lng": -103.2340,
         "descripcion": "Cuna de la artesanía de la región. Sus tianguis (jueves y domingo) y talleres ofrecen cerámica, talavera, vidrio soplado, hierro forjado y barro a precios de origen. Complemento natural de Tlaquepaque para comprar artesanía mexicana directo del productor.",
         "confianza": "alta",
+        "tags": ["Mercados y artesanías"],
     },
     {
         "city_display": "Guadalajara", "name": "Andador Independencia (Tlaquepaque)", "category": "compras", "zona": "Tlaquepaque",
@@ -2106,6 +2177,7 @@ GUADALAJARA = [
         "lat": 20.6406, "lng": -103.3115,
         "descripcion": "Calle peatonal principal de Tlaquepaque con tiendas de cerámica, vidrio soplado, textiles, joyería y piezas decorativas, junto a restaurantes con terraza. El mejor recorrido a pie para compras de artesanía fina.",
         "confianza": "alta",
+        "tags": ["Compras", "Mercados y artesanías"],
     },
     # ════════════ COMIDA CALLEJERA Y ANTOJITOS ECONÓMICOS (para todos los bolsillos) ════════════
     {
@@ -2115,6 +2187,7 @@ GUADALAJARA = [
         "lat": 20.6645, "lng": -103.3505,
         "descripcion": "Institución tapatía de torta ahogada con décadas de tradición. Birote salado relleno de carnitas, ahogado en salsa de jitomate y chile de árbol bien picante, con cebolla y limón. Económico, callejero y auténtico. Acompáñalo con un agua fresca.",
         "confianza": "alta",
+        "tags": ["Comida callejera", "Económico / mochilero", "Gastronomía local", "Historia y cultura"],
     },
     {
         "city_display": "Guadalajara", "name": "Birriería El Chololo", "category": "restaurante", "zona": "Country / Av. Patria (varias sedes)",
@@ -2123,6 +2196,7 @@ GUADALAJARA = [
         "lat": 20.7005, "lng": -103.3765,
         "descripcion": "Birriería tradicional con más de un siglo de historia (desde 1922). Famosa por su birria tatemada de res/cordero horneada a fuego lento, bañada en adobo, servida con consomé, frijoles refritos con queso y tortillas hechas a mano. De postre, su jericalla. Ambiente familiar; varias sucursales.",
         "confianza": "alta",
+        "tags": ["Dulces y repostería", "En familia / con niños", "Gastronomía local", "Historia y cultura", "Tacos y antojitos"],
     },
     {
         "city_display": "Guadalajara", "name": "La Victoria (birria de barrio)", "category": "restaurante", "zona": "Santa Teresita / Santa Tere",
@@ -2131,6 +2205,7 @@ GUADALAJARA = [
         "lat": 20.6855, "lng": -103.3585,
         "descripcion": "Birriería de barrio en Santa Teresita, querida por locales: birria tapatía tradicional, porciones generosas, buen precio y tortillas hechas a mano. Sabor casero y servicio amable, sin pretensiones. Plan muy local.",
         "confianza": "media",
+        "tags": ["Gastronomía local", "Historia y cultura", "Tacos y antojitos"],
     },
     # ════════════ VEGANO / VEGETARIANO (para todo tipo de comensal) ════════════
     {
@@ -2140,6 +2215,7 @@ GUADALAJARA = [
         "lat": 20.6760, "lng": -103.3770,
         "descripcion": "Restaurante de cocina vegana/vegetariana en la zona Lafayette, con menú amplio de hamburguesas, platos sin carne y opciones para distintas dietas, en ambiente casual y porciones generosas. Buena parada para quien no come carne.",
         "confianza": "media",
+        "tags": ["Gastronomía local", "Opciones veganas/vegetarianas"],
     },
     {
         "city_display": "Guadalajara", "name": "Falafel (Suc. Marsella)", "category": "restaurante", "zona": "Colonia Americana",
@@ -2148,6 +2224,7 @@ GUADALAJARA = [
         "lat": 20.6705, "lng": -103.3695,
         "descripcion": "Comida mediterránea/medio oriente en el corazón de la Colonia Americana: falafel en wrap o pita, hummus y platos con muchas opciones vegetarianas y veganas a precio accesible. Rápido y satisfactorio para un almuerzo mientras exploras la zona.",
         "confianza": "media",
+        "tags": ["Económico / mochilero", "Gastronomía local", "Opciones veganas/vegetarianas"],
     },
     {
         "city_display": "Guadalajara", "name": "Chía Fonda Vegana", "category": "restaurante", "zona": "Colonia Americana / Moderna",
@@ -2156,6 +2233,7 @@ GUADALAJARA = [
         "lat": 20.6712, "lng": -103.3688,
         "descripcion": "Fonda vegana acogedora con platillos mexicanos sin productos animales (tacos, bowls y brunch de fin de semana). Ambiente cálido y propuesta creativa; buena opción de comida casera vegana.",
         "confianza": "media",
+        "tags": ["Brunch y desayunos", "Gastronomía local", "Opciones veganas/vegetarianas", "Tacos y antojitos"],
     },
     {
         "city_display": "Guadalajara", "name": "Calabacitas Tiernas", "category": "restaurante", "zona": "Las Águilas (Zapopan)",
@@ -2164,6 +2242,7 @@ GUADALAJARA = [
         "lat": 20.6360, "lng": -103.4150,
         "descripcion": "Restaurante vegano/vegetariano de menú internacional (pastas, hamburguesas, tacos y postres) en Zapopan. Trayectoria larga y buena variedad para distintas dietas. Costo aproximado $250–350 MXN por persona.",
         "confianza": "media",
+        "tags": ["Dulces y repostería", "Gastronomía local", "Opciones veganas/vegetarianas", "Tacos y antojitos"],
     },
     # ════════════ COCTELERÍA / MEZCAL (vida nocturna de autor) ════════════
     {
@@ -2173,6 +2252,7 @@ GUADALAJARA = [
         "lat": 20.6725, "lng": -103.3705,
         "descripcion": "Bar de coctelería de agave (tequila y mezcal) en la Colonia Americana, reconocido en la escena de coctelería de México. Ambiente íntimo y tragos de autor centrados en destilados mexicanos. Ideal para empezar la noche tapatía.",
         "confianza": "media",
+        "tags": ["Bares de coctelería", "Cocina de autor", "Mezcal y tequila", "Vida nocturna"],
     },
     # ════════════ PRÁCTICOS — SALUD, FARMACIA Y TRANSPORTE ════════════
     {
@@ -2182,6 +2262,7 @@ GUADALAJARA = [
         "lat": 20.6735, "lng": -103.3725,
         "descripcion": "Sucursal 24 horas de Farmacias Guadalajara (cadena local) en plena Av. Vallarta, a pasos de la Colonia Americana. Medicamentos, artículos básicos y consultorio médico económico contiguo. Atención a clientes de la cadena: (33) 3818 1818. Hay muchas otras sucursales 24h en la ciudad.",
         "confianza": "alta",
+        "tags": ["Económico / mochilero"],
     },
     {
         "city_display": "Guadalajara", "name": "Hospital Ángeles del Carmen / Ángeles Andares (Urgencias 24h)", "category": "clinica", "zona": "Andares / Puerta de Hierro (Zapopan)",
@@ -2206,6 +2287,159 @@ GUADALAJARA = [
         "lat": 20.6760, "lng": -103.3460,
         "descripcion": "Estación del tren ligero Línea 3 (SITEUR) en el Centro Histórico, junto a la Catedral y la Plaza de Armas. La Línea 3 conecta de un tirón Zapopan centro ↔ Centro Histórico ↔ San Pedro Tlaquepaque, evitando el tráfico. Pasaje ~$9.50 MXN con tarjeta Mi Movilidad (recargable en estación). Limpio, rápido y económico.",
         "confianza": "alta",
+        "tags": ["Económico / mochilero"],
+    },
+
+    # ════════════ MUNDIAL FIFA 2026 — contexto vivo del torneo (sede Guadalajara) ════════════
+    # Verificado jun. 2026. El Akron juega como "Estadio Guadalajara" por reglas FIFA.
+    # Coordenadas y direcciones confirmadas vía Google Places jun. 2026.
+    {
+        "city_display": "Guadalajara", "name": "Estadio Guadalajara (Akron) — Sede Mundial 2026", "category": "atraccion", "zona": "Zapopan (El Bajío, poniente)",
+        "dir": "Cto. J.V.C. 2800, El Bajío, 45019 Zapopan, Jal., México",
+        "maps_query": "Estadio Akron Guadalajara Zapopan",
+        "lat": 20.681776, "lng": -103.462646,
+        "descripcion": "Sede del Mundial 2026 (oficialmente 'Estadio Guadalajara'), casa de las Chivas, capacidad ~49,850. Alberga 4 partidos de fase de grupos: ya se jugaron Corea del Sur vs Chequia (11 jun) y México vs Corea del Sur (18 jun); QUEDAN Colombia vs RD Congo (mar 23 jun) y Uruguay vs España (vie 26 jun). IMPORTANTE: no hay estacionamiento público durante el torneo y hay cierres viales (operativo 'Última Milla') desde 24 h antes de cada partido. Llega en Mi Macro Periférico o Mi Tren hasta estación Estadio Guadalajara/Chivas y camina 10–20 min, o en shuttle oficial (~$500 MXN redondo, con reserva). Llega 2–3 h antes por los filtros. Prohibidos drones, pirotecnia y bolsas opacas.",
+        "confianza": "muy_alta",
+        "tags": ["Eventos deportivos", "Historia y cultura"],
+    },
+    {
+        "city_display": "Guadalajara", "name": "FIFA Fan Festival — Plaza de la Liberación", "category": "experiencia", "zona": "Centro Histórico",
+        "dir": "C. Pedro Loza 27A, Zona Centro, 44100 Guadalajara, Jal., México",
+        "maps_query": "Plaza de la Liberación Centro Histórico Guadalajara",
+        "lat": 20.677015, "lng": -103.345769,
+        "descripcion": "El plan A para vivir el Mundial sin boleto: pantalla gigante (~40 m) con la Catedral de fondo, transmisión en vivo de los 104 partidos, gratis, todos los días hasta el 19 de julio. Abre ~1.5 h antes de cada partido que se transmita en pantalla principal. Es CASHLESS — lleva tarjeta (preferencia VISA); NO se permite ingresar alimentos/bebidas de fuera, ni paraguas (junio/julio son lluviosos, lleva impermeable ligero), ni mochilas opacas. Sí hay venta de cerveza/alcohol de patrocinadores. Llega en Mi Tren bajando en estación San Juan de Dios y camina 5–10 min; evita el auto por los cierres del Centro. Alrededor: corredor gastronómico jalisciense en Plaza de Armas y activaciones en Paseo Alcalde.",
+        "confianza": "muy_alta",
+        "tags": ["Cervecerías y vino", "Económico / mochilero", "Eventos deportivos"],
+    },
+    {
+        "city_display": "Guadalajara", "name": "Concierto Maná — Glorieta La Minerva (Mundial)", "category": "experiencia", "zona": "Minerva / Av. Vallarta",
+        "dir": "Glorieta La Minerva, Av. Vallarta, Guadalajara, Jal., México",
+        "maps_query": "Glorieta La Minerva Guadalajara",
+        "lat": 20.6757, "lng": -103.3895,
+        "descripcion": "Conciertos gratuitos al aire libre ligados al Mundial en la Glorieta de La Minerva. Maná (banda tapatía) tocó el 17 jun, víspera del México vs Corea; también figuran Alejandro Fernández y se evaluó Carlos Santana. Gratis y sin boleto: llega con varias horas de anticipación porque se llena y hay filtros de seguridad. La Minerva funciona como punto de congregación con ambiente mundialista los demás días. (Confirma cartelera y fechas vigentes en canales del Gobierno de Jalisco.)",
+        "confianza": "alta",
+        "tags": ["Cine y teatro", "Económico / mochilero", "Eventos deportivos", "Música en vivo", "Naturaleza y aire libre"],
+    },
+    {
+        "city_display": "Guadalajara", "name": "Mi Macro Periférico — acceso al Estadio (Mundial)", "category": "transporte", "zona": "Zapopan (Periférico poniente)",
+        "dir": "Anillo Perif. Nte., Zapopan, Jal., México",
+        "maps_query": "Mi Macro Periférico estación Estadio Guadalajara",
+        "lat": 20.6840, "lng": -103.4560,
+        "descripcion": "La forma más eficiente de llegar al Estadio Guadalajara (Akron) en días de partido del Mundial, ya que no hay estacionamiento público y hay cordón de seguridad vehicular. Combina con Mi Tren usando la tarjeta Mi Movilidad. Baja en la estación más cercana al estadio y camina por el andador (10–20 min). Evita Uber/DiDi a la puerta: no tienen acceso al perímetro y conviene descender cerca de Periférico y caminar.",
+        "confianza": "alta",
+        "tags": ["Eventos deportivos"],
+    },
+
+    # ════════════ JOYAS VERIFICADAS — añadidas jun. 2026 (coords reales Google Places) ════════════
+    {
+        "city_display": "Guadalajara", "name": "El Gallo Altanero (barra de agave)", "category": "bar", "zona": "Colonia Americana / Lafayette",
+        "dir": "Calle Marsella 126, Col Americana, Lafayette, 44160 Guadalajara, Jal., México",
+        "maps_query": "El Gallo Altanero bar Guadalajara",
+        "lat": 20.674062, "lng": -103.370762,
+        "descripcion": "Entre los mejores bares de Norteamérica (lista The World's 50 Best Bars). Templo del agave en la Colonia Americana —el barrio nombrado 'más cool del mundo' por Time Out—: tequilas, mezcales y coctelería de autor, con mariachi y ambiente cálido muy mexicano. Cocteles excelentes y bien de precio. Cerrado lun–mar; abre desde las 18:00 (dom desde 17:00). Llega temprano, se llena.",
+        "confianza": "muy_alta",
+        "tags": ["Bares de coctelería", "Cocina de autor", "Mezcal y tequila", "Música en vivo", "Vida nocturna"],
+    },
+    {
+        "city_display": "Guadalajara", "name": "Pare de Sufrir (mezcalería)", "category": "bar", "zona": "Colonia Americana",
+        "dir": "Calle Argentina 66, Col Americana, 44160 Guadalajara, Jal., México",
+        "maps_query": "Pare de Sufrir mezcaleria Guadalajara Argentina",
+        "lat": 20.6745, "lng": -103.3712,
+        "descripcion": "Mezcalería de culto en la Colonia Americana, incluida en la lista '50 Best Discovery'. Selección de ~70 destilados de agave: mezcal, bacanora, sotol y raicilla. Ambiente desenfadado, ideal para terminar la noche bailando. Pregunta por las rarezas de la barra.",
+        "confianza": "alta",
+        "tags": ["Lujo y premium", "Mezcal y tequila", "Vida nocturna"],
+    },
+    {
+        "city_display": "Guadalajara", "name": "Las Pilitas de Tonalá (aguas termales)", "category": "excursion", "zona": "Tonalá (afueras, sureste)",
+        "dir": "~15 km al sureste de Tonalá, Jal., México",
+        "maps_query": "Las Pilitas de Tonalá aguas termales",
+        "lat": 20.5870, "lng": -103.2010,
+        "descripcion": "Joya escondida que ni muchos tapatíos conocen: 6 pilas de aguas termales color turquesa a ~15 km de Tonalá, rodeadas de vegetación. Ideal para desconectar en calma. Llega en auto/taxi; lleva efectivo y traje de baño. Verifica acceso y horarios localmente antes de ir, sobre todo en temporada de lluvias.",
+        "confianza": "media",
+        "tags": ["Aguas termales", "Aventura", "Bienestar y relax", "Joyas escondidas", "Planes tranquilos"],
+    },
+    {
+        "city_display": "Guadalajara", "name": "Río Caliente (Bosque La Primavera)", "category": "excursion", "zona": "Bosque La Primavera (poniente)",
+        "dir": "Bosque La Primavera, Zapopan/Tala, Jal., México",
+        "maps_query": "Río Caliente Bosque La Primavera Guadalajara",
+        "lat": 20.6500, "lng": -103.5600,
+        "descripcion": "Río de aguas termales dentro del Bosque La Primavera, pequeño y poco conocido: el agua brota muy caliente (hasta ~70 °C en el nacimiento) y se enfría río abajo hasta una temperatura agradable para meterse; suele verse el vapor. A ~20 min del poniente de la ciudad. Plan de naturaleza para medio día; verifica acceso vigente (el bosque a veces restringe por riesgo de incendio).",
+        "confianza": "media",
+        "tags": ["Aguas termales", "Aventura", "Bienestar y relax", "Joyas escondidas", "Naturaleza y aire libre", "Planes tranquilos"],
+    },
+
+    # ════════════ JOYAS VERIFICADAS — LOTE 2 (jun. 2026, coords reales Google Places) ════════════
+    {
+        "city_display": "Guadalajara", "name": "Nejayote (molino y cocina de maíz nativo)", "category": "restaurante", "zona": "Santa Teresita / Santa Tere",
+        "dir": "Herrera y Cairo 1392, Santa Teresita, 44600 Guadalajara, Jal., México",
+        "maps_query": "Nejayote Molino Guadalajara",
+        "lat": 20.6832, "lng": -103.365667,
+        "descripcion": "Molino y cocina de maíz nativo nixtamalizado a la vista, del mismo equipo detrás de Xokol. Desayunos en mesas comunales: tacos de chile relleno, quesadilla de setas, tamales, con tortillas hechas al momento de maíz criollo. Tres salsas de la casa, muy amable con vegetarianos, precios honestos. Abre 8:30–13:00, cerrado domingo. Solo walk-in (efectivo y tarjeta). Una joya para entender el maíz tapatío.",
+        "confianza": "alta",
+        "tags": ["Brunch y desayunos", "Económico / mochilero", "Gastronomía local", "Joyas escondidas", "Opciones veganas/vegetarianas", "Tacos y antojitos"],
+    },
+    {
+        "city_display": "Guadalajara", "name": "Taquería Los Alteños", "category": "restaurante", "zona": "Chapalita Sur (Zapopan)",
+        "dir": "Av. Tepeyac, Chapalita Sur, 45040 Zapopan, Jal., México",
+        "maps_query": "Taquería Los Alteños Tepeyac Chapalita",
+        "lat": 20.661598, "lng": -103.406132,
+        "descripcion": "Institución del taco al pastor en Guadalajara (rating 4.7 con más de 11 mil reseñas). 'Los parados': trompo de pastor a la vista y todas sus variantes —taquiqueso, gringa, quesadilla— más cabeza, chorizo y bistec. Barra de salsas para armar tu taco y aguas frescas. Sistema de honestidad: tú llevas la cuenta de lo que comes. Abierto todos los días hasta la 1 AM. Suele estar lleno; comes parado.",
+        "confianza": "alta",
+        "tags": ["Comida callejera", "Gastronomía local", "Tacos y antojitos"],
+    },
+    {
+        "city_display": "Guadalajara", "name": "Templo Expiatorio del Santísimo Sacramento", "category": "atraccion", "zona": "Colonia Americana",
+        "dir": "C. Manuel López Cotilla 935, Col Americana, 44160 Guadalajara, Jal., México",
+        "maps_query": "Templo Expiatorio Guadalajara",
+        "lat": 20.673695, "lng": -103.358967,
+        "descripcion": "La joya neogótica de Guadalajara —muchos la consideran más bella que la Catedral—: vitrales espectaculares que iluminan el interior y atraen la mirada hacia arriba. En el corazón de la Colonia Americana, junto al MUSA de la UdeG. Entrada libre, abierto todo el día. Al dar las horas, un mecanismo de los Doce Apóstoles desfila en la fachada.",
+        "confianza": "muy_alta",
+        "tags": ["Arquitectura", "Cine y teatro", "Historia y cultura", "Joyas escondidas"],
+    },
+    {
+        "city_display": "Guadalajara", "name": "Sinónimo (café de especialidad)", "category": "cafe", "zona": "Colonia Americana",
+        "dir": "Av. de la Paz 2350, Col Americana, Lafayette, 44140 Guadalajara, Jal., México",
+        "maps_query": "Sinónimo café Guadalajara Avenida de la Paz",
+        "lat": 20.67232, "lng": -103.37595,
+        "descripcion": "Café de especialidad dentro de una casona de 1942 del arquitecto Pedro Castellanos, en plena Colonia Americana. Nació en 2020 con cold brew y hoy es de los favoritos para brunch: terraza en patio abierto bajo la sombra, machaca burrito, tostada de guacamole, pan francés. Abierto todos los días 9–16h. Buen Wi-Fi para trabajar.",
+        "confianza": "alta",
+        "tags": ["Arquitectura", "Brunch y desayunos", "Café de especialidad"],
+    },
+    {
+        "city_display": "Guadalajara", "name": "Zuno Café (Macondo)", "category": "cafe", "zona": "Colonia Americana",
+        "dir": "C. José Guadalupe Zuno Hernández 1912, Col Americana, 44160 Guadalajara, Jal., México",
+        "maps_query": "Zuno Café Guadalajara Colonia Americana",
+        "lat": 20.670758, "lng": -103.366723,
+        "descripcion": "Joya escondida en una casona histórica que fue residencia de un gobernador, en la calle Zuno (llena de casas porfirianas de los 1920–40). Patio exterior pet-friendly, brunch de alta calidad: avocado toast, higos sobre pan de masa madre con mascarpone, chilaquiles, cold brew. Tiende a llenarse después de las 9:30 AM. Cerrado lunes.",
+        "confianza": "alta",
+        "tags": ["Arquitectura", "Brunch y desayunos", "Café de especialidad", "Joyas escondidas", "Pet-friendly"],
+    },
+    {
+        "city_display": "Guadalajara", "name": "Teté Cocina de Barrio", "category": "restaurante", "zona": "Moderna",
+        "dir": "C. Rayón 830, Moderna, 44170 Guadalajara, Jal., México",
+        "maps_query": "Teté Cocina de Barrio Guadalajara",
+        "lat": 20.664654, "lng": -103.358051,
+        "descripcion": "Fine dining de barrio del chef Mario Papa: menú degustación que cruza ingredientes de la región con técnica de vanguardia, cocina abierta, espacio pequeño e íntimo donde los propios chefs sirven los platos. Tiene menú regular de 8 tiempos y uno vegano de 16 tiempos, ambos muy elogiados ('Michelin-worthy' según comensales). Solo cena, mié–sáb. Reservar.",
+        "confianza": "alta",
+        "tags": ["Cocina de autor", "Gastronomía local", "Lujo y premium", "Opciones veganas/vegetarianas"],
+    },
+    {
+        "city_display": "Guadalajara", "name": "La Postrería (Jesús Escalera)", "category": "cafe", "zona": "Colonia Americana",
+        "dir": "Libertad 1780, Col Americana, 44160 Guadalajara, Jal., México",
+        "maps_query": "La Postrería Guadalajara Libertad",
+        "lat": 20.672825, "lng": -103.363945,
+        "descripcion": "Cocina dulce de vanguardia del chef Jesús Escalera: no es un restaurante convencional sino el mejor spot para explorar postres de autor de temporada (pregunta cuáles hay ese día, el menú cambia). Degustación de varios tiempos donde te explican cada plato. También dan cursos y talleres de repostería. Abierto todos los días. Una parada obligada para terminar dulce.",
+        "confianza": "muy_alta",
+        "tags": ["Brunch y desayunos", "Café de especialidad", "Cocina de autor", "Dulces y repostería"],
+    },
+    {
+        "city_display": "Guadalajara", "name": "Bosque La Primavera (entrada principal)", "category": "excursion", "zona": "La Primavera (poniente, Zapopan)",
+        "dir": "Bosque La Primavera, Entrada Bosque, 45221 Jal., México",
+        "maps_query": "Entrada Bosque La Primavera Guadalajara",
+        "lat": 20.712125, "lng": -103.570259,
+        "descripcion": "Área Natural Protegida de ~30,000 ha a ~20 min del poniente de la ciudad: senderismo, ciclismo de montaña, zonas de camping y acceso a aguas termales (Río Caliente está dentro). Abierto 7–19h, cobro de acceso simbólico (~$30–60 MXN según punto). Verifica condiciones vigentes: el bosque cierra accesos en temporada seca por riesgo de incendio.",
+        "confianza": "alta",
+        "tags": ["Aguas termales", "Aventura", "Bienestar y relax", "Naturaleza y aire libre", "Planes tranquilos", "Senderismo"],
     },
 ]
 

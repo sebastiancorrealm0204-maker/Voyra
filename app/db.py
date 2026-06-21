@@ -178,6 +178,7 @@ CREATE TABLE IF NOT EXISTS destination_places (
   place_id TEXT,
   rating REAL,
   price_level TEXT,
+  tags TEXT,                      -- JSON array de tags del vocabulario controlado (cruce directo con GUSTOS); NULL = sin tags
   created_at REAL NOT NULL
 );
 CREATE TABLE IF NOT EXISTS place_recommendations (
@@ -287,6 +288,8 @@ def init_db():
             c.execute("ALTER TABLE destination_places ADD COLUMN rating REAL")
         if "price_level" not in dp_cols:
             c.execute("ALTER TABLE destination_places ADD COLUMN price_level TEXT")
+        if "tags" not in dp_cols:
+            c.execute("ALTER TABLE destination_places ADD COLUMN tags TEXT")
 
 def new_id() -> str:
     return uuid.uuid4().hex[:12]
@@ -583,7 +586,19 @@ def places_for_city(city: str) -> list[dict]:
             "SELECT * FROM destination_places WHERE city=? ORDER BY confianza DESC, created_at ASC",
             (norm_city(city),),
         ).fetchall()
-    return [dict(r) for r in rs]
+    out = []
+    for r in rs:
+        d = dict(r)
+        # tags se guarda como JSON array; devolverlo ya parseado (o lista vacía)
+        if d.get("tags"):
+            try:
+                d["tags"] = json.loads(d["tags"])
+            except (ValueError, TypeError):
+                d["tags"] = []
+        else:
+            d["tags"] = []
+        out.append(d)
+    return out
 
 
 def seed_destination_places(places: list[dict]):
@@ -608,12 +623,14 @@ def seed_destination_places(places: list[dict]):
         c.execute("DELETE FROM destination_places WHERE city=?", (city,))
         for p in places:
             c.execute(
-                "INSERT INTO destination_places (id, city, city_display, name, category, zona, lat, lng, descripcion, confianza, maps_query, dir, place_id, rating, price_level, created_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO destination_places (id, city, city_display, name, category, zona, lat, lng, descripcion, confianza, maps_query, dir, place_id, rating, price_level, tags, created_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (new_id(), norm_city(p["city_display"]), p["city_display"], p["name"], p["category"],
                  p["zona"], p["lat"], p["lng"], p["descripcion"], p["confianza"],
                  p.get("maps_query"), p.get("dir"), p.get("place_id"),
-                 p.get("rating"), p.get("price_level"), now()),
+                 p.get("rating"), p.get("price_level"),
+                 json.dumps(p.get("tags"), ensure_ascii=False) if p.get("tags") else None,
+                 now()),
             )
 
 
