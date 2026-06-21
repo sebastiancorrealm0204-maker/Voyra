@@ -268,6 +268,9 @@ def init_db():
     if IS_POSTGRES:
         with conn() as c:
             c.executescript(SCHEMA_PG)
+        # Migraciones suaves para Postgres: agrega columnas nuevas si la tabla
+        # ya existía con un esquema anterior. Usa information_schema (SQL estándar).
+        _pg_migrate_columns()
         return
 
     with conn() as c:
@@ -290,6 +293,31 @@ def init_db():
             c.execute("ALTER TABLE destination_places ADD COLUMN price_level TEXT")
         if "tags" not in dp_cols:
             c.execute("ALTER TABLE destination_places ADD COLUMN tags TEXT")
+
+
+def _pg_migrate_columns():
+    """Agrega columnas nuevas a tablas existentes en Postgres (idempotente).
+    Usa information_schema para no depender de PRAGMA (SQLite-only).
+    Agregar aquí cada columna nueva que se añada al SCHEMA."""
+    # (tabla, columna, definición SQL)
+    migrations = [
+        ("destination_places", "maps_query",  "TEXT"),
+        ("destination_places", "dir",         "TEXT"),
+        ("destination_places", "place_id",    "TEXT"),
+        ("destination_places", "rating",      "DOUBLE PRECISION"),
+        ("destination_places", "price_level", "TEXT"),
+        ("destination_places", "tags",        "TEXT"),
+        ("notifications",      "extra",       "TEXT"),
+    ]
+    with conn() as c:
+        for table, column, col_type in migrations:
+            exists = c.execute(
+                "SELECT 1 FROM information_schema.columns "
+                "WHERE table_name = %s AND column_name = %s",
+                (table, column),
+            ).fetchone()
+            if not exists:
+                c.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
 
 def new_id() -> str:
     return uuid.uuid4().hex[:12]
