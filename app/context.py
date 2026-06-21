@@ -4,7 +4,7 @@ Este texto es el prefijo cacheado en producción (prompt caching): todo lo que e
 agente sabe del viaje en < 4K tokens. Incluye datos del setup, ubicación actual,
 documentos extraídos y planes contados por el usuario.
 """
-from . import city_knowledge, db, geo, plans, timeutil
+from . import airport, city_knowledge, db, geo, plans, timeutil
 
 
 def _lugares_block(trip: dict) -> str:
@@ -117,15 +117,21 @@ def build(trip: dict, docs: list[dict] | None = None) -> str:
 
     aeropuerto_block = ""
     if trip.get("modo_aeropuerto"):
-        aeropuerto_block = (
-            "\n>>> EL USUARIO ACABA DE ATERRIZAR Y ESTÁ EN EL AEROPUERTO AHORA MISMO. <<<\n"
-            "Prioriza ayudarlo a salir bien: control migratorio, equipaje y, sobre todo, "
-            "cómo tomar transporte SEGURO. Si pregunta por taxi/transporte, recuérdale tomar "
-            "SOLO el taxi oficial (en El Dorado es Taxi Imperial, carril 1 entre puertas 8-10, "
-            "con tiquete de pre-liquidación) o pedir una app desde la zona de pick-up autorizado; "
-            "NUNCA aceptar a quien lo aborde dentro de la terminal (los 'gansos'/piratas). Tono "
-            "tranquilizador: que no se sienta perdido.\n"
-        )
+        _ap = airport.airport_for_city(trip["ciudad"])
+        if _ap and _ap.get("prompt_block"):
+            # Texto específico del aeropuerto del destino (El Dorado, GDL, …).
+            aeropuerto_block = _ap["prompt_block"]
+        else:
+            # Fallback genérico si la ciudad no tiene aeropuerto curado: ayuda a
+            # salir bien sin inventar nombres/empresas que no conoce.
+            aeropuerto_block = (
+                "\n>>> EL USUARIO ACABA DE ATERRIZAR Y ESTÁ EN EL AEROPUERTO AHORA MISMO. <<<\n"
+                "Prioriza ayudarlo a salir bien: control migratorio, equipaje y, sobre todo, cómo "
+                "tomar transporte SEGURO. Recomiéndale usar SOLO el taxi oficial autorizado del "
+                "aeropuerto (en su mostrador/fila) o pedir una app desde la zona de pick-up "
+                "autorizada; NUNCA aceptar a quien lo aborde dentro de la terminal. Tono "
+                "tranquilizador: que no se sienta perdido.\n"
+            )
 
     lugares_block = _lugares_block(trip)
     ciudad_block = city_knowledge.build_block(trip["ciudad"])
