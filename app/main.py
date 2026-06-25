@@ -764,6 +764,30 @@ def diagnostico():
     }
 
 
+@app.get("/_diag_prompt")
+def diag_prompt(q: str = "cuéntame de La Tavola"):
+    """Devuelve la LÍNEA EXACTA del prompt para el lugar mencionado en q.
+
+    Es la fuente de verdad: muestra lo que el modelo realmente ve. Si aquí
+    aparece 'DATO LOCAL (vía tiktok)', el dato SÍ llega al prompt y el problema
+    sería del modelo; si NO aparece, el problema es de datos/código.
+    """
+    trip = {
+        "id": "diag", "ciudad": "Bogotá", "hotel": "—",
+        "inicio": "2026-07-01", "fin": "2026-07-05",
+        "zona_actual": "La Candelaria", "gustos": [], "pais": "CO",
+        "planes": [], "idioma": "es",
+    }
+    block = context._lugares_block(trip, q)
+    lineas_tavola = [ln for ln in block.split("\n") if "tavola" in ln.lower()]
+    return {
+        "pregunta": q,
+        "codigo_tiene_anclaje": "mensaje" in context.build.__code__.co_varnames,
+        "lineas_con_tavola": lineas_tavola,
+        "tiene_dato_social": any("DATO LOCAL" in ln for ln in lineas_tavola),
+    }
+
+
 # ── Chat ──
 @app.get("/trips/{tid}/messages")
 def get_messages(tid: str, user: dict = Depends(current_user)):
