@@ -217,6 +217,20 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
   subscription TEXT NOT NULL,   -- JSON completo {endpoint, keys:{p256dh, auth}}
   created_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS place_enrichments (
+  id TEXT PRIMARY KEY,
+  city TEXT NOT NULL,            -- normalizado (match con destination_places.city)
+  place_name TEXT NOT NULL,      -- match EXACTO con destination_places.name
+  field TEXT NOT NULL,           -- 'dato' (joya durable) | 'fresco' (efímero, de la semana)
+  value TEXT NOT NULL,           -- el dato local extraído, listo para mostrar
+  status TEXT NOT NULL,          -- pending | approved | rejected
+  source_type TEXT,              -- tiktok | instagram | creator | manual
+  source_url TEXT,               -- enlace al contenido original (trazabilidad)
+  confidence REAL,               -- 0..1 que reportó el extractor
+  expires_at REAL,               -- para 'fresco': caduca solo; NULL = no caduca
+  created_at REAL NOT NULL,
+  reviewed_at REAL
+);
 """
 
 
@@ -638,7 +652,7 @@ def places_for_city(city: str) -> list[dict]:
         else:
             d["local"] = None
         out.append(d)
-    return out
+    return overlay_enrichments(out, city)
 
 
 def seed_destination_places(places: list[dict]):
@@ -737,3 +751,104 @@ def list_push_subscriptions(trip_id: str) -> list[dict]:
 def delete_push_subscription(endpoint: str) -> None:
     with conn() as c:
         c.execute("DELETE FROM push_subscriptions WHERE endpoint=?", (endpoint,))
+
+
+# ════════════════════ Enriquecimiento social (TikTok/IG → campo `dato`) ════════════════════
+# Las joyas extraídas de redes sociales se guardan aquí, NO en destination_places.
+# Razón: destination_places se reescribe entero en cada seed (DELETE + INSERT), así
+# que cualquier dato escrito ahí se perdería. En cambio, estas mejoras se superponen
+# en lectura (ver overlay_enrichments) y sobreviven a los reseeds. Nada se publica
+# sin aprobación humana — la confianza del producto lo exige.
+
+def add_enrichment(city: str, place_name: str, value: str, *, field: str = "dato",
+                   source_type: str | None = None, source_url: str | None = None,
+                   confidence: float | None = None, expires_at: float | None = None,
+                   status: str = "pending") -> str:
+    """Inserta una mejora candidata (por defecto en revisión: status='pending')."""
+    rid = new_id()
+    with conn() as c:
+        c.execute(
+            "INSERT INTO place_enrichments (id, city, place_name, field, value, status, "
+            "source_type, source_url, confidence, expires_at, created_at, reviewed_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            (rid, norm_city(city), place_name, field, value, status,
+             source_type, source_url, confidence, expires_at, now(), None),
+        )
+    return rid
+
+
+def list_enrichments(status: str | None = None, city: str | None = None,
+                     limit: int = 200) -> list[dict]:
+    """Lista mejoras, opcionalmente filtradas por estado y ciudad (para la cola de revisión)."""
+    q = "SELECT * FROM place_enrichments WHERE 1=1"
+    params: list = []
+    if status:
+        q += " AND status=?"; params.append(status)
+    if city:
+        q += " AND city=?"; params.append(norm_city(city))
+    q += " ORDER BY created_at DESC LIMIT ?"; params.append(limit)
+    with conn() as c:
+        rs = c.execute(q, tuple(params)).fetchall()
+    return [dict(r) for r in rs]
+
+
+def set_enrichment_status(eid: str, status: str) -> bool:
+    """Aprueba o rechaza una mejora. Devuelve True si existía."""
+    with conn() as c:
+        cur = c.execute(
+            "UPDATE place_enrichments SET status=?, reviewed_at=? WHERE id=?",
+            (status, now(), eid),
+        )
+        return bool(getattr(cur, "rowcount", 1))
+
+
+def approved_enrichments_for_city(city: str) -> dict[str, list[dict]]:
+    """Mejoras APROBADAS y vigentes de una ciudad, indexadas por nombre de lugar.
+
+    Filtra las 'fresco' caducadas (expires_at < ahora). Devuelve, por lugar, la
+    lista de {field, value, source_type, source_url} para superponer al `local`.
+    """
+    ahora = now()
+    with conn() as c:
+        rs = c.execute(
+            "SELECT place_name, field, value, source_type, source_url, expires_at "
+            "FROM place_enrichments WHERE city=? AND status='approved' "
+            "ORDER BY created_at ASC",
+            (norm_city(city),),
+        ).fetchall()
+    out: dict[str, list[dict]] = {}
+    for r in rs:
+        d = dict(r)
+        if d.get("expires_at") and d["expires_at"] < ahora:
+            continue  # 'fresco' caducado: no se muestra
+        out.setdefault(d["place_name"], []).append({
+            "field": d["field"], "value": d["value"],
+            "source_type": d.get("source_type"), "source_url": d.get("source_url"),
+        })
+    return out
+
+
+def overlay_enrichments(places: list[dict], city: str) -> list[dict]:
+    """Superpone las mejoras aprobadas sobre el `local` de cada lugar (en lectura).
+
+    - field 'dato'   → añade a local['dato_social'] (lista de joyas de redes).
+    - field 'fresco' → añade a local['fresco'] (lista de cosas de la semana).
+    No pisa el `dato` curado original; lo COMPLEMENTA, con trazabilidad de fuente.
+    """
+    extra = approved_enrichments_for_city(city)
+    if not extra:
+        return places
+    for p in places:
+        mejoras = extra.get(p["name"])
+        if not mejoras:
+            continue
+        local = dict(p.get("local") or {})
+        for m in mejoras:
+            key = "fresco" if m["field"] == "fresco" else "dato_social"
+            local.setdefault(key, []).append({
+                "texto": m["value"],
+                "fuente": m.get("source_type"),
+                "url": m.get("source_url"),
+            })
+        p["local"] = local
+    return places

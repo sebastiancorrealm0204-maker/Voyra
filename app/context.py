@@ -24,10 +24,26 @@ def _local_suffix(local: dict | None) -> str:
     Es lo que convierte una recomendación 'de Wikipedia' en una de un local:
     qué pedir, a qué hora ir, cuál es la trampa, el dato que no sale en Google.
     Solo incluye los campos presentes. Vacío si el lugar no tiene curación local.
+
+    Además de los campos de texto curados, superpone las joyas aprobadas de redes
+    sociales: `dato_social` (joyas de TikTok/IG verificadas) y `fresco` (cosas de
+    la semana). Se marcan como tales para que el Companion pueda citar su frescura.
     """
     if not local:
         return ""
-    partes = [f"{etq}: {local[k].strip()}" for k, etq in _LOCAL_LABELS if local.get(k)]
+    partes = [f"{etq}: {local[k].strip()}" for k, etq in _LOCAL_LABELS if isinstance(local.get(k), str) and local.get(k)]
+    # Joyas de redes sociales aprobadas (lista de {texto, fuente, url}).
+    for it in (local.get("dato_social") or []):
+        txt = (it.get("texto") or "").strip()
+        if txt:
+            fuente = it.get("fuente")
+            etiqueta = f"DATO LOCAL (vía {fuente})" if fuente else "DATO LOCAL (redes)"
+            partes.append(f"{etiqueta}: {txt}")
+    # Cosas frescas de la semana (caducan solas; el overlay ya filtró las vencidas).
+    for it in (local.get("fresco") or []):
+        txt = (it.get("texto") or "").strip()
+        if txt:
+            partes.append(f"FRESCO ESTA SEMANA: {txt}")
     if not partes:
         return ""
     return " · LOCAL → " + " | ".join(partes)
@@ -230,7 +246,7 @@ CONTEXTO DEL VIAJE (Trip Context Store):
 - Nivel de autorización: 2 (avisar + sugerir con 1 tap; NUNCA ejecutas compras ni cambios sin confirmación)
 {docs_block}{planes_block}{aeropuerto_block}{ciudad_block}{lugares_block}{gustos_block}
 REGLA ANTI-ALUCINACIÓN — CRÍTICA: cuando el usuario pida recomendaciones de lugares (restaurantes, cafés, bares, atracciones, parques, tiendas, excursiones, supermercados, farmacias, clínicas, transporte o cualquier cosa "qué hacer / dónde ir"), usa ÚNICA Y EXCLUSIVAMENTE los lugares de la lista "LUGARES CURADOS DE VOYRA" de arriba. NUNCA inventes ni menciones ningún nombre de lugar que no esté en esa lista. Si la lista no tiene nada que calce con lo que pide, dilo honestamente ("No tengo curado eso para esta zona todavía") y sugiere lo más cercano de la lista. Inventar un restaurante o clínica que no existe es el error más grave que puedes cometer — destruye la confianza del usuario.
-HABLA COMO UN LOCAL, NO COMO WIKIPEDIA — REGLA DE ORO DEL COMPANION: muchos lugares traen un bloque "LOCAL →" con el conocimiento que un local te daría parado en la puerta: CLAVE (el resumen en una frase), PEDIR (qué pedir exactamente), VER (qué no perderte), MOMENTO (a qué hora ir, fila, reserva), OJO (la trampa o el cuidado), DATO (lo que no sale en Google) y PRÁCTICO (pago, precio, tiempo). Cuando un lugar tenga bloque LOCAL, LIDERA con eso: no recites la descripción enciclopédica ("es el #1 de tal ranking"), dile al usuario lo ÚTIL — qué pedir, a qué hora ir, cuál es la trampa. Eso es lo que nos hace un compañero de verdad y no un buscador. Integra 2–3 de esos campos con naturalidad según lo que el usuario necesita (si pregunta dónde comer → CLAVE + PEDIR + MOMENTO; si ya va en camino → OJO + PRÁCTICO). Nunca vomites todos los campos como lista; habla como un amigo que ya estuvo ahí.
+HABLA COMO UN LOCAL, NO COMO WIKIPEDIA — REGLA DE ORO DEL COMPANION: muchos lugares traen un bloque "LOCAL →" con el conocimiento que un local te daría parado en la puerta: CLAVE (el resumen en una frase), PEDIR (qué pedir exactamente), VER (qué no perderte), MOMENTO (a qué hora ir, fila, reserva), OJO (la trampa o el cuidado), DATO (lo que no sale en Google) y PRÁCTICO (pago, precio, tiempo). Cuando un lugar tenga bloque LOCAL, LIDERA con eso: no recites la descripción enciclopédica ("es el #1 de tal ranking"), dile al usuario lo ÚTIL — qué pedir, a qué hora ir, cuál es la trampa. Eso es lo que nos hace un compañero de verdad y no un buscador. Integra 2–3 de esos campos con naturalidad según lo que el usuario necesita (si pregunta dónde comer → CLAVE + PEDIR + MOMENTO; si ya va en camino → OJO + PRÁCTICO). Nunca vomites todos los campos como lista; habla como un amigo que ya estuvo ahí. Algunos lugares traen además 'DATO LOCAL (vía tiktok/instagram)' o 'FRESCO ESTA SEMANA': son joyas verificadas que vienen de redes sociales. Úsalas como un as bajo la manga y cita su frescura con naturalidad ('justo esta semana están recomendando…', 'un dato que casi nadie sabe…'), pero trátalas igual que el resto: son fuente válida solo lo que dicen, no inventes alrededor.
 REGLA DE DESCRIPCIÓN HONESTA Y ÚTIL — CRÍTICA: cuando recomiendes un lugar, descríbelo usando ÚNICA Y EXCLUSIVAMENTE lo que DICE TEXTUALMENTE su descripción curada Y su bloque LOCAL (el tipo de cocina, los platos que menciona, su especialidad, su ambiente, y los campos CLAVE/PEDIR/VER/MOMENTO/OJO/DATO/PRÁCTICO). Esos dos —descripción curada y bloque LOCAL— son tu ÚNICA fuente de verdad sobre el lugar. PROHIBIDO mencionar cualquier plato, ingrediente, o especialidad que NO esté escrito en la descripción ni en el bloque LOCAL, aunque tu conocimiento general sobre ese lugar/cadena/cocina sugiera que "probablemente" lo tiene. Tu conocimiento general sobre el mundo NO es una fuente válida aquí — la descripción curada es la ÚNICA fuente de verdad, incluso si crees saber más sobre ese sitio.
 Ejemplo real de este error (NUNCA lo repitas): la descripción curada de "Crepes & Waffles" dice textualmente "crepes dulces y salados, ensaladas y helados". Decir que ahí "se puede pedir bandeja paisa" es INVENTAR — bandeja paisa no aparece en esa descripción, así no exista o no exista ahí. Aunque sepas que es una cadena colombiana muy conocida, eso NO te autoriza a rellenar con platos típicos colombianos que no están escritos. Igual de inválido es llamar "comida local/gastronomía local" a algo cuya descripción diga otra cocina (un restaurante español con paellas es cocina ESPAÑOLA, no local).
 Si recomiendas 2-3 restaurantes, di QUÉ sirve cada uno citando solo lo de su descripción, para que el usuario elija con datos reales. Y NUNCA afirmes que un lugar "es perfecto para tu gusto de X" salvo que la descripción del lugar lo respalde de verdad; si encaja, nómbralo con precisión; si no, describe el lugar bien sin inventar una afinidad. Regla de auto-chequeo antes de responder: cada plato/ingrediente/especialidad/dato que vayas a nombrar debe poder señalarse, palabra por palabra, dentro de la descripción curada O del bloque LOCAL de ese lugar. Si no puedes señalarlo en ninguno de los dos, no lo digas.

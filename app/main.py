@@ -4,6 +4,7 @@ Correr:  uvicorn app.main:app --reload
 Docs:    http://localhost:8000/docs
 """
 import json
+import os
 import urllib.parse
 
 from fastapi import FastAPI, HTTPException, Depends, Header, Request
@@ -12,7 +13,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, Field
 
 from . import (context, db, engine, geo, llm, push, scheduler, search, seed_data,
-               watchers, auth, limits, email_send)
+               watchers, auth, limits, email_send, social_enrich)
 
 app = FastAPI(title="Voyra Companion", version="0.2.0")
 
@@ -58,6 +59,15 @@ def verified_user(user: dict = Depends(current_user)) -> dict:
         raise HTTPException(403, "Verifica tu email para usar esta función. "
                                  "Revisa tu correo o pide un nuevo enlace.")
     return user
+
+
+def admin_guard(x_admin_token: str | None = Header(default=None)) -> None:
+    """Protege la cola de revisión de enriquecimientos. Como aún no hay rol de
+    admin en el modelo de usuario, gateamos con un token de entorno
+    (VOYRA_ADMIN_TOKEN). Si no está configurado, los endpoints quedan cerrados."""
+    esperado = os.environ.get("VOYRA_ADMIN_TOKEN", "")
+    if not esperado or (x_admin_token or "").strip() != esperado:
+        raise HTTPException(403, "Acceso de administrador requerido.")
 
 
 def own_trip(tid: str, user: dict) -> dict:
@@ -673,6 +683,51 @@ def airport_arrival(tid: str, user: dict = Depends(current_user)):
 def destination_places(city: str):
     """Inspecciona la base curada para una ciudad (debug / verificación)."""
     return db.places_for_city(city)
+
+
+# ════════════════════ Enriquecimiento social (cola de revisión, admin) ════════════════════
+# Pipeline TikTok/IG → campo `dato`. Submit extrae un candidato y lo encola; el
+# fundador revisa y aprueba. Nada se publica sin aprobación. Gateado por VOYRA_ADMIN_TOKEN.
+
+class EnrichSubmitIn(BaseModel):
+    city: str
+    place_name: str           # debe coincidir EXACTO con destination_places.name
+    source_text: str          # caption / transcripción de la pieza social
+    source_type: str = "manual"   # tiktok | instagram | creator | manual
+    source_url: str | None = None
+
+
+@app.post("/admin/enrich/submit")
+def enrich_submit(body: EnrichSubmitIn, _: None = Depends(admin_guard)):
+    """Destila un dato local del texto social y, si pasa el umbral, lo encola
+    como 'pending'. Devuelve el resultado de la extracción (incluido el motivo de
+    descarte si no se encoló) para que el operador entienda la decisión."""
+    return social_enrich.submit(
+        body.place_name, body.city, body.source_text,
+        source_type=body.source_type, source_url=body.source_url,
+    )
+
+
+@app.get("/admin/enrich/pending")
+def enrich_pending(city: str | None = None, _: None = Depends(admin_guard)):
+    """Cola de mejoras en revisión (opcionalmente por ciudad)."""
+    return {"pending": db.list_enrichments(status="pending", city=city)}
+
+
+@app.post("/admin/enrich/{eid}/approve")
+def enrich_approve(eid: str, _: None = Depends(admin_guard)):
+    """Aprueba una mejora: pasa a superponerse en las recomendaciones al instante."""
+    if not db.set_enrichment_status(eid, "approved"):
+        raise HTTPException(404, "Mejora no encontrada.")
+    return {"ok": True, "status": "approved"}
+
+
+@app.post("/admin/enrich/{eid}/reject")
+def enrich_reject(eid: str, _: None = Depends(admin_guard)):
+    """Rechaza una mejora: no se mostrará nunca."""
+    if not db.set_enrichment_status(eid, "rejected"):
+        raise HTTPException(404, "Mejora no encontrada.")
+    return {"ok": True, "status": "rejected"}
 
 
 @app.get("/_diag")
