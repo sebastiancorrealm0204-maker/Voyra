@@ -668,7 +668,7 @@ LOCAL_BOGOTA: dict[str, dict] = {
     },
     "La Tavola Rústica": {
         "clave": "El italiano más bonito de la Zona T: jardín central al aire libre, producto importado de Italia.",
-        "pedir": "Las pizzas son lo más sólido — pide una de base. El spritz es la bebida de la casa, pídelo para arrancar. Si vas a pedir pasta, pregunta al mesero qué está bueno ese día; la carbonara no es tradicional (lleva crema).",
+        "pedir": "Las pizzas son lo más sólido — pide una de base. Si vas a pedir pasta, pregunta al mesero qué está bueno ese día; la carbonara no es tradicional (lleva crema).",
         "momento": "Almuerzo, de 12pm en adelante. Domingos cierra a las 6pm. Reserva recomendada, sobre todo fin de semana — el jardín se llena.",
         "ojo": "La pasta puede decepcionar si buscas autenticidad italiana estricta (la carbonara lleva crema). Las pizzas y los antipasti son donde brillan de verdad.",
         "dato": "El espacio tiene un jardín central con olivos y arquitectura de arco que se siente más Toscana que Bogotá — bueno para fotos y para una tarde larga.",

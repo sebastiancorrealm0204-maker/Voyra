@@ -796,7 +796,7 @@ BOGOTA = [
         "dir": "Cra. 11 #86-75, Bogotá, Colombia",
         "maps_query": "La Tavola Rustica restaurante Bogotá",
         "lat": 4.6694952, "lng": -74.0505153,
-        "descripcion": "Italiano de autor en casa con jardín central al aire libre — uno de los espacios más bonitos de la Zona T. Producto importado de Italia: pizzas, pastas, antipasti y una selección de vinos notable. El spritz es la bebida de la casa. Abre todos los días desde el mediodía; domingos cierra a las 6pm. Reservar recomendado.",
+        "descripcion": "Italiano de autor en casa con jardín central al aire libre — uno de los espacios más bonitos de la Zona T. Producto importado de Italia: pizzas, pastas y antipasti con una selección de vinos notable. Abre todos los días desde el mediodía; domingos cierra a las 6pm. Reservar recomendado.",
         "confianza": "alta",
         "tags": ["Cocina de autor", "Planes tranquilos", "Brunch y desayunos"],
     },
