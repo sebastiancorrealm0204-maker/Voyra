@@ -2456,6 +2456,8 @@ def all_seeds() -> list[dict]:
     se conservan en el dict; db.seed_destination_places ignora las claves que no
     sean columnas, así que no estorban.
     """
+    from .local_bogota import LOCAL_BOGOTA  # conocimiento local por lugar (Bogotá)
+
     out = []
     for p in BOGOTA + GUADALAJARA:
         if "lat" in p and "lng" in p:
@@ -2465,5 +2467,10 @@ def all_seeds() -> list[dict]:
         else:
             coords = geo.zone_coords(p["city_display"], p["zona"])
             lat, lng = coords if coords else (0.0, 0.0)
-        out.append({**p, "lat": lat, "lng": lng})
+        # Pega el conocimiento local (solo Bogotá por ahora; indexado por nombre).
+        # Si el lugar ya trae `local` explícito en el seed, ese gana.
+        local = p.get("local")
+        if local is None and p["city_display"] == "Bogotá":
+            local = LOCAL_BOGOTA.get(p["name"])
+        out.append({**p, "lat": lat, "lng": lng, "local": local})
     return out

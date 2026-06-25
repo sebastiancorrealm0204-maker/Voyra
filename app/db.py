@@ -179,6 +179,7 @@ CREATE TABLE IF NOT EXISTS destination_places (
   rating REAL,
   price_level TEXT,
   tags TEXT,                      -- JSON array de tags del vocabulario controlado (cruce directo con GUSTOS); NULL = sin tags
+  local TEXT,                     -- JSON object con conocimiento local por lugar (clave, pedir/ver, momento, ojo, dato, practico); NULL = sin curación local
   created_at REAL NOT NULL
 );
 CREATE TABLE IF NOT EXISTS place_recommendations (
@@ -293,6 +294,8 @@ def init_db():
             c.execute("ALTER TABLE destination_places ADD COLUMN price_level TEXT")
         if "tags" not in dp_cols:
             c.execute("ALTER TABLE destination_places ADD COLUMN tags TEXT")
+        if "local" not in dp_cols:
+            c.execute("ALTER TABLE destination_places ADD COLUMN local TEXT")
 
 
 def _pg_migrate_columns():
@@ -307,6 +310,7 @@ def _pg_migrate_columns():
         ("destination_places", "rating",      "DOUBLE PRECISION"),
         ("destination_places", "price_level", "TEXT"),
         ("destination_places", "tags",        "TEXT"),
+        ("destination_places", "local",       "TEXT"),
         ("notifications",      "extra",       "TEXT"),
     ]
     with conn() as c:
@@ -625,6 +629,14 @@ def places_for_city(city: str) -> list[dict]:
                 d["tags"] = []
         else:
             d["tags"] = []
+        # local se guarda como JSON object; devolverlo ya parseado (o None)
+        if d.get("local"):
+            try:
+                d["local"] = json.loads(d["local"])
+            except (ValueError, TypeError):
+                d["local"] = None
+        else:
+            d["local"] = None
         out.append(d)
     return out
 
@@ -651,13 +663,14 @@ def seed_destination_places(places: list[dict]):
         c.execute("DELETE FROM destination_places WHERE city=?", (city,))
         for p in places:
             c.execute(
-                "INSERT INTO destination_places (id, city, city_display, name, category, zona, lat, lng, descripcion, confianza, maps_query, dir, place_id, rating, price_level, tags, created_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO destination_places (id, city, city_display, name, category, zona, lat, lng, descripcion, confianza, maps_query, dir, place_id, rating, price_level, tags, local, created_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (new_id(), norm_city(p["city_display"]), p["city_display"], p["name"], p["category"],
                  p["zona"], p["lat"], p["lng"], p["descripcion"], p["confianza"],
                  p.get("maps_query"), p.get("dir"), p.get("place_id"),
                  p.get("rating"), p.get("price_level"),
                  json.dumps(p.get("tags"), ensure_ascii=False) if p.get("tags") else None,
+                 json.dumps(p.get("local"), ensure_ascii=False) if p.get("local") else None,
                  now()),
             )
 
