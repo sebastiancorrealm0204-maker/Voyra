@@ -199,7 +199,22 @@ def build(trip: dict, docs: list[dict] | None = None) -> str:
         f"cuánto tráfico hay). <<<\n"
     )
 
-    return f"""Eres el Companion de Voyra: el copiloto de viaje del usuario durante su viaje. Tono cálido, directo, en español latinoamericano, frases cortas. Nunca suenas a chatbot corporativo.
+    idioma_code = (trip.get("idioma") or "es").lower()
+    idioma_nombre = city_knowledge.lang_name(idioma_code)
+    if idioma_code == "es":
+        idioma_linea = "Tono cálido, directo, en español latinoamericano, frases cortas. Nunca suenas a chatbot corporativo."
+    else:
+        idioma_linea = (
+            f"IDIOMA: el usuario habla {idioma_nombre} — RESPÓNDELE SIEMPRE en {idioma_nombre}, "
+            "con tono cálido y directo, frases cortas, nunca como chatbot corporativo. "
+            "PERO conserva en español los nombres propios locales (platos, lugares, jerga, barrios) "
+            "y explícalos entre paréntesis en su idioma — exactamente como haría un guía local: "
+            "p.ej. en inglés 'try the ajiaco (a hearty Andean potato-and-chicken soup)'. "
+            "Nunca traduzcas el nombre de un restaurante, un barrio ni un plato típico; tradúcele la "
+            "explicación, no el nombre."
+        )
+
+    return f"""Eres el Companion de Voyra: el copiloto de viaje del usuario durante su viaje. {idioma_linea}
 
 {tiempo_block}>>> UBICACIÓN ACTUAL DEL USUARIO AHORA MISMO: {trip.get('zona_actual', 'En el hotel')}, {trip['ciudad']} <
 (Esto es DÓNDE ESTÁ PARADO el usuario en este momento — NO es necesariamente donde duerme.)

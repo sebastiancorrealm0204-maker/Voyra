@@ -523,3 +523,36 @@ def country_for_city(city: str) -> str:
     """País del DESTINO (no del usuario). Cadena vacía si no se conoce — en ese
     caso el scanner usa solo el nombre de la ciudad."""
     return CITY_COUNTRY.get(norm_city(city), "")
+
+
+# Idioma que se HABLA en el destino (no el del usuario). Es el idioma DESTINO del
+# traductor: las frases que el viajero necesita decirle a un local. Para destinos
+# del mismo idioma del usuario, el traductor se convierte en glosario local.
+CITY_LANG: dict[str, str] = {
+    "bogota": "es",
+    "cartagena": "es",
+    "medellin": "es",
+    "cali": "es",
+    "guadalajara": "es",
+    "ciudad de mexico": "es",
+    "cancun": "es",
+    "monterrey": "es",
+}
+
+# Nombre legible del idioma para inyectar en el prompt del Companion.
+LANG_NAME: dict[str, str] = {
+    "es": "español latinoamericano",
+    "en": "English",
+    "pt": "português (Brasil)",
+    "fr": "français",
+}
+
+
+def lang_for_city(city: str) -> str:
+    """Idioma que se habla en el destino (código ISO corto). 'es' por defecto."""
+    return CITY_LANG.get(norm_city(city), "es")
+
+
+def lang_name(code: str) -> str:
+    """Nombre legible del idioma del usuario, para el system prompt."""
+    return LANG_NAME.get((code or "es").lower(), LANG_NAME["es"])

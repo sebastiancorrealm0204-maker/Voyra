@@ -115,6 +115,7 @@ class TripIn(BaseModel):
     vuelo_regreso: str = ""
     pais: str = "Colombia"
     gustos: list[str] = Field(default_factory=list)
+    idioma: str = "es"            # idioma del usuario (es | en | pt | fr) — en qué le habla el Companion
 
 
 class TripPatchIn(BaseModel):
@@ -127,6 +128,7 @@ class TripPatchIn(BaseModel):
     vuelo_regreso: str | None = None
     pais: str | None = None
     gustos: list[str] | None = None
+    idioma: str | None = None
     # True una vez que el usuario vio/cerró la MiniGuia de bienvenida de ESTE
     # viaje. Por viaje (no por usuario): cada viaje nuevo la muestra una vez,
     # pero reabrir el mismo viaje —en este dispositivo o en otro— no la repite.
@@ -350,12 +352,27 @@ def create_trip(t: TripIn, user: dict = Depends(verified_user)):
             "mensaje": f"Tu plan permite {tope} viajes activos. "
                        "Borra uno para crear otro."})
     tid = db.create_trip(t.model_dump(), user_id=user["id"])
-    if t.ciudad.strip():
-        saludo = (f"¡Listo! Ya estoy vigilando tu vuelo, el clima y lo que se mueve en {t.ciudad}. "
-                  "Para avisarte solo de lo que te sirve: ¿qué planes tienes para hoy y mañana?")
-    else:
-        saludo = ("¡Hola! Soy tu Companion. Sube tus reservas (vuelo, hotel, tours) y armo tu "
-                  "viaje contigo. También puedes contarme a dónde vas y cuándo.")
+    _idi = (t.idioma or "es").lower()
+    _saludos = {
+        "es": (f"¡Listo! Ya estoy vigilando tu vuelo, el clima y lo que se mueve en {t.ciudad}. "
+               "Para avisarte solo de lo que te sirve: ¿qué planes tienes para hoy y mañana?",
+               "¡Hola! Soy tu Companion. Sube tus reservas (vuelo, hotel, tours) y armo tu "
+               "viaje contigo. También puedes contarme a dónde vas y cuándo."),
+        "en": (f"All set! I'm already watching your flight, the weather and what's happening in {t.ciudad}. "
+               "So I only ping you with what's useful: what are your plans for today and tomorrow?",
+               "Hi! I'm your Companion. Upload your bookings (flight, hotel, tours) and I'll build your "
+               "trip with you. You can also just tell me where you're going and when."),
+        "pt": (f"Pronto! Já estou de olho no seu voo, no clima e no que rola em {t.ciudad}. "
+               "Para te avisar só do que importa: quais são seus planos para hoje e amanhã?",
+               "Oi! Sou o seu Companion. Suba suas reservas (voo, hotel, passeios) e eu monto sua "
+               "viagem com você. Você também pode só me dizer para onde vai e quando."),
+        "fr": (f"C'est prêt ! Je surveille déjà ton vol, la météo et ce qui se passe à {t.ciudad}. "
+               "Pour ne t'alerter que de l'utile : quels sont tes plans pour aujourd'hui et demain ?",
+               "Salut ! Je suis ton Companion. Ajoute tes réservations (vol, hôtel, activités) et je "
+               "construis ton voyage avec toi. Tu peux aussi simplement me dire où tu vas et quand."),
+    }
+    con_ciudad, sin_ciudad = _saludos.get(_idi, _saludos["es"])
+    saludo = con_ciudad if t.ciudad.strip() else sin_ciudad
     db.insert("messages", {"trip_id": tid, "role": "companion", "content": saludo})
 
     # Geocodificar el hotel en background para no demorar la respuesta del
