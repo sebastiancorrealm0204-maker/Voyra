@@ -49,13 +49,14 @@ def _local_suffix(local: dict | None) -> str:
     return " · LOCAL → " + " | ".join(partes)
 
 
-def _lugares_block(trip: dict) -> str:
+def _lugares_block(trip: dict, mensaje: str = "") -> str:
     """Inyecta los lugares curados de la ciudad en el system prompt.
 
-    Ordena por distancia desde la zona_actual del usuario (si hay GPS usa
-    las coordenadas reales; si no, el centroide de la zona). Incluye los
-    primeros 25 para no exceder el contexto. Esto es lo que le permite al
-    LLM hacer recomendaciones concretas SIN alucinar.
+    Ordena por distancia desde la zona_actual del usuario. Incluye los primeros
+    30 con su bloque LOCAL completo. ADEMÁS, si el usuario menciona un lugar por
+    su nombre en `mensaje`, ese lugar se ANCLA al top con su bloque completo
+    aunque esté lejos — así el Companion siempre ve los datos (incluidas las
+    joyas sociales) del lugar por el que preguntan, sin importar la ubicación.
     """
     city = trip.get("ciudad", "")
     places = db.places_for_city(city)
@@ -71,8 +72,34 @@ def _lugares_block(trip: dict) -> str:
             key=lambda p: geo.haversine_km(origin[0], origin[1], p["lat"], p["lng"]),
         )
 
-    # Top 30 con descripción completa — para recomendar por cercanía
-    top = places[:30]
+    # Anclar lugares mencionados por nombre en el mensaje del usuario: aunque
+    # estén lejos, deben entrar al top con su bloque LOCAL completo (es el lugar
+    # por el que están preguntando). Match por palabras significativas: si las
+    # palabras distintivas del nombre curado (≥4 letras, sin artículos ni
+    # genéricos) aparecen en el mensaje, se ancla. Así "La Tavola" ancla a
+    # "La Tavola Rústica", y "puerta falsa" ancla a "La Puerta Falsa".
+    _STOP = {"la", "el", "los", "las", "de", "del", "y", "restaurante", "cafe",
+             "café", "bar", "the", "rustica", "rústica"}
+    msg_low = (mensaje or "").lower()
+    anclados: list[dict] = []
+    if msg_low:
+        for p in places:
+            palabras = [w for w in p["name"].lower().replace("(", " ").replace(")", " ").split()
+                        if len(w) >= 4 and w not in _STOP]
+            if not palabras:
+                continue
+            # Ancla si TODAS las palabras distintivas del nombre están en el mensaje.
+            if all(w in msg_low for w in palabras):
+                anclados.append(p)
+
+    # Top: los anclados primero (sin duplicar), luego los más cercanos.
+    top = list(anclados)
+    for p in places:
+        if p not in top:
+            top.append(p)
+        if len(top) >= 30:
+            break
+
     lineas = []
     for p in top:
         dist = ""
@@ -97,9 +124,9 @@ def _lugares_block(trip: dict) -> str:
 
     # Índice del resto de lugares curados (solo nombre + zona). Evita que el
     # Companion diga "no tengo ese lugar" cuando SÍ está curado pero quedó fuera
-    # del top 30 por distancia. Si el usuario pregunta por uno de estos, el
+    # del top por distancia. Si el usuario pregunta por uno de estos, el
     # Companion sabe que existe y es válido recomendarlo.
-    resto = places[30:]
+    resto = [p for p in places if p not in top]
     if resto:
         nombres = ", ".join(f"{p['name']} ({p['zona']})" for p in resto)
         bloque += (
@@ -161,7 +188,7 @@ def _gustos_block(trip: dict) -> str:
     )
 
 
-def build(trip: dict, docs: list[dict] | None = None) -> str:
+def build(trip: dict, docs: list[dict] | None = None, mensaje: str = "") -> str:
     docs = docs if docs is not None else db.rows("documents", trip["id"])
     docs_block = ""
     if docs:
@@ -192,7 +219,7 @@ def build(trip: dict, docs: list[dict] | None = None) -> str:
                 "tranquilizador: que no se sienta perdido.\n"
             )
 
-    lugares_block = _lugares_block(trip)
+    lugares_block = _lugares_block(trip, mensaje)
     ciudad_block = city_knowledge.build_block(trip["ciudad"])
     gustos_block = _gustos_block(trip)
 

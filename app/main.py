@@ -811,7 +811,7 @@ def chat(tid: str, c: ChatIn, user: dict = Depends(verified_user)):
     # mostrar "se me cruzaron los cables". Si falla, degradamos con un mensaje
     # honesto en vez de devolver un 500.
     try:
-        reply = llm.chat(context.build(trip), history)
+        reply = llm.chat(context.build(trip, mensaje=c.message), history)
     except llm.RateLimited:
         reply = ("Ahora mismo tengo mucha demanda y no alcancé a responderte. "
                  "Dame unos segundos y reenvíame el mensaje.")
