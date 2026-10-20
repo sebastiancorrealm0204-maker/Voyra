@@ -5,6 +5,9 @@ __pycache__/
 
 # Base de datos
 *.db
+*.db-wal
+*.db-shm
+*.db-journal
 
 # Variables de entorno
 .env
@@ -12,5 +15,8 @@ __pycache__/
 # Virtual environment
 venv/
 .venv/
-echo "private_key.pem" >> .gitignore
-echo "public_key.pem" >> .gitignore
+private_key.pem
+public_key.pem
+
+# Tests
+.pytest_cache/

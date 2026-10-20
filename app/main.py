@@ -4,33 +4,130 @@ Correr:  uvicorn app.main:app --reload
 Docs:    http://localhost:8000/docs
 """
 import json
+import logging
 import os
+import time
 import urllib.parse
+import uuid
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Depends, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
-from . import (context, db, engine, geo, llm, push, scheduler, search, seed_data,
-               watchers, auth, limits, email_send, social_enrich)
+from . import (context, db, engine, geo, llm, memoria, net, places_live, push, scheduler,
+               search, seed_data, verificacion, watchers, auth, limits, email_send, social_enrich,
+               waitlist)
 
-app = FastAPI(title="Voyra Companion", version="0.2.0")
+# Logging estructurado (clave=valor) en un solo formato para toda la app. Railway
+# captura stdout; LOG_LEVEL=DEBUG para depurar.
+if not logging.getLogger().handlers:
+    logging.basicConfig(
+        level=os.environ.get("LOG_LEVEL", "INFO").upper(),
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    )
+log = logging.getLogger("voyra.api")
+
+# Raíz del repo: los archivos del frontend se sirven por ruta absoluta (antes
+# dependían del directorio desde el que se lanzara uvicorn).
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Threads del threadpool de FastAPI para endpoints sync. El default de anyio es
+# 40: con 40 chats esperando al LLM (hasta ~50 s c/u) se bloqueaban TODOS los
+# endpoints, incluido /health. Configurable por env.
+_THREADPOOL_SIZE = int(os.environ.get("THREADPOOL_SIZE", "100"))
+
+# Pool para el fan-out del chat (respuesta LLM ∥ router ∥ extracción ∥ Places).
+_fanout = ThreadPoolExecutor(max_workers=int(os.environ.get("CHAT_FANOUT_WORKERS", "32")),
+                             thread_name_prefix="voyra-chat")
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Arranque/apagado ordenado (reemplaza los on_event deprecados).
+    Arranque: amplía el threadpool y prende el scheduler proactivo.
+    Apagado: scheduler → pushes en vuelo → cliente HTTP → pool de Postgres."""
+    try:
+        import anyio.to_thread
+        anyio.to_thread.current_default_thread_limiter().total_tokens = _THREADPOOL_SIZE
+    except Exception:
+        log.exception("threadpool_config_error")
+    # Si APScheduler no está instalado, la app sigue normal sin modo proactivo.
+    scheduler.start()
+    log.info("app_start llm=%s db=%s", llm.MODE, "postgres" if db.IS_POSTGRES else "sqlite")
+    try:
+        yield
+    finally:
+        scheduler.shutdown()
+        push.shutdown()
+        _fanout.shutdown(wait=False, cancel_futures=True)
+        net.close()
+        db.close_pool()
+        log.info("app_stop")
+
+
+app = FastAPI(title="Voyra Companion", version="0.2.0", lifespan=lifespan)
 
 # CORS: permite que el frontend (corriendo en el navegador, ej. un Artifact de
 # Claude) llame a este backend en localhost. En producción, reemplaza "*" por
 # el dominio real del frontend.
+# (Esto incluye la landing en Vercel, que llama a POST /waitlist sin credenciales.)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# GZip: el HTML del frontend (~cientos de KB), /destinations/{city}/places y los
+# historiales JSON se comprimen 5-10x. Respuestas pequeñas (<1 KB) no se tocan.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
+
+
+@app.middleware("http")
+async def _log_requests(request: Request, call_next):
+    """Log por request (método, ruta, status, duración) + X-Request-ID para
+    poder cruzar un error del front con la línea del log."""
+    rid = request.headers.get("x-request-id") or uuid.uuid4().hex[:12]
+    t0 = time.perf_counter()
+    response = await call_next(request)
+    dur_ms = (time.perf_counter() - t0) * 1000
+    response.headers["X-Request-ID"] = rid
+    nivel = logging.WARNING if response.status_code >= 500 or dur_ms > 15000 else logging.INFO
+    log.log(nivel, "req rid=%s method=%s path=%s status=%s dur_ms=%.0f",
+            rid, request.method, request.url.path, response.status_code, dur_ms)
+    return response
+
+
+def _es_db_saturada(exc: Exception) -> bool:
+    """Pool de Postgres agotado o SQLite bloqueado: falla transitoria → 503."""
+    nombre = type(exc).__name__
+    if nombre in ("PoolTimeout", "TooManyRequests"):
+        return True
+    import sqlite3
+    return isinstance(exc, sqlite3.OperationalError) and "locked" in str(exc).lower()
+
+
+@app.exception_handler(Exception)
+async def _error_no_manejado(request: Request, exc: Exception):
+    """Ningún error interno sale como texto plano ni filtra detalles: JSON con
+    un mensaje genérico (y 503 + Retry-After si es saturación transitoria de la
+    DB, para que el cliente reintente)."""
+    if _es_db_saturada(exc):
+        log.warning("db_saturada path=%s error=%s", request.url.path, type(exc).__name__)
+        return JSONResponse({"detail": "Servicio ocupado, intenta de nuevo en unos segundos."},
+                            status_code=503, headers={"Retry-After": "2"})
+    log.exception("error_no_manejado path=%s", request.url.path)
+    return JSONResponse({"detail": "Error interno. Intenta de nuevo."}, status_code=500)
+
 
 db.init_pool()       # abre el ConnectionPool de Postgres (no-op en modo SQLite)
 db.init_db()
 auth.init_auth()
 limits.init_limits()
+waitlist.init_waitlist()
 db.seed_destination_places(seed_data.all_seeds())
 
 
@@ -71,11 +168,11 @@ def admin_guard(x_admin_token: str | None = Header(default=None)) -> None:
 
 
 def own_trip(tid: str, user: dict) -> dict:
-    """Carga el trip y verifica que sea del usuario. 404 si no existe, 403 si no es suyo."""
-    trip = db.get_trip(tid)
+    """Carga el trip y verifica que sea del usuario. 404 si no existe, 403 si no es suyo.
+    Una sola query (trip + dueño)."""
+    trip, owner = db.get_trip_with_owner(tid)
     if not trip:
         raise HTTPException(404, "trip no existe")
-    owner = db.trip_owner(tid)
     # Trips legacy sin dueño: se permiten (compat con datos previos a auth).
     if owner is not None and owner != user["id"]:
         raise HTTPException(403, "Este viaje no es tuyo.")
@@ -100,19 +197,6 @@ def _consume_or_429(user: dict, resource: str):
             "usado": e.used,
             "mensaje": f"Alcanzaste tu límite diario de {e.limit} para esta función. "
                        "Se renueva mañana."})
-
-
-@app.on_event("startup")
-def _arrancar_scheduler():
-    """Arranca el scheduler proactivo (check-ins por hora local del destino).
-    Si APScheduler no está instalado, la app sigue normal sin modo proactivo."""
-    scheduler.start()
-
-
-@app.on_event("shutdown")
-def _cerrar_pool():
-    """Cierra el ConnectionPool de Postgres al apagar la app (no-op en SQLite)."""
-    db.close_pool()
 
 
 # ── Schemas ──
@@ -153,21 +237,24 @@ class SignalIn(BaseModel):
 
 
 class LocationIn(BaseModel):
-    zona: str = "En el hotel"
-    lat: float | None = None
-    lng: float | None = None
+    zona: str = Field("En el hotel", max_length=200)
+    lat: float | None = Field(None, ge=-90, le=90)
+    lng: float | None = Field(None, ge=-180, le=180)
     disparar_geofence: bool = False
 
 
 class ChatIn(BaseModel):
-    message: str
+    # Tope defensivo: un mensaje gigante solo quema tokens (y cuota del proveedor).
+    message: str = Field(..., max_length=10_000)
 
 
 class DocIn(BaseModel):
-    filename: str
-    text_content: str = ""           # texto del documento (.txt o ya extraído)
-    image_data_url: str = ""         # data:image/...;base64,... para fotos/capturas de reservas
-    pdf_data_url: str = ""           # data:application/pdf;base64,... — se extrae texto en backend
+    # Topes defensivos (~15 MB de archivo en base64): evitan que un upload
+    # descomunal tumbe el proceso por memoria. Holgados para fotos de celular.
+    filename: str = Field(..., max_length=300)
+    text_content: str = Field("", max_length=500_000)       # texto del documento (.txt o ya extraído)
+    image_data_url: str = Field("", max_length=20_000_000)  # data:image/...;base64,... fotos/capturas
+    pdf_data_url: str = Field("", max_length=20_000_000)    # data:application/pdf;base64,...
 
 
 class FeedbackIn(BaseModel):
@@ -347,8 +434,13 @@ def _geocodificar_hotel_bg(tid: str, nombre_hotel: str, ciudad: str, pais: str =
                     "google_name_hotel": coords.get("google_name", ""),
                 })
         except Exception:
-            pass  # silencioso — el trip sigue funcionando sin coordenadas del hotel
+            # El trip sigue funcionando sin coordenadas del hotel. (Antes este
+            # except se tragaba un NameError: `places_live` no estaba importado
+            # en este módulo, así que el geocoding NUNCA corría.)
+            log.warning("geocode_hotel_fallo trip=%s", tid, exc_info=True)
 
+    if not places_live.disponible():
+        return  # sin key no hay nada que geocodificar: ni gastamos un thread
     threading.Thread(target=_run, daemon=True).start()
 
 
@@ -397,10 +489,7 @@ def create_trip(t: TripIn, user: dict = Depends(verified_user)):
 @app.get("/trips")
 def list_my_trips(user: dict = Depends(current_user)):
     """Lista los viajes del usuario autenticado."""
-    with db.conn() as c:
-        rs = c.execute("SELECT id FROM trips WHERE user_id=? ORDER BY created_at DESC",
-                       (user["id"],)).fetchall()
-    return {"trips": [db.get_trip(r["id"]) for r in rs]}
+    return {"trips": db.list_trips_for_user(user["id"])}
 
 
 @app.patch("/trips/{tid}")
@@ -558,7 +647,11 @@ def ingest_signal(tid: str, s: SignalIn, user: dict = Depends(current_user)):
 def duffel(tid: str, payload: dict):
     # Webhook de proveedor: no lleva sesión de usuario. Se deja sin auth de
     # usuario a propósito (en producción, validar firma del webhook de Duffel).
-    return watchers.duffel_webhook(tid, payload)
+    # Idempotente por payload["id"] (ver watchers.duffel_webhook).
+    try:
+        return watchers.duffel_webhook(tid, payload)
+    except KeyError:
+        raise HTTPException(404, "trip no existe")
 
 
 @app.post("/trips/{tid}/location")
@@ -646,8 +739,8 @@ def nearby_chain(tid: str, q: str, orig_lat: float | None = None,
 
     Pasa orig_lat/orig_lng (GPS del usuario) o usa la ubicación guardada del trip.
     """
-    from . import places_live
     trip = own_trip(tid, user)
+    radio_m = max(100, min(int(radio_m), 50_000))  # Google rechaza radios fuera de rango
     olat = orig_lat or trip.get("lat_actual")
     olng = orig_lng or trip.get("lng_actual")
     if olat is None or olng is None:
@@ -818,85 +911,114 @@ def chat(tid: str, c: ChatIn, user: dict = Depends(verified_user)):
     if not es_tap:
         _consume_or_429(user, "chat")
     db.insert("messages", {"trip_id": tid, "role": "user", "content": c.message})
-    history = [{"role": m["role"], "content": m["content"]} for m in db.rows("messages", tid)]
+    # Solo los últimos CHAT_HISTORY_MAX mensajes (antes: los 200 MÁS VIEJOS).
+    history = context.historial(tid)
+
+    # ── PARALELISMO ──
+    # La respuesta del chat NO depende de la intención: arranca YA en otro
+    # thread mientras el router clasifica y, si toca, se extraen planes o se
+    # busca la cadena en Google. Antes era router → chat → extracción en serie
+    # (hasta 3 llamadas LLM una tras otra); ahora el turno dura ~lo que la más
+    # lenta de ellas.
+    system = context.build(trip, mensaje=c.message, memoria=memoria.bloque(user["id"], tid))
+    fut_reply = _fanout.submit(llm.chat, system, history)
 
     # ── ROUTER DE INTENCIÓN ──
-    # Una sola llamada BARATA (sin el system prompt grande) clasifica el mensaje.
-    # Con eso decidimos qué llamadas caras hacer DESPUÉS. Antes corrían SIEMPRE
-    # las tres (chat + extracción de planes + cadenas), lo que reventaba el límite
-    # de tokens/min de Groq (los 429 del dashboard). Ahora cada subtarea corre
-    # solo cuando la intención la pide.
+    # Una sola llamada BARATA (sin el system prompt grande) clasifica el mensaje
+    # (y casi siempre ni eso: las reglas rápidas deciden sin LLM). Con eso
+    # decidimos qué subtareas extra correr. Cada subtarea corre solo cuando la
+    # intención la pide (evita los 429 de tokens/min de Groq).
     from . import router as router_mod
     intent = router_mod.clasificar(c.message, trip) if not es_tap else {"intencion": "charla"}
     intencion = intent["intencion"]
+
+    fut_planes = None
+    if not es_tap and intencion == "agendar_plan":
+        fut_planes = _fanout.submit(_propuestas_de_chat, c.message, trip)
+    fut_cadena = None
+    if not es_tap and intencion == "buscar_cadena":
+        fut_cadena = _fanout.submit(_buscar_cadena_chat, c.message, trip, user["id"])
 
     # La conversación es el producto: una falla transitoria del proveedor LLM
     # (timeout, 429 tras failover, corte de red) NO debe tumbar el endpoint ni
     # mostrar "se me cruzaron los cables". Si falla, degradamos con un mensaje
     # honesto en vez de devolver un 500.
     try:
-        reply = llm.chat(context.build(trip, mensaje=c.message), history)
+        reply = fut_reply.result()
     except llm.RateLimited:
         reply = ("Ahora mismo tengo mucha demanda y no alcancé a responderte. "
                  "Dame unos segundos y reenvíame el mensaje.")
-    except Exception:
+    except Exception as e:
+        log.warning("chat_fallback trip=%s error=%s", tid, type(e).__name__)
         reply = ("Se me trabó la conexión un momento y no alcancé a procesar eso. "
                  "Mándamelo de nuevo y lo retomo al instante.")
+    # Verificación que corrige: si la respuesta atribuye a un lugar curado algo
+    # que su ficha no respalda (caso real: "Crepes & Waffles" + "bandeja paisa"),
+    # se reescribe o recorta ANTES de guardarla y mostrarla. Se guarda la versión
+    # corregida para que el próximo turno no arrastre el error del historial.
+    reply, verificacion_info = verificacion.verificar_y_corregir(
+        reply, db.places_for_city(trip.get("ciudad", "")))
     db.insert("messages", {"trip_id": tid, "role": "companion", "content": reply})
 
-    # Red de seguridad: ¿el chat inventó un plato que no está en la descripción
-    # curada del lugar que mencionó? (caso real: "Crepes & Waffles" + "bandeja
-    # paisa"). No bloqueamos la respuesta — solo lo dejamos en logs para poder
-    # ver si el prompt sigue fallando y reforzarlo o ajustar la curación.
-    try:
-        from . import food_guard
-        food_guard.verificar_respuesta(reply, db.places_for_city(trip.get("ciudad", "")))
-    except Exception:
-        pass
-
-    # Extracción de planes: SOLO si el router dice que el usuario está agendando.
-    # Antes corría en CADA mensaje (una llamada LLM extra siempre). Ahora se salta
-    # por completo en navegación, búsqueda, recomendación y charla → menos tokens
-    # y, de paso, mata el bug de "quiero volver al hotel" → "¿lo anoto?".
-    propuestas = []
-    if not es_tap and intencion == "agendar_plan":
-        from . import plans as plans_mod, timeutil
-        propuestas = plans_mod.normalizar_lista(
-            llm.extract_plans_from_chat(c.message, trip), origen="chat")
-        propuestas = plans_mod.limpiar_lugar_ciudad(propuestas, trip.get("ciudad", ""))
-        propuestas = plans_mod.enriquecer_con_curacion(
-            propuestas, db.places_for_city(trip.get("ciudad", "")), db.best_place_match)
-        try:
-            ahora = timeutil.now_local(trip)
-            propuestas = plans_mod.rellenar_fechas(propuestas, c.message, ahora)
-        except Exception:
-            pass
-
-    # Búsqueda en vivo de cadenas: SOLO si el router la pidió (no en cada mensaje).
-    chain_results = None
-    if not es_tap and intencion == "buscar_cadena":
-        from . import places_live
-        cadena_q = places_live.detectar_busqueda_cadena(c.message)
-        if cadena_q and places_live.disponible():
-            olat = trip.get("lat_actual")
-            olng = trip.get("lng_actual")
-            if olat is None or olng is None:
-                coords = geo.resolve_origin(trip)
-                if coords:
-                    olat, olng = coords
-            if olat and olng:
-                try:
-                    limits.check_and_consume(user["id"], "maps")
-                    resultados = places_live.buscar_cerca(cadena_q, olat, olng)
-                    if resultados:
-                        chain_results = {"query": cadena_q, "items": resultados}
-                except limits.QuotaError:
-                    chain_results = {"query": cadena_q, "items": [],
-                                     "nota": "Llegaste a tu límite de búsquedas en vivo por hoy. "
-                                             "Se renueva mañana."}
+    propuestas = _resultado_o(fut_planes, [], "planes")
+    chain_results = _resultado_o(fut_cadena, None, "cadena")
 
     return {"reply": reply, "planes_propuestos": propuestas, "chain_results": chain_results,
-            "intencion": intencion, "restante_chat": limits.remaining(user["id"], "chat")}
+            "intencion": intencion, "restante_chat": limits.remaining(user["id"], "chat"),
+            "verificacion": verificacion_info}
+
+
+def _resultado_o(fut, default, nombre: str):
+    """Resultado de una subtarea del chat; si falló, `default` (nunca un 500)."""
+    if fut is None:
+        return default
+    try:
+        return fut.result()
+    except Exception:
+        log.warning("chat_subtarea_fallo subtarea=%s", nombre, exc_info=True)
+        return default
+
+
+def _propuestas_de_chat(mensaje: str, trip: dict) -> list[dict]:
+    """Extracción de planes: SOLO cuando el router dice que el usuario está
+    agendando. Antes corría en CADA mensaje (una llamada LLM extra siempre); se
+    salta en navegación, búsqueda, recomendación y charla → menos tokens y, de
+    paso, mata el bug de "quiero volver al hotel" → "¿lo anoto?"."""
+    from . import plans as plans_mod, timeutil
+    propuestas = plans_mod.normalizar_lista(
+        llm.extract_plans_from_chat(mensaje, trip), origen="chat")
+    propuestas = plans_mod.limpiar_lugar_ciudad(propuestas, trip.get("ciudad", ""))
+    propuestas = plans_mod.enriquecer_con_curacion(
+        propuestas, db.places_for_city(trip.get("ciudad", "")), db.best_place_match)
+    try:
+        ahora = timeutil.now_local(trip)
+        propuestas = plans_mod.rellenar_fechas(propuestas, mensaje, ahora)
+    except Exception:
+        pass
+    return propuestas
+
+
+def _buscar_cadena_chat(mensaje: str, trip: dict, user_id: str) -> dict | None:
+    """Búsqueda en vivo de cadenas: SOLO si el router la pidió (no en cada mensaje)."""
+    cadena_q = places_live.detectar_busqueda_cadena(mensaje)
+    if not (cadena_q and places_live.disponible()):
+        return None
+    olat = trip.get("lat_actual")
+    olng = trip.get("lng_actual")
+    if olat is None or olng is None:
+        coords = geo.resolve_origin(trip)
+        if coords:
+            olat, olng = coords
+    if not (olat and olng):
+        return None
+    try:
+        limits.check_and_consume(user_id, "maps")
+    except limits.QuotaError:
+        return {"query": cadena_q, "items": [],
+                "nota": "Llegaste a tu límite de búsquedas en vivo por hoy. "
+                        "Se renueva mañana."}
+    resultados = places_live.buscar_cerca(cadena_q, olat, olng)
+    return {"query": cadena_q, "items": resultados} if resultados else None
 
 
 # ── Documentos ──
@@ -904,21 +1026,29 @@ def chat(tid: str, c: ChatIn, user: dict = Depends(verified_user)):
 def upload_doc(tid: str, d: DocIn, user: dict = Depends(verified_user)):
     trip = own_trip(tid, user)
     _consume_or_429(user, "document")  # extracción/visión = LLM caro
-    if d.pdf_data_url:
-        from . import docparse
-        texto = docparse.pdf_b64_to_text(d.pdf_data_url)
-        if texto:
-            r = llm.extract_document(texto, d.filename, trip)
+    try:
+        if d.pdf_data_url:
+            from . import docparse
+            texto = docparse.pdf_b64_to_text(d.pdf_data_url)
+            if texto:
+                r = llm.extract_document(texto, d.filename, trip)
+            else:
+                # PDF escaneado (sin texto): no hay capa de texto que leer.
+                r = {"tipo": "otro",
+                     "resumen": f"PDF {d.filename} recibido, pero no tiene texto legible (parece escaneado).",
+                     "confirmacion": f"Guardé {d.filename}. Si es una foto/escaneo, súbela como imagen para leerla mejor.",
+                     "planes": []}
+        elif d.image_data_url:
+            r = llm.extract_document_image(d.image_data_url, d.filename, trip)
         else:
-            # PDF escaneado (sin texto): no hay capa de texto que leer.
-            r = {"tipo": "otro",
-                 "resumen": f"PDF {d.filename} recibido, pero no tiene texto legible (parece escaneado).",
-                 "confirmacion": f"Guardé {d.filename}. Si es una foto/escaneo, súbela como imagen para leerla mejor.",
-                 "planes": []}
-    elif d.image_data_url:
-        r = llm.extract_document_image(d.image_data_url, d.filename, trip)
-    else:
-        r = llm.extract_document(d.text_content, d.filename, trip)
+            r = llm.extract_document(d.text_content, d.filename, trip)
+    except Exception as e:
+        # Proveedor caído/saturado: 503 claro (el front puede reintentar) en vez
+        # de un 500 opaco. No guardamos un documento vacío en el contexto.
+        log.warning("documento_llm_fallo trip=%s error=%s", tid, type(e).__name__)
+        raise HTTPException(503, {"error": "llm_no_disponible",
+                                  "mensaje": "No pude leer el documento ahora mismo. "
+                                             "Intenta de nuevo en unos segundos."})
     db.insert("documents", {"trip_id": tid, "filename": d.filename,
                             "doc_type": r["tipo"], "summary": r["resumen"]})
     # Si el documento reveló datos del viaje (ciudad, hotel, fechas, vuelos),
@@ -983,14 +1113,99 @@ def decisions(tid: str, user: dict = Depends(current_user)):
 
 @app.get("/health")
 def health():
-    from . import places_live
-    return {"status": "ok", "llm_mode": llm.MODE, "search_mode": search.MODE,
+    """Estado REAL: hace ping a la DB (503 si no responde, para que el balanceador
+    / Railway lo detecte) y reporta scheduler y circuit breakers de los LLM.
+    Mantiene todas las claves de antes."""
+    db_estado = db.ping()
+    breakers = llm.breaker_state()
+    degradado = not db_estado["ok"] or any(v == "open" for v in breakers.values())
+    cuerpo = {"status": "ok" if not degradado else "degraded",
+            "db": db_estado, "scheduler": scheduler.running(), "llm_breakers": breakers,
+            "llm_mode": llm.MODE, "search_mode": search.MODE,
             "push_enabled": push.enabled(), "places_live": places_live.MODE,
             "email_mode": email_send.mode(),
             "limits": {"free": limits.FREE_LIMITS,
                        "max_trips": limits.MAX_TRIPS_PER_USER,
                        "global_maps_per_day": limits.GLOBAL_MAPS_PER_DAY,
-                       "maps_used_today": limits.global_used_today("maps")}}
+                       "maps_used_today": (limits.global_used_today("maps")
+                                           if db_estado["ok"] else None)}}
+    if not db_estado["ok"]:
+        return JSONResponse(cuerpo, status_code=503)
+    return cuerpo
+
+
+# ── Waitlist (landing) ──
+class WaitlistIn(BaseModel):
+    email: str = Field(..., max_length=254)
+    name: str = Field("", max_length=200)
+    phone: str = Field("", max_length=60)
+    source: str = Field("", max_length=100)
+    city: str = Field("", max_length=120)
+
+
+def _client_ip(request: Request) -> str:
+    """IP del cliente para rate limit anónimo. Detrás del proxy de Railway,
+    request.client.host es la IP del PROXY (igual para todos), así que se usa el
+    primer salto de X-Forwarded-For si viene. Es falsificable, pero aquí solo
+    sirve para frenar spam del formulario (la dedup por email ya protege)."""
+    xff = request.headers.get("x-forwarded-for", "")
+    if xff:
+        return xff.split(",")[0].strip() or "unknown"
+    return request.client.host if request.client else "unknown"
+
+
+@app.post("/waitlist")
+def waitlist_add(body: WaitlistIn, request: Request):
+    """Alta pública desde la landing. Idempotente por email:
+    {"ok": true, "status": "added" | "already"}."""
+    if waitlist.rate_limited(_client_ip(request)):
+        raise HTTPException(429, "Demasiados intentos desde esta red. Intenta más tarde.")
+    try:
+        return waitlist.add(
+            body.email, name=body.name, phone=body.phone, source=body.source, city=body.city,
+            user_agent=request.headers.get("user-agent", ""),
+            referer=request.headers.get("referer", "") or request.headers.get("origin", ""),
+        )
+    except ValueError:
+        raise HTTPException(400, "Email inválido.")
+
+
+@app.get("/waitlist/count")
+def waitlist_count():
+    """Contador público para la landing (cacheado unos segundos)."""
+    return {"count": waitlist.count()}
+
+
+def _waitlist_admin(x_admin_token: str | None, token: str | None) -> None:
+    """Admin de la waitlist: header X-Admin-Token o ?token= contra ADMIN_TOKEN.
+    Sin ADMIN_TOKEN configurado → 503 (nunca quedan abiertos por error)."""
+    if not waitlist.admin_configured():
+        raise HTTPException(503, "Panel de waitlist no configurado (falta ADMIN_TOKEN).")
+    if not waitlist.admin_ok(x_admin_token or token):
+        raise HTTPException(403, "Acceso de administrador requerido.")
+
+
+@app.get("/admin/waitlist")
+def waitlist_admin_json(token: str | None = None,
+                        x_admin_token: str | None = Header(default=None)):
+    _waitlist_admin(x_admin_token, token)
+    rows = waitlist.all_rows()
+    return {"count": len(rows), "leads": rows}
+
+
+@app.get("/admin/waitlist.csv")
+def waitlist_admin_csv(token: str | None = None,
+                       x_admin_token: str | None = Header(default=None)):
+    _waitlist_admin(x_admin_token, token)
+    return PlainTextResponse(waitlist.to_csv(), media_type="text/csv; charset=utf-8",
+                             headers={"Content-Disposition": "attachment; filename=waitlist.csv"})
+
+
+@app.get("/admin/waitlist/panel")
+def waitlist_admin_panel(token: str | None = None,
+                         x_admin_token: str | None = Header(default=None)):
+    _waitlist_admin(x_admin_token, token)
+    return HTMLResponse(waitlist.panel_html(waitlist.all_rows()))
 
 
 # ── Frontend / PWA ──
@@ -1000,14 +1215,15 @@ def frontend():
     la API). Necesario para que navigator.geolocation funcione en el celular
     — el navegador exige contexto seguro (HTTPS o localhost); abrir el HTML
     como archivo local o desde otro dominio no cumple eso."""
-    return FileResponse("companion-agente.html")
+    return FileResponse(os.path.join(_ROOT, "companion-agente.html"))
 
 
 @app.get("/manifest.webmanifest", include_in_schema=False)
 def pwa_manifest():
     """Manifest de la PWA. Los íconos van embebidos como data-URI dentro del
     archivo, así que no se necesita una carpeta de imágenes ni rutas extra."""
-    return FileResponse("manifest.webmanifest", media_type="application/manifest+json")
+    return FileResponse(os.path.join(_ROOT, "manifest.webmanifest"),
+                        media_type="application/manifest+json")
 
 
 @app.get("/sw.js", include_in_schema=False)
@@ -1016,7 +1232,7 @@ def service_worker():
     'Cache-Control: no-cache' hace que el navegador detecte nuevas versiones
     del SW al recargar; 'Service-Worker-Allowed: /' fija el scope explícito."""
     return FileResponse(
-        "sw.js",
+        os.path.join(_ROOT, "sw.js"),
         media_type="application/javascript",
         headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"},
     )

@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import pytest
 from fastapi.testclient import TestClient
 
-from app import db, engine, seed_data
+from app import db, engine, seed_data, watchers
 
 
 # ── Helpers de autenticación para los tests de API ──
@@ -69,8 +69,8 @@ def test_promo_muere_en_filtro(trip):
 def test_presupuesto_diario(trip):
     for _ in range(2):
         engine.ingest(trip, "scanner", "recomendacion", False, "lugar viral afín a gastronomía")
-    for _ in range(2):
-        engine.ingest(trip, "scanner", "zona", False, "zona nueva")
+    engine.ingest(trip, "scanner", "zona", False, "zona nueva")
+    assert len(db.pushes_today(trip)) == engine.PRESUPUESTO_DIARIO == 3
     r = engine.ingest(trip, "scanner", "clima", False, "lluvia mañana")
     assert r["filter"] == "presupuesto_agotado" and r["decision"] == "feed"
 
@@ -744,3 +744,122 @@ def test_email_no_verificado_no_crea_trip():
     r = client.post("/auth/signup", json={"email": "nv@x.com", "password": "supersecret"})
     # no verificamos; intentamos loguear -> 403, así que no hay token
     assert client.post("/auth/login", json={"email": "nv@x.com", "password": "supersecret"}).status_code == 403
+
+
+# ── Avisos mesurados ──
+def test_en_la_app_lo_no_urgente_va_al_feed(trip):
+    """Si el usuario está usando la app, lo no urgente no le suena el celular."""
+    db.insert("messages", {"trip_id": trip, "role": "user", "content": "hola"})
+    r = engine.ingest(trip, "scanner", "recomendacion", False, "lugar afín")
+    assert r["decision"] == "feed"
+    r = engine.ingest(trip, "Duffel webhook", "vuelo", True, "cambio de puerta")
+    assert r["decision"] == "push"  # lo urgente llega igual
+
+
+def test_checkin_sin_push_si_hablo_hace_poco(trip, monkeypatch):
+    from app import push
+    enviados = []
+    monkeypatch.setattr(push, "send_to_trip_async", lambda *a, **k: enviados.append(a))
+    watchers.check_in(trip)
+    assert len(enviados) == 1
+    db.insert("messages", {"trip_id": trip, "role": "user", "content": "mañana voy a la playa"})
+    watchers.check_in(trip)
+    assert len(enviados) == 1  # ya estaba en contacto: el check-in queda solo en el chat
+
+
+# ── Memoria del viajero ──
+def test_memoria_recuerda_perfil_y_viajes_anteriores():
+    from app import auth, memoria
+    client, H = _auth_client()
+    uid = client.get("/auth/me", headers=H).json()["id"]
+    auth.set_profile(uid, {"alergias": "mariscos", "preferencias": "cafés tranquilos"})
+    viejo = db.create_trip({"ciudad": "Bogotá", "hotel": "H", "inicio": "2025-03-01", "fin": "2025-03-05",
+                            "planes": [{"titulo": "Museo del Oro", "fecha": "2025-03-02"}]}, user_id=uid)
+    nuevo = db.create_trip({"ciudad": "Cartagena", "hotel": "H", "inicio": "2026-07-12",
+                            "fin": "2026-07-18"}, user_id=uid)
+    b = memoria.bloque(uid, nuevo)
+    assert "mariscos" in b and "cafés tranquilos" in b
+    assert "Bogotá" in b and "Museo del Oro" in b
+    assert "Cartagena" not in b  # el viaje actual no es "anterior"
+    assert viejo
+
+
+def test_memoria_vacia_sin_datos():
+    from app import memoria
+    assert memoria.bloque(None, "x") == ""
+
+
+# ── Verificación que corrige ──
+def _bogota():
+    return db.places_for_city("Bogotá")
+
+
+def test_detector_usa_la_ficha_completa_no_solo_la_descripcion():
+    from app import food_guard
+    # el tamal de La Puerta Falsa está respaldado por su ficha: no es error
+    assert food_guard.verificar_respuesta("En La Puerta Falsa pide el tamal santafereño.", _bogota()) == []
+    # el caso real: bandeja paisa en una crepería
+    h = food_guard.verificar_respuesta("En Crepes & Waffles pide la bandeja paisa.", _bogota())
+    assert [(x["plato_mencionado"], x["lugar"]) for x in h] == [("bandeja paisa", "Crepes & Waffles")]
+
+
+def test_detector_atribuye_por_frase():
+    from app import food_guard
+    ok = "En La Puerta Falsa pide el tamal. Si prefieres algo dulce, Crepes & Waffles."
+    assert food_guard.verificar_respuesta(ok, _bogota()) == []
+    # "ahí" se refiere al último lugar nombrado
+    mal = "Ve a Crepes & Waffles. Ahí pide el ajiaco, es buenísimo."
+    assert [x["lugar"] for x in food_guard.verificar_respuesta(mal, _bogota())] == ["Crepes & Waffles"]
+
+
+def test_corrige_reescribiendo(monkeypatch):
+    from app import llm, verificacion
+    monkeypatch.setattr(llm, "chat", lambda system, h: "En Crepes & Waffles pide los crepes salados y un helado.")
+    r, info = verificacion.verificar_y_corregir("En Crepes & Waffles pide la bandeja paisa.", _bogota())
+    assert r == "En Crepes & Waffles pide los crepes salados y un helado."
+    assert info["corregida"] and info["metodo"] == "reescritura"
+
+
+def test_si_la_reescritura_sigue_mal_recorta(monkeypatch):
+    from app import llm, verificacion
+    monkeypatch.setattr(llm, "chat", lambda system, h: "En Crepes & Waffles pide el sancocho.")
+    orig = "Te recomiendo Crepes & Waffles. Ahí pide la bandeja paisa. Queda a 5 minutos."
+    r, info = verificacion.verificar_y_corregir(orig, _bogota())
+    assert "bandeja" not in r and "sancocho" not in r
+    assert r == "Te recomiendo Crepes & Waffles. Queda a 5 minutos." and info["metodo"] == "recorte"
+
+
+def test_si_el_llm_falla_recorta(monkeypatch):
+    from app import llm, verificacion
+
+    def _boom(*a, **k):
+        raise llm.ProviderUnavailable("caído")
+    monkeypatch.setattr(llm, "chat", _boom)
+    r, info = verificacion.verificar_y_corregir("En Crepes & Waffles pide la bandeja paisa.", _bogota())
+    assert "bandeja" not in r and r and info["metodo"] == "recorte"
+
+
+def test_respuesta_correcta_no_gasta_llamadas(monkeypatch):
+    from app import llm, verificacion
+    llamadas = []
+    monkeypatch.setattr(llm, "chat", lambda *a: llamadas.append(a) or "x")
+    r, info = verificacion.verificar_y_corregir("En La Puerta Falsa pide el tamal.", _bogota())
+    assert r == "En La Puerta Falsa pide el tamal." and info["corregida"] is False and llamadas == []
+
+
+def test_chat_entrega_y_guarda_la_version_corregida(monkeypatch):
+    from app import llm, verificacion
+    client, H = _auth_client()
+    tid = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H", "inicio": "2026-07-12",
+                                      "fin": "2026-07-18"}, headers=H).json()["trip_id"]
+
+    def _fake(system, history):
+        if system == verificacion._SYSTEM_CORRECTOR:
+            return "En Crepes & Waffles pide los crepes salados."
+        return "En Crepes & Waffles pide la bandeja paisa."
+    monkeypatch.setattr(llm, "chat", _fake)
+    r = client.post(f"/trips/{tid}/chat", json={"message": "¿qué pido en Crepes?"}, headers=H).json()
+    assert r["reply"] == "En Crepes & Waffles pide los crepes salados."
+    assert r["verificacion"]["corregida"] is True
+    guardado = [m["content"] for m in db.rows("messages", tid) if m["role"] == "companion"][-1]
+    assert guardado == r["reply"]

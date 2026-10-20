@@ -8,12 +8,18 @@ Tablas:
 - documents: fotos/PDFs subidos, ya extraídos a texto
 - messages: historial de chat por viaje
 """
+import atexit
+import copy
 import json
+import logging
 import os
 import sqlite3
+import threading
 import time
 import uuid
 from contextlib import contextmanager
+
+log = logging.getLogger("voyra.db")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Capa de persistencia BILINGÜE: SQLite (local/tests) o Postgres/Supabase (prod).
@@ -46,25 +52,45 @@ if _db_dir:
 # El pool de Postgres se crea perezosamente la primera vez que se pide una
 # conexión (o explícitamente con init_pool() en el startup de FastAPI).
 _pg_pool = None
+_pool_lock = threading.Lock()
+
+# SQLite: cuánto espera un writer a que otro libere el lock antes de fallar con
+# "database is locked". El default de sqlite3 (5s) se queda corto cuando el
+# scheduler, el geocoding en background y los requests escriben a la vez.
+_SQLITE_TIMEOUT_S = float(os.environ.get("SQLITE_TIMEOUT_S", "15"))
 
 
 def init_pool():
-    """Crea el ConnectionPool de Postgres. Idempotente. Llamar en el startup de
-    FastAPI. En modo SQLite no hace nada."""
+    """Crea el ConnectionPool de Postgres. Idempotente y thread-safe. Llamar en
+    el startup de FastAPI. En modo SQLite no hace nada."""
     global _pg_pool
     if not IS_POSTGRES or _pg_pool is not None:
         return _pg_pool
-    from psycopg_pool import ConnectionPool
-    from psycopg.rows import dict_row
-    _pg_pool = ConnectionPool(
-        conninfo=DATABASE_URL,
-        min_size=1,
-        max_size=int(os.environ.get("PG_POOL_MAX", "10")),
-        # El pooler de Supabase (transaction mode) no soporta prepared statements.
-        kwargs={"row_factory": dict_row, "prepare_threshold": None},
-        open=True,
-    )
-    return _pg_pool
+    with _pool_lock:
+        if _pg_pool is not None:
+            return _pg_pool
+        from psycopg_pool import ConnectionPool
+        from psycopg.rows import dict_row
+        _pg_pool = ConnectionPool(
+            conninfo=DATABASE_URL,
+            min_size=int(os.environ.get("PG_POOL_MIN", "1")),
+            max_size=int(os.environ.get("PG_POOL_MAX", "10")),
+            # El pooler de Supabase (transaction mode) no soporta prepared statements.
+            # connect_timeout: no colgar el arranque/requests si la DB no responde.
+            kwargs={"row_factory": dict_row, "prepare_threshold": None,
+                    "connect_timeout": int(os.environ.get("PG_CONNECT_TIMEOUT", "10"))},
+            # Verifica la conexión al sacarla del pool: el pooler de Supabase corta
+            # conexiones ociosas y sin esto el siguiente request fallaba con
+            # "SSL connection has been closed unexpectedly".
+            check=ConnectionPool.check_connection,
+            # Si el pool está agotado, fallar en N s (→ 503) en vez de colgar 30s.
+            timeout=float(os.environ.get("PG_POOL_TIMEOUT", "10")),
+            max_idle=float(os.environ.get("PG_POOL_MAX_IDLE", "300")),
+            open=True,
+        )
+        # Cierre ordenado aunque no corra el lifespan (scripts, tests, demo.py).
+        atexit.register(close_pool)
+        return _pg_pool
 
 
 def close_pool():
@@ -231,6 +257,29 @@ CREATE TABLE IF NOT EXISTS place_enrichments (
   created_at REAL NOT NULL,
   reviewed_at REAL
 );
+CREATE TABLE IF NOT EXISTS webhook_events (
+  id TEXT PRIMARY KEY,          -- '<proveedor>:<id del evento>' (idempotencia de webhooks)
+  trip_id TEXT NOT NULL,
+  created_at REAL NOT NULL
+);
+"""
+
+# Índices secundarios. Antes solo existían los de las PRIMARY KEY, así que cada
+# "SELECT ... WHERE trip_id=?" (notificaciones, mensajes, decisiones, presupuesto
+# de push en CADA señal) era un full scan que crece con todos los viajes del
+# sistema. CREATE INDEX IF NOT EXISTS es sintaxis común a SQLite y Postgres.
+INDEXES = """
+CREATE INDEX IF NOT EXISTS idx_trips_user ON trips(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_events_trip ON events(trip_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_decisions_trip ON decisions(trip_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_notifications_trip ON notifications(trip_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_notifications_cat ON notifications(trip_id, category);
+CREATE INDEX IF NOT EXISTS idx_messages_trip ON messages(trip_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_documents_trip ON documents(trip_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_place_recs_trip ON place_recommendations(trip_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_dest_places_city ON destination_places(city);
+CREATE INDEX IF NOT EXISTS idx_push_subs_trip ON push_subscriptions(trip_id);
+CREATE INDEX IF NOT EXISTS idx_enrich_city ON place_enrichments(city, status);
 """
 
 
@@ -267,13 +316,50 @@ def conn():
         with pool.connection() as raw:   # commit/rollback y devolución al pool automáticos
             yield _PgConn(raw)
     else:
-        c = sqlite3.connect(DB_PATH)
+        c = sqlite3.connect(DB_PATH, timeout=_SQLITE_TIMEOUT_S)
         c.row_factory = sqlite3.Row
         try:
             yield c
             c.commit()
+        except BaseException:
+            # Antes una excepción a mitad de bloque dejaba la transacción abierta
+            # hasta el close() (rollback implícito); explícito es más claro y
+            # libera el lock de escritura de inmediato.
+            try:
+                c.rollback()
+            except sqlite3.Error:
+                pass
+            raise
         finally:
             c.close()
+
+
+@contextmanager
+def transaction():
+    """Conexión con transacción de ESCRITURA tomada desde el inicio.
+
+    Para read-modify-write (p. ej. update_trip): en SQLite hace BEGIN IMMEDIATE
+    (toma el lock de escritura antes de leer, así dos writers no se pisan); en
+    Postgres el caller usa SELECT ... FOR UPDATE dentro de esta misma conexión.
+    """
+    with conn() as c:
+        if not IS_POSTGRES:
+            c.execute("BEGIN IMMEDIATE")
+        yield c
+
+
+def ping() -> dict:
+    """Chequeo real de la DB para /health: SELECT 1 con latencia."""
+    t0 = time.perf_counter()
+    try:
+        with conn() as c:
+            c.execute("SELECT 1").fetchone()
+        return {"ok": True, "engine": "postgres" if IS_POSTGRES else "sqlite",
+                "latency_ms": round((time.perf_counter() - t0) * 1000, 1)}
+    except Exception as e:
+        log.error("db_ping_fallo error=%s", e)
+        return {"ok": False, "engine": "postgres" if IS_POSTGRES else "sqlite",
+                "error": type(e).__name__}
 
 
 def init_db():
@@ -286,6 +372,7 @@ def init_db():
         # Migraciones suaves para Postgres: agrega columnas nuevas si la tabla
         # ya existía con un esquema anterior. Usa information_schema (SQL estándar).
         _pg_migrate_columns()
+        _crear_indices()
         return
 
     with conn() as c:
@@ -310,6 +397,32 @@ def init_db():
             c.execute("ALTER TABLE destination_places ADD COLUMN tags TEXT")
         if "local" not in dp_cols:
             c.execute("ALTER TABLE destination_places ADD COLUMN local TEXT")
+        # trips.user_id también lo migra auth.init_auth; lo necesitamos ya aquí
+        # porque el índice idx_trips_user lo referencia.
+        trip_cols = {r["name"] for r in c.execute("PRAGMA table_info(trips)").fetchall()}
+        if "user_id" not in trip_cols:
+            c.execute("ALTER TABLE trips ADD COLUMN user_id TEXT")
+    _crear_indices()
+
+
+def _crear_indices():
+    """Crea los índices secundarios en una sola transacción. Si algo falla (BD
+    rara de un esquema muy viejo), reintenta uno por uno, loguea el que no se
+    pudo y el arranque sigue."""
+    stmts = [x.strip() for x in INDEXES.split(";") if x.strip()]
+    try:
+        with conn() as c:
+            for stmt in stmts:
+                c.execute(stmt)
+        return
+    except Exception:
+        pass
+    for stmt in stmts:
+        try:
+            with conn() as c:
+                c.execute(stmt)
+        except Exception as e:
+            log.warning("indice_no_creado sql=%s error=%s", stmt[:60], e)
 
 
 def _pg_migrate_columns():
@@ -326,6 +439,7 @@ def _pg_migrate_columns():
         ("destination_places", "tags",        "TEXT"),
         ("destination_places", "local",       "TEXT"),
         ("notifications",      "extra",       "TEXT"),
+        ("trips",              "user_id",     "TEXT"),
     ]
     with conn() as c:
         for table, column, col_type in migrations:
@@ -369,6 +483,17 @@ def get_trip(tid: str) -> dict | None:
     return {"id": r["id"], **json.loads(r["data"])} if r else None
 
 
+def get_trip_with_owner(tid: str) -> tuple[dict | None, str | None]:
+    """(trip, user_id del dueño) en UNA sola query. Lo usa main.own_trip en
+    cada request autenticado; antes eran dos viajes a la DB (get_trip +
+    trip_owner), lo que en Postgres remoto se nota en cada endpoint."""
+    with conn() as c:
+        r = c.execute("SELECT id, data, user_id FROM trips WHERE id=?", (tid,)).fetchone()
+    if not r:
+        return None, None
+    return {"id": r["id"], **json.loads(r["data"])}, r["user_id"]
+
+
 def list_trips() -> list[dict]:
     """Todos los viajes. Lo usa el scheduler para recorrer trips activos."""
     with conn() as c:
@@ -376,13 +501,32 @@ def list_trips() -> list[dict]:
     return [{"id": r["id"], **json.loads(r["data"])} for r in rs]
 
 
-def update_trip(tid: str, patch: dict):
-    t = get_trip(tid)
-    if not t:
-        raise KeyError(tid)
-    t.pop("id")
-    t.update(patch)
+def list_trips_for_user(user_id: str) -> list[dict]:
+    """Viajes de un usuario, más recientes primero, en UNA query (antes: una
+    query por id + una por trip = N+1)."""
     with conn() as c:
+        rs = c.execute("SELECT id, data FROM trips WHERE user_id=? ORDER BY created_at DESC",
+                       (user_id,)).fetchall()
+    return [{"id": r["id"], **json.loads(r["data"])} for r in rs]
+
+
+def update_trip(tid: str, patch: dict):
+    """Aplica `patch` al JSON del trip de forma ATÓMICA.
+
+    Antes era leer (una conexión) → modificar → escribir (otra conexión): dos
+    escrituras concurrentes al mismo trip (el geocoding del hotel en background,
+    un ping de ubicación, el feedback que silencia una categoría) se pisaban y
+    una se perdía. Ahora la lectura y la escritura van en la MISMA transacción
+    con lock de escritura (BEGIN IMMEDIATE en SQLite, FOR UPDATE en Postgres).
+    """
+    lock = " FOR UPDATE" if IS_POSTGRES else ""
+    with transaction() as c:
+        r = c.execute(f"SELECT data FROM trips WHERE id=?{lock}", (tid,)).fetchone()
+        if not r:
+            raise KeyError(tid)
+        t = json.loads(r["data"])
+        t.pop("id", None)
+        t.update(patch)
         c.execute("UPDATE trips SET data=? WHERE id=?", (json.dumps(t), tid))
 
 
@@ -431,11 +575,34 @@ def insert(table: str, row: dict) -> str:
 
 
 def rows(table: str, trip_id: str, limit: int = 200) -> list[dict]:
+    """Las ÚLTIMAS `limit` filas del trip, en orden cronológico.
+
+    Antes era 'ORDER BY created_at ASC LIMIT 200' = las PRIMERAS 200: pasado ese
+    número, los mensajes/notificaciones nuevos dejaban de aparecer (el chat
+    respondía sin ver el último mensaje del usuario). Para < limit filas el
+    resultado es idéntico al de antes.
+    """
     with conn() as c:
         rs = c.execute(
-            f"SELECT * FROM {table} WHERE trip_id=? ORDER BY created_at ASC LIMIT ?", (trip_id, limit)
+            f"SELECT * FROM {table} WHERE trip_id=? ORDER BY created_at DESC LIMIT ?", (trip_id, limit)
         ).fetchall()
-    return [dict(r) for r in rs]
+    out = [dict(r) for r in rs]
+    out.reverse()
+    return out
+
+
+def last_user_message_at(trip_id: str) -> float | None:
+    """Timestamp del último mensaje que escribió el usuario (o None). Sirve como
+    señal barata de "está usando la app ahora"."""
+    with conn() as c:
+        r = c.execute("SELECT MAX(created_at) AS t FROM messages WHERE trip_id=? AND role='user'",
+                      (trip_id,)).fetchone()
+    return r["t"] if r and r["t"] is not None else None
+
+
+def user_active_within(trip_id: str, minutes: float) -> bool:
+    t = last_user_message_at(trip_id)
+    return t is not None and now() - t <= minutes * 60
 
 
 def pushes_today(trip_id: str) -> list[dict]:
@@ -626,7 +793,45 @@ def place_matches(consulta: str, nombre_curado: str) -> bool:
     return place_match_score(consulta, nombre_curado) >= 0.5
 
 
+# ── Caché de la curación ──
+# places_for_city se llama 3-5 veces por mensaje de chat (system prompt, origen,
+# food_guard, enriquecimiento de planes) y cada vez traía ~180 filas + parseaba
+# su JSON. destination_places solo cambia con seed_destination_places (al
+# arrancar), así que se cachea por (DB, ciudad). Las mejoras aprobadas
+# (place_enrichments) se cachean aparte con TTL corto para que una aprobación
+# hecha en OTRO worker aparezca en segundos; en el mismo proceso se invalida al
+# instante. Cada llamada devuelve una COPIA nueva (los callers mutan los dicts).
+_PLACES_TTL_S = float(os.environ.get("PLACES_DB_CACHE_TTL_S", "300"))
+_ENRICH_TTL_S = float(os.environ.get("ENRICH_CACHE_TTL_S", "30"))
+_cache_lock = threading.Lock()
+_places_cache: dict[tuple, tuple[float, str]] = {}
+_enrich_cache: dict[tuple, tuple[float, dict]] = {}
+
+
+def _cache_key(city_norm: str) -> tuple:
+    return ("pg" if IS_POSTGRES else DB_PATH, city_norm)
+
+
+def invalidate_places_cache() -> None:
+    """Vacía la caché de curación + mejoras (tras re-seed o aprobar/rechazar)."""
+    with _cache_lock:
+        _places_cache.clear()
+        _enrich_cache.clear()
+
+
 def places_for_city(city: str) -> list[dict]:
+    key = _cache_key(norm_city(city))
+    with _cache_lock:
+        hit = _places_cache.get(key)
+    if hit and hit[0] > time.monotonic():
+        return overlay_enrichments(json.loads(hit[1]), city)
+    out = _places_for_city_db(city)
+    with _cache_lock:
+        _places_cache[key] = (time.monotonic() + _PLACES_TTL_S, json.dumps(out, ensure_ascii=False))
+    return overlay_enrichments(out, city)
+
+
+def _places_for_city_db(city: str) -> list[dict]:
     with conn() as c:
         rs = c.execute(
             "SELECT * FROM destination_places WHERE city=? ORDER BY confianza DESC, created_at ASC",
@@ -652,7 +857,7 @@ def places_for_city(city: str) -> list[dict]:
         else:
             d["local"] = None
         out.append(d)
-    return overlay_enrichments(out, city)
+    return out
 
 
 def seed_destination_places(places: list[dict]):
@@ -672,9 +877,14 @@ def seed_destination_places(places: list[dict]):
     """
     if not places:
         return
-    city = norm_city(places[0]["city_display"])
+    # TODAS las ciudades presentes en el seed. Antes solo se borraba la ciudad
+    # del PRIMER lugar (Bogotá), pero el seed trae Bogotá + Guadalajara: cada
+    # arranque re-insertaba Guadalajara encima de la anterior y la duplicaba
+    # (68 → 136 → 204 filas…), inflando el prompt y el /nearby con repetidos.
+    ciudades = sorted({norm_city(p["city_display"]) for p in places})
     with conn() as c:
-        c.execute("DELETE FROM destination_places WHERE city=?", (city,))
+        for city in ciudades:
+            c.execute("DELETE FROM destination_places WHERE city=?", (city,))
         for p in places:
             c.execute(
                 "INSERT INTO destination_places (id, city, city_display, name, category, zona, lat, lng, descripcion, confianza, maps_query, dir, place_id, rating, price_level, tags, local, created_at) "
@@ -687,6 +897,7 @@ def seed_destination_places(places: list[dict]):
                  json.dumps(p.get("local"), ensure_ascii=False) if p.get("local") else None,
                  now()),
             )
+    invalidate_places_cache()
 
 
 # ── Dedup de /nearby: no repetir los mismos lugares dentro de la ventana ──
@@ -729,6 +940,35 @@ def mark_proactive_sent(trip_id: str, kind: str, local_date: str) -> bool:
             (new_id(), trip_id, kind, local_date, now()),
         )
         return cur.rowcount == 1
+
+
+def unmark_proactive_sent(trip_id: str, kind: str, local_date: str) -> None:
+    """Deshace el registro cuando el disparo FALLÓ (p. ej. LLM caído): así el
+    siguiente tick lo reintenta en vez de perder el check-in de todo el día."""
+    with conn() as c:
+        c.execute("DELETE FROM proactive_log WHERE trip_id=? AND kind=? AND local_date=?",
+                  (trip_id, kind, local_date))
+
+
+# ── Idempotencia de webhooks ──
+def claim_webhook_event(event_key: str, trip_id: str) -> bool:
+    """Registra un evento de webhook. True si es la PRIMERA vez que llega; False
+    si es un reintento/duplicado del proveedor (Duffel reintenta si no respondemos
+    rápido). Atómico gracias a la PRIMARY KEY + ON CONFLICT (ambos motores)."""
+    with conn() as c:
+        cur = c.execute(
+            "INSERT INTO webhook_events (id, trip_id, created_at) VALUES (?,?,?) "
+            "ON CONFLICT (id) DO NOTHING",
+            (event_key, trip_id, now()),
+        )
+        return cur.rowcount == 1
+
+
+def release_webhook_event(event_key: str) -> None:
+    """Libera la marca si el procesamiento falló, para que el reintento del
+    proveedor sí se procese."""
+    with conn() as c:
+        c.execute("DELETE FROM webhook_events WHERE id=?", (event_key,))
 
 
 # ── Suscripciones Web Push (VAPID) ──
@@ -774,6 +1014,7 @@ def add_enrichment(city: str, place_name: str, value: str, *, field: str = "dato
             (rid, norm_city(city), place_name, field, value, status,
              source_type, source_url, confidence, expires_at, now(), None),
         )
+    invalidate_places_cache()
     return rid
 
 
@@ -799,7 +1040,9 @@ def set_enrichment_status(eid: str, status: str) -> bool:
             "UPDATE place_enrichments SET status=?, reviewed_at=? WHERE id=?",
             (status, now(), eid),
         )
-        return bool(getattr(cur, "rowcount", 1))
+        ok = bool(getattr(cur, "rowcount", 1))
+    invalidate_places_cache()
+    return ok
 
 
 def approved_enrichments_for_city(city: str) -> dict[str, list[dict]]:
@@ -808,6 +1051,11 @@ def approved_enrichments_for_city(city: str) -> dict[str, list[dict]]:
     Filtra las 'fresco' caducadas (expires_at < ahora). Devuelve, por lugar, la
     lista de {field, value, source_type, source_url} para superponer al `local`.
     """
+    key = _cache_key(norm_city(city))
+    with _cache_lock:
+        hit = _enrich_cache.get(key)
+    if hit and hit[0] > time.monotonic():
+        return copy.deepcopy(hit[1])
     ahora = now()
     with conn() as c:
         rs = c.execute(
@@ -825,6 +1073,8 @@ def approved_enrichments_for_city(city: str) -> dict[str, list[dict]]:
             "field": d["field"], "value": d["value"],
             "source_type": d.get("source_type"), "source_url": d.get("source_url"),
         })
+    with _cache_lock:
+        _enrich_cache[key] = (time.monotonic() + _ENRICH_TTL_S, copy.deepcopy(out))
     return out
 
 

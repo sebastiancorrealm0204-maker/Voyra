@@ -17,6 +17,13 @@ CITY_TZ = {
     "cartagena": "America/Bogota",
     "medellin": "America/Bogota",
     "cali": "America/Bogota",
+    # México (sin horario de verano desde 2022): UTC-6, una hora menos que
+    # Bogotá. Guadalajara ya tiene curación; sin esto sus quiet hours y
+    # check-ins caían una hora corridos.
+    "guadalajara": "America/Mexico_City",
+    "ciudad de mexico": "America/Mexico_City",
+    "cdmx": "America/Mexico_City",
+    "monterrey": "America/Monterrey",
 }
 
 DEFAULT_TZ = "America/Bogota"  # razonable para el mercado LATAM inicial

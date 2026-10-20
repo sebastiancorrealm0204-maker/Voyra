@@ -17,9 +17,14 @@ Keys:
   GROQ_API_KEY       (+ GROQ_MODEL,      default llama-3.3-70b-versatile)
 """
 import json
+import logging
 import os
 
 import httpx
+
+from . import net
+
+log = logging.getLogger("voyra.llm")
 
 PROVIDERS = {
     "anthropic": {
@@ -101,11 +106,25 @@ MODE = "mock" if not _available() else f"scoring={SCORING_PROVIDER}, chat={CHAT_
 # Por eso un backoff fijo de 0.6s no basta para un 429 de TPM: hay que esperar a
 # que el proveedor diga cuándo (header 'retry-after'), o saltar a otro proveedor.
 _TIMEOUT = httpx.Timeout(connect=8.0, read=45.0, write=10.0, pool=8.0)
+# Visión: imágenes grandes tardan más en subir/procesarse.
+_TIMEOUT_VISION = httpx.Timeout(connect=8.0, read=90.0, write=30.0, pool=8.0)
 _REINTENTOS = 2  # 3 intentos en total
 _STATUS_REINTENTABLES = {408, 409, 429, 500, 502, 503, 504, 529}
 # Tope de espera por reintento: nunca bloqueamos al usuario más de esto. Si el
 # proveedor pide esperar más, mejor fallar/saltar de proveedor que congelar el chat.
 _MAX_ESPERA_429 = 6.0
+# Tope TOTAL de reintentos por proveedor: no programamos un reintento que haga
+# que una sola llamada supere este tiempo (el failover a otro proveedor y el
+# fallback del endpoint se encargan del resto).
+_DEADLINE_S = float(os.environ.get("LLM_DEADLINE_S", "50"))
+
+# Circuit breaker por proveedor: tras 3 fallas transitorias seguidas, el
+# proveedor se salta 30s y vamos directo al respaldo, en vez de que cada usuario
+# espere su propio timeout de 45s contra un proveedor caído.
+_breaker = net.CircuitBreaker(
+    umbral=int(os.environ.get("LLM_BREAKER_THRESHOLD", "3")),
+    enfriamiento_s=float(os.environ.get("LLM_BREAKER_COOLDOWN_S", "30")),
+)
 
 
 def _espera_tras_429(resp: httpx.Response, intento: int) -> float:
@@ -121,43 +140,70 @@ def _espera_tras_429(resp: httpx.Response, intento: int) -> float:
     return min(0.6 * (2 ** intento), _MAX_ESPERA_429)
 
 
-class RateLimited(Exception):
+class ProviderError(Exception):
+    """Base de las fallas TRANSITORIAS de un proveedor (permiten failover)."""
+
+
+class RateLimited(ProviderError):
     """El proveedor devolvió 429 y se agotaron los reintentos. La capa de arriba
     puede capturarla para intentar OTRO proveedor (failover)."""
 
 
-def _post_con_reintentos(url: str, headers: dict, payload: dict) -> httpx.Response:
-    """POST con reintentos ante errores transitorios. Lanza la última excepción
-    si se agotan los intentos. En 429 persistente lanza RateLimited para permitir
-    failover de proveedor arriba."""
+class ProviderUnavailable(ProviderError):
+    """Timeout, error de red, 5xx persistente o respuesta ilegible del proveedor."""
+
+
+def _post_con_reintentos(url: str, headers: dict, payload: dict,
+                         timeout: httpx.Timeout = _TIMEOUT,
+                         reintentos: int = _REINTENTOS) -> httpx.Response:
+    """POST con reintentos ante errores transitorios. Usa el cliente HTTP
+    compartido (keep-alive: sin handshake TLS nuevo por llamada).
+
+    - 429 persistente      -> RateLimited (failover arriba).
+    - red/timeout/5xx      -> ProviderUnavailable (failover arriba).
+    - 4xx no reintentable  -> httpx.HTTPStatusError (credenciales/payload: no
+      tiene sentido reintentar ni saltar de proveedor).
+    """
     import time as _time
-    ultima_exc: Exception | None = None
-    for intento in range(_REINTENTOS + 1):
+    inicio = _time.monotonic()
+    for intento in range(reintentos + 1):
+        ultimo = intento >= reintentos
         try:
-            resp = httpx.post(url, headers=headers, json=payload, timeout=_TIMEOUT)
-            if resp.status_code == 429:
-                if intento < _REINTENTOS:
-                    _time.sleep(_espera_tras_429(resp, intento))
-                    continue
-                raise RateLimited("429 tras reintentos")
-            if resp.status_code in _STATUS_REINTENTABLES and intento < _REINTENTOS:
-                _time.sleep(min(0.6 * (2 ** intento), _MAX_ESPERA_429))
-                continue
-            resp.raise_for_status()
-            return resp
+            resp = net.client().post(url, headers=headers, json=payload, timeout=timeout)
         except (httpx.TimeoutException, httpx.TransportError) as e:
-            ultima_exc = e
-            if intento < _REINTENTOS:
-                _time.sleep(0.6 * (intento + 1))
-                continue
-            raise
-        except httpx.HTTPStatusError as e:
-            # 4xx no reintentables (400, 401, 403): fallan de inmediato.
-            ultima_exc = e
-            raise
-    if ultima_exc:
-        raise ultima_exc
-    raise RuntimeError("post sin respuesta")  # inalcanzable
+            espera = 0.6 * (intento + 1)
+            if ultimo or (_time.monotonic() - inicio + espera) > _DEADLINE_S:
+                raise ProviderUnavailable(f"red/timeout: {type(e).__name__}") from e
+            _time.sleep(espera)
+            continue
+        if resp.status_code == 429:
+            espera = _espera_tras_429(resp, intento)
+            if ultimo or (_time.monotonic() - inicio + espera) > _DEADLINE_S:
+                raise RateLimited("429 tras reintentos")
+            _time.sleep(espera)
+            continue
+        if resp.status_code in _STATUS_REINTENTABLES:
+            espera = min(0.6 * (2 ** intento), _MAX_ESPERA_429)
+            if ultimo or (_time.monotonic() - inicio + espera) > _DEADLINE_S:
+                raise ProviderUnavailable(f"HTTP {resp.status_code} tras reintentos")
+            _time.sleep(espera)
+            continue
+        # 4xx no reintentables (400, 401, 403): fallan de inmediato.
+        resp.raise_for_status()
+        return resp
+    raise ProviderUnavailable("post sin respuesta")  # inalcanzable
+
+
+def _texto_respuesta(cfg: dict, resp: httpx.Response) -> str:
+    """Extrae el texto de la respuesta según el estilo del proveedor. Una
+    respuesta con forma inesperada cuenta como falla transitoria (failover)."""
+    try:
+        data = resp.json()
+        if cfg["style"] == "anthropic":
+            return "".join(b.get("text", "") for b in data["content"] if b.get("type") == "text")
+        return data["choices"][0]["message"]["content"] or ""
+    except (ValueError, KeyError, IndexError, TypeError) as e:
+        raise ProviderUnavailable("respuesta ilegible del proveedor") from e
 
 
 def _call_one(provider: str, system: str, messages: list[dict], max_tokens: int = 800) -> str:
@@ -170,7 +216,7 @@ def _call_one(provider: str, system: str, messages: list[dict], max_tokens: int 
             {"model": cfg["model"], "max_tokens": max_tokens, "system": system,
              "messages": messages},
         )
-        return "".join(b.get("text", "") for b in resp.json()["content"] if b.get("type") == "text")
+        return _texto_respuesta(cfg, resp)
     # estilo OpenAI (DeepSeek, Groq): el system va como primer mensaje
     resp = _post_con_reintentos(
         cfg["url"],
@@ -178,7 +224,7 @@ def _call_one(provider: str, system: str, messages: list[dict], max_tokens: int 
         {"model": cfg["model"], "max_tokens": max_tokens,
          "messages": [{"role": "system", "content": system}] + messages},
     )
-    return resp.json()["choices"][0]["message"]["content"]
+    return _texto_respuesta(cfg, resp)
 
 
 def _orden_failover(primario: str) -> list[str]:
@@ -190,61 +236,73 @@ def _orden_failover(primario: str) -> list[str]:
 
 
 def _call(provider: str, system: str, messages: list[dict], max_tokens: int = 800) -> str:
-    """Llama al proveedor con FAILOVER: si el primario está rate-limited, intenta
-    con el siguiente disponible. Solo hacemos failover ante RateLimited (429), no
-    ante errores de credenciales (no tendría sentido reintentar un 401 en otro)."""
+    """Llama al proveedor con FAILOVER: si el primario falla de forma transitoria
+    (429, timeout, red, 5xx), intenta con el siguiente disponible. No hacemos
+    failover ante errores de credenciales/payload (4xx): no tendría sentido
+    reintentar un 401 en otro proveedor.
+
+    Los proveedores con el circuit breaker abierto se saltan; si TODOS están
+    abiertos se intenta igual el primero (mejor un intento que fallar seguro)."""
     cadena = _orden_failover(provider)
     if not cadena:
         # sin keys: caemos al comportamiento mock de cada función de arriba
         return _call_one(provider, system, messages, max_tokens)
+    sanos = [p for p in cadena if _breaker.permitido(p)] or cadena[:1]
     ultima: Exception | None = None
-    for p in cadena:
+    for p in sanos:
         try:
-            return _call_one(p, system, messages, max_tokens)
-        except RateLimited as e:
+            out = _call_one(p, system, messages, max_tokens)
+            _breaker.exito(p)
+            return out
+        except ProviderError as e:
+            _breaker.falla(p)
+            log.warning("llm_failover provider=%s error=%s", p, e)
             ultima = e
-            continue  # proveedor saturado → probar el siguiente
-    # todos saturados
+            continue  # proveedor saturado/caído → probar el siguiente
+    # todos fallaron
     if ultima:
         raise ultima
-    raise RuntimeError("sin proveedores")
+    raise ProviderUnavailable("sin proveedores")
+
+
+def breaker_state() -> dict:
+    """Estado del circuit breaker por proveedor (para /health)."""
+    return _breaker.estado()
 
 
 def _call_vision(provider: str, system: str, prompt: str, image_data_url: str,
                  max_tokens: int = 800) -> str:
-    """Llamada multimodal: una imagen + texto. Solo proveedores estilo OpenAI con
-    modelo de visión (Groq llama-3.2/4 vision). El modelo de visión se toma de
-    {PROVIDER}_VISION_MODEL si está, si no se intenta con el modelo de chat."""
+    """Llamada multimodal: una imagen + texto. El modelo de visión se toma de
+    {PROVIDER}_VISION_MODEL si está, si no se intenta con el modelo de chat.
+    Pasa por los mismos reintentos que el resto (antes no tenía ninguno)."""
     cfg = PROVIDERS[provider]
     if cfg["style"] == "anthropic":
         # data URL → bloque image base64 de Anthropic
         media, b64 = _split_data_url(image_data_url)
-        resp = httpx.post(
+        resp = _post_con_reintentos(
             cfg["url"],
-            headers={"x-api-key": cfg["key"], "anthropic-version": "2023-06-01",
-                     "content-type": "application/json"},
-            json={"model": VISION_MODELS.get(provider, cfg["model"]), "max_tokens": max_tokens,
-                  "system": system,
-                  "messages": [{"role": "user", "content": [
-                      {"type": "image", "source": {"type": "base64", "media_type": media, "data": b64}},
-                      {"type": "text", "text": prompt}]}]},
-            timeout=120,
+            {"x-api-key": cfg["key"], "anthropic-version": "2023-06-01",
+             "content-type": "application/json"},
+            {"model": VISION_MODELS.get(provider, cfg["model"]), "max_tokens": max_tokens,
+             "system": system,
+             "messages": [{"role": "user", "content": [
+                 {"type": "image", "source": {"type": "base64", "media_type": media, "data": b64}},
+                 {"type": "text", "text": prompt}]}]},
+            timeout=_TIMEOUT_VISION, reintentos=1,
         )
-        resp.raise_for_status()
-        return "".join(b.get("text", "") for b in resp.json()["content"] if b.get("type") == "text")
-    resp = httpx.post(
+        return _texto_respuesta(cfg, resp)
+    resp = _post_con_reintentos(
         cfg["url"],
-        headers={"Authorization": f"Bearer {cfg['key']}", "Content-Type": "application/json"},
-        json={"model": VISION_MODELS.get(provider, cfg["model"]), "max_tokens": max_tokens,
-              "messages": [
-                  {"role": "system", "content": system},
-                  {"role": "user", "content": [
-                      {"type": "text", "text": prompt},
-                      {"type": "image_url", "image_url": {"url": image_data_url}}]}]},
-        timeout=120,
+        {"Authorization": f"Bearer {cfg['key']}", "Content-Type": "application/json"},
+        {"model": VISION_MODELS.get(provider, cfg["model"]), "max_tokens": max_tokens,
+         "messages": [
+             {"role": "system", "content": system},
+             {"role": "user", "content": [
+                 {"type": "text", "text": prompt},
+                 {"type": "image_url", "image_url": {"url": image_data_url}}]}]},
+        timeout=_TIMEOUT_VISION, reintentos=1,
     )
-    resp.raise_for_status()
-    return resp.json()["choices"][0]["message"]["content"]
+    return _texto_respuesta(cfg, resp)
 
 
 def _split_data_url(data_url: str) -> tuple[str, str]:

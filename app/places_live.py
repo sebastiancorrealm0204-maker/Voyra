@@ -15,13 +15,25 @@ mínimo). Sin GOOGLE_MAPS_API_KEY corre en modo mock (lista vacía).
 La key es la MISMA que usa enrich_places.py (Places API New). En Railway se
 configura como variable de entorno GOOGLE_MAPS_API_KEY.
 """
+import logging
 import os
 
-import httpx
+from . import net
+
+log = logging.getLogger("voyra.places")
 
 API_KEY = os.environ.get("GOOGLE_MAPS_API_KEY", "")
 MODE = "real" if API_KEY else "mock"
 SEARCH_URL = "https://places.googleapis.com/v1/places:searchText"
+
+# Timeouts acotados: la búsqueda en vivo va dentro del request del chat, así que
+# nunca debe colgar al usuario más de unos segundos.
+_TIMEOUT = 8.0
+# Cachés TTL: la misma búsqueda ("farmacia" a ~100 m del mismo punto) o el mismo
+# hotel no cambian en minutos/horas. Evita pagar y esperar a Google dos veces.
+_cache_cerca = net.TTLCache(ttl_s=float(os.environ.get("PLACES_CACHE_TTL_S", "600")), maxsize=1024)
+_cache_hotel = net.TTLCache(ttl_s=24 * 3600, maxsize=1024)
+_SIN_CACHE = object()
 
 # Field mask mínimo = SKU barato. Solo lo que el viajero necesita ver.
 _FIELDS = ",".join([
@@ -155,9 +167,14 @@ def buscar_cerca(query: str, lat: float, lng: float,
         return []
 
     q = SINONIMOS.get(query.strip().lower(), query.strip())
+    # Clave de caché: coordenadas redondeadas a ~100 m (3 decimales).
+    ck = (q.lower(), round(float(lat), 3), round(float(lng), 3), int(radio_m), int(max_results))
+    cacheado = _cache_cerca.get(ck)
+    if cacheado is not None:
+        return [dict(x) for x in cacheado]
     try:
-        resp = httpx.post(
-            SEARCH_URL,
+        resp = net.request(
+            "POST", SEARCH_URL, retries=1,
             headers={
                 "Content-Type": "application/json",
                 "X-Goog-Api-Key": API_KEY,
@@ -175,12 +192,14 @@ def buscar_cerca(query: str, lat: float, lng: float,
                     }
                 },
             },
-            timeout=15,
+            timeout=_TIMEOUT,
         )
         if resp.status_code != 200:
+            log.warning("places_search_error status=%s", resp.status_code)
             return []
         places = resp.json().get("places", [])
-    except Exception:
+    except Exception as e:
+        log.warning("places_search_exception error=%s", type(e).__name__)
         return []
 
     out = []
@@ -196,6 +215,7 @@ def buscar_cerca(query: str, lat: float, lng: float,
             "place_id": p.get("id", ""),
             "maps_link": _maps_link(plat, plng, p.get("id", ""), lat, lng),
         })
+    _cache_cerca.set(ck, [dict(x) for x in out])
     return out
 
 
@@ -232,9 +252,15 @@ def geocodificar_hotel(nombre_hotel: str, ciudad: str, pais: str = "") -> dict |
     if sufijo_pais and sufijo_pais.lower() not in query.lower():
         query += f", {sufijo_pais}"
 
+    ck = query.strip().lower()
+    # None también se cachea (hotel no encontrado): no re-preguntar en cada PATCH.
+    cacheado = _cache_hotel.get(ck, _SIN_CACHE)
+    if cacheado is not _SIN_CACHE:
+        return dict(cacheado) if cacheado else None
+
     try:
-        resp = httpx.post(
-            SEARCH_URL,
+        resp = net.request(
+            "POST", SEARCH_URL, retries=1,
             headers={
                 "Content-Type": "application/json",
                 "X-Goog-Api-Key": API_KEY,
@@ -248,21 +274,26 @@ def geocodificar_hotel(nombre_hotel: str, ciudad: str, pais: str = "") -> dict |
                 # y una restricción geográfica podría descartar el resultado correcto.
                 "includedType": "lodging",
             },
-            timeout=12,
+            timeout=_TIMEOUT,
         )
         if resp.status_code != 200:
+            log.warning("places_geocode_error status=%s", resp.status_code)
             return None
         places = resp.json().get("places", [])
         if not places:
+            _cache_hotel.set(ck, None)
             return None
         p = places[0]
         loc = p.get("location", {})
-        return {
+        out = {
             "lat": round(loc.get("latitude", 0.0), 7),
             "lng": round(loc.get("longitude", 0.0), 7),
             "place_id": p.get("id", ""),
             "dir": p.get("formattedAddress", ""),
             "google_name": (p.get("displayName") or {}).get("text", ""),
         }
-    except Exception:
+        _cache_hotel.set(ck, dict(out))
+        return out
+    except Exception as e:
+        log.warning("places_geocode_exception error=%s", type(e).__name__)
         return None

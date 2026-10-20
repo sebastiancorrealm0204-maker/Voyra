@@ -74,6 +74,10 @@ CREATE TABLE IF NOT EXISTS signup_attempts (
   ip TEXT NOT NULL,
   created_at REAL NOT NULL
 );
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_email_verif_user ON email_verifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_signup_ip ON signup_attempts(ip, created_at);
 """
 
 
@@ -262,11 +266,26 @@ def create_session(user_id: str) -> str:
 def user_for_session(token: str) -> dict | None:
     if not token:
         return None
+    # Una sola query (JOIN) en vez de dos: corre en CADA request autenticado.
     with db.conn() as c:
-        r = c.execute("SELECT * FROM sessions WHERE token=?", (token,)).fetchone()
-        if not r or r["expires_at"] < time.time():
-            return None
-    return get_user(r["user_id"])
+        r = c.execute(
+            "SELECT u.*, s.expires_at AS session_expires_at FROM sessions s "
+            "JOIN users u ON u.id = s.user_id WHERE s.token=?", (token,)).fetchone()
+    if not r or r["session_expires_at"] < time.time():
+        return None
+    u = dict(r)
+    u.pop("session_expires_at", None)
+    return u
+
+
+def cleanup_expired() -> None:
+    """Borra sesiones y tokens de verificación vencidos, e intentos de registro
+    de más de un día (la ventana anti-abuso es de 1h). Lo llama el scheduler."""
+    ahora = time.time()
+    with db.conn() as c:
+        c.execute("DELETE FROM sessions WHERE expires_at < ?", (ahora,))
+        c.execute("DELETE FROM email_verifications WHERE expires_at < ?", (ahora,))
+        c.execute("DELETE FROM signup_attempts WHERE created_at < ?", (ahora - 86400,))
 
 
 def destroy_session(token: str):

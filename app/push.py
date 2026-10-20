@@ -15,9 +15,21 @@ Depende de pywebpush (en requirements). El envío nunca debe tumbar el proceso:
 si falla, se loguea y se sigue.
 """
 import json
+import logging
 import os
+import time
+from concurrent.futures import ThreadPoolExecutor
 
-from . import db
+from . import db, net
+
+log = logging.getLogger("voyra.push")
+
+# Timeout por envío: pywebpush no pone ninguno por defecto, así que un endpoint
+# de push colgado (FCM/APNs/Mozilla) podía bloquear el thread indefinidamente.
+_PUSH_TIMEOUT_S = float(os.environ.get("PUSH_TIMEOUT_S", "10"))
+# Pool pequeño para despachar pushes SIN bloquear el request que los originó.
+_executor = ThreadPoolExecutor(max_workers=int(os.environ.get("PUSH_WORKERS", "4")),
+                               thread_name_prefix="voyra-push")
 
 VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "").strip()
 VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "").strip()
@@ -69,7 +81,7 @@ def send_to_trip(trip_id: str, title: str, body: str, data: dict | None = None) 
     try:
         from pywebpush import webpush, WebPushException
     except ImportError:
-        print("[push] pywebpush no instalado — push real desactivado")
+        log.warning("push pywebpush no instalado — push real desactivado")
         return {"enabled": False, "enviadas": 0, "fallidas": 0}
 
     payload = json.dumps({
@@ -84,20 +96,63 @@ def send_to_trip(trip_id: str, title: str, body: str, data: dict | None = None) 
     for s in subs:
         try:
             sub_info = json.loads(s["subscription"])
-            webpush(
-                subscription_info=sub_info,
-                data=payload,
-                vapid_private_key=VAPID_PRIVATE_KEY,
-                vapid_claims=dict(claims),  # copia: webpush muta el dict
-                ttl=86400,  # guardar hasta 24h si el dispositivo está offline
-            )
-            enviadas += 1
-        except WebPushException as e:
-            # 404/410 = suscripción muerta (app desinstalada, permiso revocado).
-            status = getattr(e.response, "status_code", None)
-            if status in (404, 410):
-                db.delete_push_subscription(s["endpoint"])
+        except (ValueError, TypeError):
             fallidas += 1
-        except Exception:
-            fallidas += 1
+            continue
+        for intento in range(2):  # 1 reintento ante 429/5xx o red
+            try:
+                webpush(
+                    subscription_info=sub_info,
+                    data=payload,
+                    vapid_private_key=VAPID_PRIVATE_KEY,
+                    vapid_claims=dict(claims),  # copia: webpush muta el dict
+                    ttl=86400,  # guardar hasta 24h si el dispositivo está offline
+                    timeout=_PUSH_TIMEOUT_S,
+                )
+                enviadas += 1
+                break
+            except WebPushException as e:
+                # 404/410 = suscripción muerta (app desinstalada, permiso revocado).
+                status = getattr(e.response, "status_code", None)
+                if status in (404, 410):
+                    db.delete_push_subscription(s["endpoint"])
+                    fallidas += 1
+                    break
+                if intento == 0 and (status in (429,) or (status or 0) >= 500):
+                    time.sleep(net.backoff(0))
+                    continue
+                log.warning("push_fallo status=%s trip=%s", status, trip_id)
+                fallidas += 1
+                break
+            except Exception as e:
+                if intento == 0:
+                    time.sleep(net.backoff(0))
+                    continue
+                log.warning("push_excepcion error=%s trip=%s", type(e).__name__, trip_id)
+                fallidas += 1
     return {"enabled": True, "enviadas": enviadas, "fallidas": fallidas}
+
+
+def send_to_trip_async(trip_id: str, title: str, body: str, data: dict | None = None) -> bool:
+    """Como send_to_trip pero en background: el request que originó el push
+    (ingest de una señal, check-in) no espera a FCM/APNs. Devuelve True si se
+    encoló. Sin VAPID no encola nada (barato: no gasta un thread)."""
+    if not enabled():
+        return False
+
+    def _run():
+        try:
+            send_to_trip(trip_id, title, body, data=data)
+        except Exception:
+            log.exception("push_async_error trip=%s", trip_id)
+
+    try:
+        _executor.submit(_run)
+        return True
+    except RuntimeError:  # executor cerrado (shutdown en curso)
+        return False
+
+
+def shutdown() -> None:
+    """Espera a los pushes en vuelo al apagar la app (no deja pushes a medias)."""
+    _executor.shutdown(wait=True, cancel_futures=False)

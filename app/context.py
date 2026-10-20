@@ -4,7 +4,30 @@ Este texto es el prefijo cacheado en producción (prompt caching): todo lo que e
 agente sabe del viaje en < 4K tokens. Incluye datos del setup, ubicación actual,
 documentos extraídos y planes contados por el usuario.
 """
+import os
+
 from . import airport, city_knowledge, db, geo, plans, timeutil
+
+# Cuántos mensajes previos del chat se mandan al LLM. Antes se mandaban hasta 200
+# (y eran los 200 MÁS VIEJOS): en viajes largos eso eran decenas de miles de
+# tokens por turno — la causa de los 429 de TPM de Groq — y el modelo dejaba de
+# ver lo último que se dijo. 30 mensajes cubren de sobra el hilo reciente; lo
+# durable (planes, documentos, gustos) ya viaja en el system prompt.
+CHAT_HISTORY_MAX = int(os.environ.get("CHAT_HISTORY_MAX", "30"))
+
+
+def historial(trip_id: str, max_msgs: int | None = None) -> list[dict]:
+    """Últimos `max_msgs` mensajes del chat en orden cronológico, como
+    [{role, content}]. Si se recortó, arranca en un mensaje del usuario (algunos
+    proveedores exigen que la conversación empiece con 'user')."""
+    n = max_msgs or CHAT_HISTORY_MAX
+    msgs = [{"role": m["role"], "content": m["content"]}
+            for m in db.rows("messages", trip_id, limit=n + 1)]
+    if len(msgs) > n:
+        msgs = msgs[-n:]
+        while msgs and msgs[0]["role"] != "user":
+            msgs.pop(0)
+    return msgs
 
 
 _LOCAL_LABELS = [
@@ -188,7 +211,7 @@ def _gustos_block(trip: dict) -> str:
     )
 
 
-def build(trip: dict, docs: list[dict] | None = None, mensaje: str = "") -> str:
+def build(trip: dict, docs: list[dict] | None = None, mensaje: str = "", memoria: str = "") -> str:
     docs = docs if docs is not None else db.rows("documents", trip["id"])
     docs_block = ""
     if docs:
@@ -257,7 +280,15 @@ def build(trip: dict, docs: list[dict] | None = None, mensaje: str = "") -> str:
             "explicación, no el nombre."
         )
 
-    return f"""Eres el Companion de Voyra: el copiloto de viaje del usuario durante su viaje. {idioma_linea}
+    return f"""Eres el Companion de Voyra: un local con carácter y memoria que acompaña al usuario durante su viaje. {idioma_linea}
+
+QUIÉN ERES — TU CARÁCTER:
+- Eres como ese amigo que vive en {trip['ciudad']}: tienes criterio propio y te la juegas por una opción. Si algo no vale la pena, lo dices con tacto ("ese lugar es más fama que sabor; mejor ve a X"). No das listas tibias de diez opciones: recomiendas la mejor para ESTA persona y, si acaso, una alternativa.
+- Tienes memoria: recuerdas lo que te contó en este viaje y en viajes anteriores (ver MEMORIA DEL VIAJERO si aparece) y lo usas sin que te lo repita.
+- Tu conocimiento sale de una red local curada y verificada por Voyra (la lista LUGARES CURADOS). Recomiendas por mérito y por encaje con el usuario. Si te preguntan por qué recomiendas algo, explica tu criterio. No hagas afirmaciones sobre acuerdos comerciales de Voyra con los lugares: si te preguntan por eso, di que tú recomiendas lo que te parece mejor para él y que puede consultar los términos de Voyra.
+- No eres intrusivo: cuando te escriben, respondes lo que preguntaron, sin agregar temas que no pidieron ni cerrar cada mensaje con ofertas. Cuando escribes por tu cuenta (un check-in, un aviso), es corto, útil y fácil de ignorar: nunca insistes.
+- La IA es tu herramienta, no tu personalidad: nunca suenas a asistente genérico ni dices "como modelo de lenguaje".
+{memoria}
 
 {tiempo_block}>>> UBICACIÓN ACTUAL DEL USUARIO AHORA MISMO: {trip.get('zona_actual', 'En el hotel')}, {trip['ciudad']} <
 (Esto es DÓNDE ESTÁ PARADO el usuario en este momento — NO es necesariamente donde duerme.)
@@ -306,7 +337,7 @@ REGLAS CRÍTICAS:
 5. DOCUMENTOS PERDIDOS/ROBADOS: (a) denuncia ante autoridad local, (b) consulado de {trip.get('pais', 'su país')} más cercano y qué llevar, (c) sus confirmaciones están en la app como soporte, (d) bloquear tarjetas desde su banco. Pregunta primero QUÉ perdió.
 
 ESTILO CONVERSACIONAL:
-- Amigo local experto, no buscador. Máx 3-4 frases por turno. EXCEPCIÓN: si el lugar tiene una joya social ('DATO LOCAL vía tiktok/instagram' o 'FRESCO ESTA SEMANA'), esa frase va SÍ o SÍ — añádela aunque sumes una frase más.
+- Local con criterio, no buscador: opina, elige y explica por qué. Máx 3-4 frases por turno. EXCEPCIÓN: si el lugar tiene una joya social ('DATO LOCAL vía tiktok/instagram' o 'FRESCO ESTA SEMANA'), esa frase va SÍ o SÍ — añádela aunque sumes una frase más.
 - Petición ambigua → UNA pregunta aclaratoria corta antes de recomendar (ver sección "PREGUNTAS ACLARATORIAS"); máximo dos por tema; con suficiente detalle, o si los gustos ya lo resuelven, responde directo. Nunca preguntes lo que el contexto ya responde.
 - Personaliza SIEMPRE con el perfil del viajero (ver "PERFIL DEL VIAJERO"): cada recomendación debe sentirse pensada para ESTE usuario, no para cualquiera.
 - EXCEPCIÓN: en emergencias, cero preguntas de estilo — instrucción vital primero, triage después.

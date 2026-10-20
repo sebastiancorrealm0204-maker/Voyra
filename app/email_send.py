@@ -17,9 +17,12 @@ Variables de entorno:
   APP_BASE_URL          — URL pública del backend, ej. https://web-production-1b2f6.up.railway.app
   SMTP_HOST/PORT/USER/PASSWORD — alternativa SMTP
 """
+import logging
 import os
 
-import httpx
+from . import net
+
+log = logging.getLogger("voyra.email")
 
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
 EMAIL_FROM = os.environ.get("EMAIL_FROM", "Voyra <onboarding@resend.dev>").strip()
@@ -76,26 +79,28 @@ def send_verification(email: str, token: str) -> dict:
     m = mode()
 
     if m == "dev":
-        print(f"[email:dev] Verificación para {email}: {link}")
+        log.info("email_dev verificacion para=%s link=%s", email, link)
         return {"sent": False, "mode": "dev", "dev_link": link}
 
     if m == "resend":
         try:
-            resp = httpx.post(
-                "https://api.resend.com/emails",
+            # 1 reintento con backoff ante red/5xx/429. Si el primer intento sí
+            # llegó, el duplicado es inofensivo: lleva el MISMO enlace/token.
+            resp = net.request(
+                "POST", "https://api.resend.com/emails", retries=1,
                 headers={"Authorization": f"Bearer {RESEND_API_KEY}",
                          "Content-Type": "application/json"},
                 json={"from": EMAIL_FROM, "to": [email],
                       "subject": "Confirma tu email — Voyra",
                       "html": _html(link)},
-                timeout=15,
+                timeout=10,
             )
             ok = resp.status_code in (200, 201)
             if not ok:
-                print(f"[email:resend] fallo {resp.status_code}: {resp.text[:200]}")
+                log.warning("email_resend_fallo status=%s body=%s", resp.status_code, resp.text[:200])
             return {"sent": ok, "mode": "resend"}
         except Exception as e:
-            print(f"[email:resend] excepción: {e}")
+            log.warning("email_resend_excepcion error=%s", e)
             return {"sent": False, "mode": "resend", "error": str(e)}
 
     # SMTP
@@ -106,11 +111,11 @@ def send_verification(email: str, token: str) -> dict:
         msg["Subject"] = "Confirma tu email — Voyra"
         msg["From"] = EMAIL_FROM
         msg["To"] = email
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as s:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as s:
             s.starttls()
             s.login(SMTP_USER, SMTP_PASSWORD)
             s.sendmail(SMTP_USER, [email], msg.as_string())
         return {"sent": True, "mode": "smtp"}
     except Exception as e:
-        print(f"[email:smtp] excepción: {e}")
+        log.warning("email_smtp_excepcion error=%s", e)
         return {"sent": False, "mode": "smtp", "error": str(e)}

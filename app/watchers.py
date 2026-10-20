@@ -7,15 +7,41 @@
 - news_alert: News watcher (Google News + X + TikTok/IG) → señal operativa de seguridad.
 - check_in: cron 8pm que pregunta/confirma los planes de mañana.
 """
+import logging
+from concurrent.futures import ThreadPoolExecutor
+
 from . import airport, context, db, engine, geo, llm, search
+
+log = logging.getLogger("voyra.watchers")
 
 
 def duffel_webhook(trip_id: str, payload: dict) -> dict:
+    """Webhook de Duffel → señal operativa.
+
+    IDEMPOTENTE: Duffel reintenta la entrega si no respondemos 2xx a tiempo, y
+    sin dedup cada reintento generaba OTRO push de "tu vuelo cambió". Si el
+    evento trae `id`, se registra en webhook_events y los duplicados se
+    responden con la misma forma pero sin volver a notificar. Si el
+    procesamiento falla, la marca se libera para que el reintento sí entre.
+    """
+    if db.get_trip(trip_id) is None:
+        raise KeyError(trip_id)
+    data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
     tipo = payload.get("type", "order.updated")
-    data = payload.get("data", {})
     desc = data.get("description") or str(data)[:300]
-    return engine.ingest(trip_id, source="Duffel webhook", category="vuelo",
-                         operational=True, payload=f"Webhook Duffel ({tipo}): {desc}")
+    event_id = str(payload.get("id") or "").strip()
+    clave = f"duffel:{event_id}" if event_id else ""
+    if clave and not db.claim_webhook_event(clave, trip_id):
+        log.info("webhook_duplicado provider=duffel event=%s trip=%s", event_id, trip_id)
+        return {"decision_id": None, "filter": "webhook_duplicado", "score": None,
+                "decision": "silence", "notification": None, "duplicado": True}
+    try:
+        return engine.ingest(trip_id, source="Duffel webhook", category="vuelo",
+                             operational=True, payload=f"Webhook Duffel ({tipo}): {desc}")
+    except Exception:
+        if clave:
+            db.release_webhook_event(clave)
+        raise
 
 
 def update_location(trip_id: str, zona: str, disparar_geofence: bool = False,
@@ -100,15 +126,33 @@ def news_alert(trip_id: str, alerta: str) -> dict:
                          category="seguridad", operational=True, payload=alerta)
 
 
+_CHECKIN_FALLBACK = {
+    "nocturno": ("¡Buenas noches! ¿Qué planes tienes para mañana? Cuéntame y te "
+                 "ayudo a organizarlos (horarios, cómo llegar, qué llevar)."),
+    "matutino": ("¡Buenos días! ¿Qué tienes planeado para hoy? Cuéntame y te doy "
+                 "tips para arrancar bien."),
+}
+
+
+def _texto_checkin(trip: dict, instruccion: str, tipo: str) -> str:
+    """Genera el check-in con el LLM; si el proveedor falla, usa un texto fijo
+    cálido en vez de reventar el endpoint / el tick del scheduler."""
+    history = context.historial(trip["id"])
+    history.append({"role": "user", "content": instruccion})
+    try:
+        return llm.chat(context.build(trip), history)
+    except Exception as e:
+        log.warning("checkin_fallback tipo=%s trip=%s error=%s", tipo, trip["id"], type(e).__name__)
+        return _CHECKIN_FALLBACK[tipo]
+
+
 def check_in(trip_id: str) -> dict:
     trip = db.get_trip(trip_id)
-    history = [{"role": m["role"], "content": m["content"]} for m in db.rows("messages", trip_id)]
-    history.append({"role": "user", "content": (
+    texto = _texto_checkin(trip, (
         "[SEÑAL DEL SISTEMA — no es el usuario]: Son las 8pm. Haz tu check-in nocturno: máximo 3 frases "
         "cálidas, comenta algo útil de mañana (clima, actividad conocida, o el vuelo si es el último día) "
         "y pregunta los planes de mañana. Si ya los conoces, confírmalos y da un tip concreto en vez de preguntar."
-    )})
-    texto = llm.chat(context.build(trip), history)
+    ), "nocturno")
     db.insert("messages", {"trip_id": trip_id, "role": "companion", "content": texto})
     _push_checkin(trip_id, "Prepara mañana 🌙", texto)
     return {"message": texto}
@@ -118,23 +162,28 @@ def check_in_matutino(trip_id: str) -> dict:
     """Check-in de la mañana (~8am hora local): saluda, comenta el plan/clima del
     día y da un tip concreto para arrancar. Es conversación, no alerta operativa."""
     trip = db.get_trip(trip_id)
-    history = [{"role": m["role"], "content": m["content"]} for m in db.rows("messages", trip_id)]
-    history.append({"role": "user", "content": (
+    texto = _texto_checkin(trip, (
         "[SEÑAL DEL SISTEMA — no es el usuario]: Es la mañana (~8am). Haz tu check-in matutino: "
         "máximo 3 frases cálidas. Si conoces los planes de HOY, confírmalos y da un tip concreto para "
         "arrancar bien (a qué hora salir, qué llevar, clima si lo sabes). Si no conoces los planes de hoy, "
         "pregúntalos en una frase amable. No repitas lo que ya dijiste anoche."
-    )})
-    texto = llm.chat(context.build(trip), history)
+    ), "matutino")
     db.insert("messages", {"trip_id": trip_id, "role": "companion", "content": texto})
     _push_checkin(trip_id, "Revisa tu día ☀️", texto)
     return {"message": texto}
+
+
+# Si el usuario habló con el Companion hace menos de esto, el check-in queda en
+# el chat pero no le suena el celular: ya está en contacto, no hace falta empujar.
+CHECKIN_SIN_PUSH_SI_ACTIVO_MIN = 180
 
 
 def _push_checkin(trip_id: str, title: str, texto: str) -> None:
     """Manda el check-in al celular como push (si hay VAPID). El cuerpo va corto
     a propósito: la notificación es solo el 'gancho' para abrir la app, donde el
     mensaje completo ya quedó guardado en el chat. Nunca rompe el flujo."""
+    if db.user_active_within(trip_id, CHECKIN_SIN_PUSH_SI_ACTIVO_MIN):
+        return
     try:
         from . import push
         # Cuerpo breve para la notificación (1 línea). El texto completo vive en
@@ -142,9 +191,9 @@ def _push_checkin(trip_id: str, title: str, texto: str) -> None:
         cuerpo = texto if len(texto) <= 90 else texto[:87].rstrip() + "…"
         # data.kind="checkin" + open_chat le dice al service worker / la app que
         # al tocar debe abrir directamente la conversación.
-        push.send_to_trip(trip_id, title, cuerpo, data={"kind": "checkin", "open": "chat"})
+        push.send_to_trip_async(trip_id, title, cuerpo, data={"kind": "checkin", "open": "chat"})
     except Exception:
-        pass
+        log.exception("push_checkin_error trip=%s", trip_id)
 
 
 def recordatorio_vuelo_regreso(trip_id: str) -> dict:
@@ -210,10 +259,7 @@ def scan_destination(trip_id: str) -> dict:
         rango = "2026"
 
     # ── Búsqueda 1: Seguridad / alertas operativas (siempre, 1 búsqueda) ──
-    noticias = search.search(
-        f"{lugar} manifestación cierre vial huelga alerta seguridad turista",
-        max_results=3, topic="news",
-    )
+    q_noticias = (f"{lugar} manifestación cierre vial huelga alerta seguridad turista", 3, "news")
 
     # ── Búsquedas 2-N: Una por gusto del usuario (máx 3 para no quemar cuota) ──
     # Cada gusto se traduce a términos de búsqueda concretos para que Tavily
@@ -264,17 +310,25 @@ def scan_destination(trip_id: str) -> dict:
     gustos = trip.get("gustos") or []
     gustos_a_buscar = gustos[:3] if gustos else []  # máx 3 búsquedas de cuota
 
-    recomendaciones: list[dict] = []
     if gustos_a_buscar:
-        for gusto in gustos_a_buscar:
-            query = GUSTO_QUERY.get(gusto, f"{lugar} {gusto.lower()} {rango}")
-            recomendaciones += search.search(query, max_results=2, topic="general")
+        q_recos = [(GUSTO_QUERY.get(g, f"{lugar} {g.lower()} {rango}"), 2, "general")
+                   for g in gustos_a_buscar]
     else:
         # Sin gustos: fallback genérico de qué hacer en las fechas del viaje.
-        recomendaciones = search.search(
-            f"{lugar} qué hacer eventos festivales {rango}",
-            max_results=3, topic="general",
-        )
+        q_recos = [(f"{lugar} qué hacer eventos festivales {rango}", 3, "general")]
+
+    # Las 2-4 búsquedas son independientes: en paralelo (antes en serie, ~1-3 s
+    # cada una). El scoring de abajo sigue en serie a propósito: el presupuesto
+    # diario de push se evalúa señal por señal y en paralelo podría excederse.
+    consultas = [q_noticias] + q_recos
+    if search.MODE == "mock":
+        resultados_busqueda = [[] for _ in consultas]
+    else:
+        with ThreadPoolExecutor(max_workers=min(4, len(consultas))) as ex:
+            resultados_busqueda = list(ex.map(
+                lambda q: search.search(q[0], max_results=q[1], topic=q[2]), consultas))
+    noticias = resultados_busqueda[0]
+    recomendaciones: list[dict] = [it for lote in resultados_busqueda[1:] for it in lote]
 
     resultados = []
     for item in noticias:

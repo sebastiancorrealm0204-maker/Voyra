@@ -9,10 +9,18 @@ entrenamiento futuro del scorer propio (principio acordado: guardar todo desde
 el día uno como si fuéramos a entrenar mañana).
 """
 import json
+import logging
 
 from . import context, db, llm, timeutil
 
-PRESUPUESTO_DIARIO = 4
+log = logging.getLogger("voyra.engine")
+
+# Avisos mesurados: el Companion avisa, pero no satura. Los operativos (vuelo,
+# seguridad) no cuentan para el presupuesto y llegan siempre.
+PRESUPUESTO_DIARIO = 3
+# Si el usuario escribió hace menos de esto, está en la app: lo no urgente se
+# queda en el feed in-app en vez de sonarle el celular.
+EN_APP_MINUTOS = 15
 MAX_POR_CATEGORIA_DIA = 2
 QUIET_START, QUIET_END = 22.5, 7.0  # 10:30pm – 7:00am hora local del destino
 CATEGORIAS_BLOQUEADAS = {"promo_no_solicitada", "marketing"}
@@ -42,6 +50,48 @@ def _filtro(trip: dict, category: str, operational: bool) -> str:
     return "pass"
 
 
+_TITULOS_FALLBACK = {
+    "vuelo": "Novedad de tu vuelo",
+    "seguridad": "Alerta en tu destino",
+    "itinerario": "Recordatorio de tu plan",
+    "clima": "Cambio de clima",
+}
+
+
+def _score_fallback(category: str, operational: bool, payload: str) -> dict:
+    """Scoring determinístico cuando el LLM falla (caído, timeout, JSON roto).
+
+    Lo crítico es que un evento OPERATIVO (vuelo, seguridad, hora de salir)
+    llegue SIEMPRE: antes, una falla del proveedor reventaba el ingest con un
+    500 y el aviso de retraso de vuelo se perdía. Lo no operativo baja a feed
+    (score 50): queda visible en la app sin gastar push con un texto genérico.
+    """
+    titulo = _TITULOS_FALLBACK.get(category, "Novedad de tu viaje")
+    return {"score": 90 if operational else 50,
+            "razon": "Scoring LLM no disponible: decisión determinística de respaldo.",
+            "titulo": titulo, "mensaje": (payload or "")[:280],
+            "accion": "Ver detalle" if operational else None, "_mode": "fallback"}
+
+
+def _score(system_fn, source: str, payload: str, category: str, operational: bool,
+           extra: dict | None) -> dict:
+    """llm.score_event con validación de la salida y fallback determinístico.
+    `system_fn` es perezoso: en modo mock el system prompt (~40K caracteres)
+    no se usa, así que ni se construye."""
+    try:
+        mock = llm.SCORING_PROVIDER == "mock" or not llm._available()
+        r = llm.score_event("" if mock else system_fn(), source, payload, category, extra=extra)
+        r["score"] = max(0, min(100, int(float(r["score"]))))
+        if not str(r.get("titulo") or "").strip() or not str(r.get("mensaje") or "").strip():
+            raise ValueError("salida LLM sin titulo/mensaje")
+        r.setdefault("_mode", "real")
+        return r
+    except Exception as e:
+        log.warning("scoring_fallback category=%s operational=%s error=%s",
+                    category, operational, type(e).__name__)
+        return _score_fallback(category, operational, payload)
+
+
 def ingest(trip_id: str, source: str, category: str, operational: bool, payload: str,
            extra: dict | None = None) -> dict:
     """Punto de entrada de toda señal. Devuelve la decisión completa.
@@ -69,10 +119,11 @@ def ingest(trip_id: str, source: str, category: str, operational: bool, payload:
         })
         return {"decision_id": did, "filter": filtro, "score": None, "decision": decision, "notification": None}
 
-    system = context.build(trip)
-    r = llm.score_event(system, source, payload, category, extra=extra)
+    r = _score(lambda: context.build(trip), source, payload, category, operational, extra)
     score = max(int(r["score"]), 90) if operational else int(r["score"])
     decision = "push" if score >= 70 else "feed" if score >= 40 else "silence"
+    if decision == "push" and not operational and db.user_active_within(trip_id, EN_APP_MINUTOS):
+        decision = "feed"
 
     did = db.insert("decisions", {
         "trip_id": trip_id, "event_id": event_id, "filter_result": "pass",
@@ -94,13 +145,16 @@ def ingest(trip_id: str, source: str, category: str, operational: bool, payload:
         # se quedan en el feed in-app). Web Push (VAPID). Si no hay claves VAPID
         # configuradas, push.send_to_trip no hace nada y la notificación igual
         # quedó persistida y consultable. El envío nunca debe romper el ingest.
+        # Se despacha en background: el request (o el tick del scheduler) no
+        # espera a FCM/APNs, que pueden tardar varios segundos por dispositivo.
         if decision == "push":
             try:
                 from . import push
-                push.send_to_trip(trip_id, r["titulo"], r["mensaje"],
-                                  data={"notification_id": nid, "category": category, "action": r.get("accion")})
+                push.send_to_trip_async(trip_id, r["titulo"], r["mensaje"],
+                                        data={"notification_id": nid, "category": category,
+                                              "action": r.get("accion")})
             except Exception:
-                pass
+                log.exception("push_dispatch_error trip=%s", trip_id)
 
     return {"decision_id": did, "filter": "pass", "score": score, "reason": r.get("razon"),
             "decision": decision, "notification": notification}

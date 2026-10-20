@@ -1,5 +1,21 @@
 # Voyra Companion — backend del agente del durante
 
+> **Posicionamiento:** el Companion es un local con carácter y memoria, alimentado por una
+> red local curada y verificado con IA encima. **Avisa, pero sin
+> invadir:** máximo 3 avisos no urgentes al día, silencio de noche, y si el usuario está
+> usando la app en ese momento lo no urgente queda en el feed en vez de sonarle el celular
+> (`engine.EN_APP_MINUTOS`). Los check-ins no mandan push si habló con el Companion en las
+> últimas 3 h. Lo operativo (vuelo, seguridad) llega siempre.
+>
+> **Verificación que corrige:** antes de guardar y mostrar cada respuesta del chat,
+> `app/verificacion.py` revisa frase por frase (sin LLM, `food_guard.py`) que ningún plato se
+> atribuya a un lugar curado cuya ficha no lo respalde. Si encuentra algo, una segunda llamada
+> reescribe la respuesta con la ficha real; si la reescritura sigue mal o el LLM falla, recorta
+> las frases culpables. Sin hallazgos no hay llamadas extra.
+>
+> **Memoria:** en cada turno del chat, `app/memoria.py` añade al prompt el perfil global del
+> viajero (preferencias, alergias, notas) y sus viajes anteriores (ciudades, gustos, lugares).
+
 El servicio que vive en el servidor: persiste el Trip Context, recibe señales de los
 watchers (webhooks Duffel, geofences del teléfono, Destination Scanner, News watcher),
 decide con el motor de relevancia (filtro determinístico + scoring con Claude), entrega
@@ -70,7 +86,7 @@ señal → FILTRO DETERMINÍSTICO (costo cero)          → SCORING (Claude Haik
         · categoría bloqueada                          · score 0-100 con razón
         · silenciada por el usuario (feedback)         · ≥70 push
         · quiet hours 22:30–07:00 (operativo pasa)     · 40-69 feed in-app
-        · presupuesto 4 push/día (operativo pasa)      · <40 silencio
+        · presupuesto 3 push/día (operativo pasa)      · <40 silencio
         · tope 2/categoría/día
 ```
 
