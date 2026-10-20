@@ -18,7 +18,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
-from . import (context, db, engine, geo, llm, memoria, net, places_live, push, scheduler,
+from . import (ciudades, context, db, engine, geo, llm, memoria, net, places_live, push, scheduler,
                search, seed_data, verificacion, watchers, auth, limits, email_send, social_enrich,
                waitlist)
 
@@ -453,23 +453,24 @@ def create_trip(t: TripIn, user: dict = Depends(verified_user)):
             "limite": tope,
             "mensaje": f"Tu plan permite {tope} viajes activos. "
                        "Borra uno para crear otro."})
+    _exigir_ciudad_activa(t.ciudad)
     tid = db.create_trip(t.model_dump(), user_id=user["id"])
     _idi = (t.idioma or "es").lower()
     _saludos = {
-        "es": (f"¡Listo! Ya estoy vigilando tu vuelo, el clima y lo que se mueve en {t.ciudad}. "
-               "Para avisarte solo de lo que te sirve: ¿qué planes tienes para hoy y mañana?",
+        "es": (f"¡Listo! Soy tu amigo local en {t.ciudad}. Pregúntame dónde comer, qué hacer o cómo "
+               "moverte. Para empezar: ¿qué planes tienes para hoy y mañana?",
                "¡Hola! Soy tu Companion. Sube tus reservas (vuelo, hotel, tours) y armo tu "
                "viaje contigo. También puedes contarme a dónde vas y cuándo."),
-        "en": (f"All set! I'm already watching your flight, the weather and what's happening in {t.ciudad}. "
-               "So I only ping you with what's useful: what are your plans for today and tomorrow?",
+        "en": (f"All set! I'm your local friend in {t.ciudad}. Ask me where to eat, what to do or how to "
+               "get around. To start: what are your plans for today and tomorrow?",
                "Hi! I'm your Companion. Upload your bookings (flight, hotel, tours) and I'll build your "
                "trip with you. You can also just tell me where you're going and when."),
-        "pt": (f"Pronto! Já estou de olho no seu voo, no clima e no que rola em {t.ciudad}. "
-               "Para te avisar só do que importa: quais são seus planos para hoje e amanhã?",
+        "pt": (f"Pronto! Sou seu amigo local em {t.ciudad}. Me pergunte onde comer, o que fazer ou como "
+               "se locomover. Para começar: quais são seus planos para hoje e amanhã?",
                "Oi! Sou o seu Companion. Suba suas reservas (voo, hotel, passeios) e eu monto sua "
                "viagem com você. Você também pode só me dizer para onde vai e quando."),
-        "fr": (f"C'est prêt ! Je surveille déjà ton vol, la météo et ce qui se passe à {t.ciudad}. "
-               "Pour ne t'alerter que de l'utile : quels sont tes plans pour aujourd'hui et demain ?",
+        "fr": (f"C'est prêt ! Je suis ton ami local à {t.ciudad}. Demande-moi où manger, quoi faire ou "
+               "comment te déplacer. Pour commencer : quels sont tes plans pour aujourd'hui et demain ?",
                "Salut ! Je suis ton Companion. Ajoute tes réservations (vol, hôtel, activités) et je "
                "construis ton voyage avec toi. Tu peux aussi simplement me dire où tu vas et quand."),
     }
@@ -486,6 +487,14 @@ def create_trip(t: TripIn, user: dict = Depends(verified_user)):
     return {"trip_id": tid, "greeting": saludo, "trip": db.get_trip(tid)}
 
 
+def _exigir_ciudad_activa(ciudad: str | None) -> None:
+    """422 si se intenta abrir un viaje en una ciudad donde aún no estamos.
+    Vacío se permite: el onboarding crea un viaje en blanco para subir reservas."""
+    if ciudad and ciudad.strip() and not ciudades.activa(ciudad):
+        raise HTTPException(422, {"error": "ciudad_no_disponible", "ciudades": ciudades.ACTIVAS,
+                                  "mensaje": ciudades.mensaje_no_disponible(ciudad)})
+
+
 @app.get("/trips")
 def list_my_trips(user: dict = Depends(current_user)):
     """Lista los viajes del usuario autenticado."""
@@ -496,6 +505,8 @@ def list_my_trips(user: dict = Depends(current_user)):
 def patch_trip(tid: str, p: TripPatchIn, user: dict = Depends(current_user)):
     own_trip(tid, user)
     patch = {k: v for k, v in p.model_dump().items() if v is not None}
+    if p.ciudad is not None:
+        _exigir_ciudad_activa(p.ciudad)
     if patch:
         db.update_trip(tid, patch)
     # Si se actualizó el hotel o la ciudad, re-geocodificar el hotel en background.
@@ -1062,6 +1073,9 @@ def upload_doc(tid: str, d: DocIn, user: dict = Depends(verified_user)):
         val = (ti.get(clave) or "").strip() if isinstance(ti.get(clave), str) else ti.get(clave)
         if val and not (trip.get(campo) or "").strip():
             patch[campo] = val
+    if patch.get("ciudad") and not ciudades.activa(patch["ciudad"]):
+        r["ciudad_no_disponible"] = {"ciudad": patch.pop("ciudad"),
+                                     "mensaje": ciudades.mensaje_no_disponible(ti["ciudad"])}
     if patch:
         db.update_trip(tid, patch)
     r["trip_info_aplicado"] = patch

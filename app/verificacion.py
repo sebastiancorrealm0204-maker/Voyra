@@ -25,6 +25,8 @@ _SYSTEM_CORRECTOR = (
     "de la respuesta, sin comentarios ni explicaciones."
 )
 
+_REESCRITURAS = 2
+
 _SIN_RESPUESTA = ("Déjame confirmarlo bien antes de recomendártelo: ¿me cuentas qué se te antoja "
                   "y te digo el lugar que mejor encaja?")
 
@@ -53,13 +55,24 @@ def verificar_y_corregir(reply: str, places: list[dict]) -> tuple[str, dict]:
     informe = {"corregida": True, "hallazgos": [
         {"plato": h["plato_mencionado"], "lugar": h["lugar"]} for h in hallazgos]}
 
-    try:
-        nuevo = (llm.chat(_SYSTEM_CORRECTOR, [{"role": "user", "content": _prompt(reply, hallazgos)}]) or "").strip()
-        if nuevo and not nuevo.startswith("[demo]") and not food_guard.verificar_respuesta(nuevo, places):
-            log.info("verificacion_corregida metodo=reescritura hallazgos=%d", len(hallazgos))
+    # Hasta dos reescrituras: recortar frases deja a veces una respuesta que ya
+    # no se entiende ("Ese sí es el almuerzo…" sin el lugar al que se refería),
+    # así que antes de recortar se le da al LLM una segunda oportunidad con lo
+    # que su primer intento aún tenía mal.
+    pendientes, base = hallazgos, reply
+    for intento in range(1, _REESCRITURAS + 1):
+        try:
+            nuevo = (llm.chat(_SYSTEM_CORRECTOR, [{"role": "user", "content": _prompt(base, pendientes)}]) or "").strip()
+        except Exception as e:
+            log.warning("verificacion_reescritura_fallo intento=%d error=%s", intento, type(e).__name__)
+            break
+        if not nuevo or nuevo.startswith("[demo]"):
+            break
+        restantes = food_guard.verificar_respuesta(nuevo, places)
+        if not restantes:
+            log.info("verificacion_corregida metodo=reescritura intento=%d hallazgos=%d", intento, len(hallazgos))
             return nuevo, {**informe, "metodo": "reescritura"}
-    except Exception as e:
-        log.warning("verificacion_reescritura_fallo error=%s", type(e).__name__)
+        pendientes, base = restantes, nuevo
 
     recortada = food_guard.quitar_frases(reply, hallazgos) or _SIN_RESPUESTA
     log.info("verificacion_corregida metodo=recorte hallazgos=%d", len(hallazgos))

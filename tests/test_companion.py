@@ -111,7 +111,7 @@ def test_api_end_to_end():
     from app.main import app
     client = TestClient(app)
     H = _auth_headers(client)
-    t = client.post("/trips", json={"ciudad": "Cartagena", "hotel": "H", "inicio": "2026-07-12",
+    t = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H", "inicio": "2026-07-12",
                                     "fin": "2026-07-18"}, headers=H).json()
     tid = t["trip_id"]
     assert "planes" not in t  # greeting devuelto
@@ -271,9 +271,11 @@ def test_airport_gps_activa_modo():
     assert loc["modo_aeropuerto"] is True
 
 
-def test_airport_ciudad_sin_curacion():
+def test_airport_ciudad_sin_curacion(monkeypatch):
     """Una ciudad sin aeropuerto curado responde 'no disponible', sin romper."""
+    from app import ciudades
     from app.main import app
+    monkeypatch.setattr(ciudades, "ACTIVAS", ["Bogotá", "Cartagena"])  # una ciudad abierta pero sin aeropuerto curado
     client = TestClient(app)
     H = _auth_headers(client)
     t = client.post("/trips", json={"ciudad": "Cartagena", "hotel": "H",
@@ -288,7 +290,7 @@ def test_scan_mock_mode_no_crash():
     from app.main import app
     client = TestClient(app)
     H = _auth_headers(client)
-    t = client.post("/trips", json={"ciudad": "Cartagena", "hotel": "H", "inicio": "2026-07-12",
+    t = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H", "inicio": "2026-07-12",
                                     "fin": "2026-07-18"}, headers=H).json()
     tid = t["trip_id"]
     r = client.post(f"/trips/{tid}/scan", headers=H).json()
@@ -863,3 +865,48 @@ def test_chat_entrega_y_guarda_la_version_corregida(monkeypatch):
     assert r["verificacion"]["corregida"] is True
     guardado = [m["content"] for m in db.rows("messages", tid) if m["role"] == "companion"][-1]
     assert guardado == r["reply"]
+
+
+# ── Lanzamiento solo en Bogotá ──
+def test_solo_se_crean_viajes_en_bogota():
+    client, H = _auth_client()
+    assert client.post("/trips", json={"ciudad": "bogota, Colombia"}, headers=H).status_code == 200
+    r = client.post("/trips", json={"ciudad": "Lima"}, headers=H)
+    assert r.status_code == 422 and r.json()["detail"]["error"] == "ciudad_no_disponible"
+    assert "Bogotá" in r.json()["detail"]["mensaje"]
+
+
+def test_no_se_puede_cambiar_el_viaje_a_otra_ciudad():
+    client, H = _auth_client()
+    tid = client.post("/trips", json={}, headers=H).json()["trip_id"]  # viaje en blanco (subir reservas)
+    assert client.patch(f"/trips/{tid}", json={"ciudad": "Medellín"}, headers=H).status_code == 422
+    assert client.patch(f"/trips/{tid}", json={"ciudad": "Bogotá"}, headers=H).json()["ciudad"] == "Bogotá"
+
+
+def test_reserva_de_otra_ciudad_no_pisa_la_ciudad(monkeypatch):
+    from app import llm
+    client, H = _auth_client()
+    tid = client.post("/trips", json={}, headers=H).json()["trip_id"]
+    monkeypatch.setattr(llm, "extract_document", lambda *a, **k: {
+        "tipo": "hotel", "resumen": "Hotel en Lima", "trip_info": {"ciudad": "Lima", "hotel": "Hotel Miraflores"},
+        "planes": []})
+    r = client.post(f"/trips/{tid}/documents", json={"filename": "reserva.txt", "text_content": "Hotel en Lima"},
+                    headers=H).json()
+    assert r["ciudad_no_disponible"]["ciudad"] == "Lima"
+    assert r["trip"].get("ciudad", "") == ""          # la ciudad no se aplicó
+    assert r["trip"]["hotel"] == "Hotel Miraflores"   # el resto sí
+
+
+def test_saludo_con_el_tono_nuevo():
+    client, H = _auth_client()
+    g = client.post("/trips", json={"ciudad": "Bogotá"}, headers=H).json()["greeting"]
+    assert "amigo local en Bogotá" in g and "vigilando" not in g
+
+
+def test_segunda_reescritura_antes_de_recortar(monkeypatch):
+    from app import llm, verificacion
+    intentos = iter(["En Crepes & Waffles pide el sancocho.",          # 1ª: sigue mal
+                     "En Crepes & Waffles pide un crepe salado."])     # 2ª: bien
+    monkeypatch.setattr(llm, "chat", lambda system, h: next(intentos))
+    r, info = verificacion.verificar_y_corregir("En Crepes & Waffles pide la bandeja paisa.", _bogota())
+    assert r == "En Crepes & Waffles pide un crepe salado." and info["metodo"] == "reescritura"
