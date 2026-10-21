@@ -545,6 +545,8 @@ LANG_NAME: dict[str, str] = {
     "en": "English",
     "pt": "português (Brasil)",
     "fr": "français",
+    "de": "Deutsch",
+    "it": "italiano",
 }
 
 

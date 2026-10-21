@@ -209,7 +209,7 @@ class TripIn(BaseModel):
     vuelo_regreso: str = ""
     pais: str = "Colombia"
     gustos: list[str] = Field(default_factory=list)
-    idioma: str = "es"            # idioma del usuario (es | en | pt | fr) — en qué le habla el Companion
+    idioma: str = "es"            # idioma del usuario (es | en | pt | fr | de | it) — en qué le habla el Companion
 
 
 class TripPatchIn(BaseModel):
@@ -473,6 +473,14 @@ def create_trip(t: TripIn, user: dict = Depends(verified_user)):
                "comment te déplacer. Pour commencer : quels sont tes plans pour aujourd'hui et demain ?",
                "Salut ! Je suis ton Companion. Ajoute tes réservations (vol, hôtel, activités) et je "
                "construis ton voyage avec toi. Tu peux aussi simplement me dire où tu vas et quand."),
+        "de": (f"Fertig! Ich bin dein Local-Freund in {t.ciudad}. Frag mich, wo du essen kannst, was du "
+               "unternehmen sollst oder wie du dich fortbewegst. Zum Start: Was hast du heute und morgen vor?",
+               "Hallo! Ich bin dein Companion. Lade deine Buchungen hoch (Flug, Hotel, Touren) und ich "
+               "plane deine Reise mit dir. Du kannst mir auch einfach sagen, wohin du reist und wann."),
+        "it": (f"Pronto! Sono il tuo amico locale a {t.ciudad}. Chiedimi dove mangiare, cosa fare o come "
+               "muoverti. Per iniziare: che programmi hai per oggi e domani?",
+               "Ciao! Sono il tuo Companion. Carica le tue prenotazioni (volo, hotel, attività) e costruisco "
+               "il tuo viaggio con te. Puoi anche dirmi semplicemente dove vai e quando."),
     }
     con_ciudad, sin_ciudad = _saludos.get(_idi, _saludos["es"])
     saludo = con_ciudad if t.ciudad.strip() else sin_ciudad
