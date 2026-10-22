@@ -1,0 +1,46 @@
+# Blueprint de Render para el backend (FastAPI).
+# Los secretos llevan `sync: false`: Render los pide en el panel y no se guardan en el repo.
+services:
+  - type: web
+    name: voyra-backend
+    runtime: python
+    plan: free            # cambia a `starter` para que no se duerma y corran los avisos programados
+    region: virginia      # la más cercana a Colombia/México; no se puede cambiar después de crear
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      # ── Base de datos (Supabase/Postgres). Sin ella usa SQLite y pierde datos en cada deploy.
+      - key: DATABASE_URL
+        sync: false
+      # ── Cerebro (al menos una; con varias, scoring/extracción van a la más barata y el chat a Claude)
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      # ── Admin y URLs
+      - key: ADMIN_TOKEN
+        sync: false
+      - key: APP_BASE_URL   # URL del frontend, ej. https://voyra-app.onrender.com
+        sync: false
+      # ── Notificaciones push (genera el par con generar_vapid.py)
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT   # ej. mailto:tu@correo.com
+        sync: false
+      # ── Opcionales (déjalas vacías si no las usas)
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: CIUDADES_ACTIVAS
+        sync: false
