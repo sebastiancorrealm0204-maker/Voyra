@@ -102,3 +102,9 @@ presupuesto, quiet hours y silenciamientos, y su score se eleva a >=90.
 5. **Timezone del destino** en el Trip Context para quiet hours correctas.
 6. **Prompt caching** del Trip Context (header `cache_control` de la API de Anthropic) — el ahorro del 90% de la spec.
 7. **Postgres** en lugar de SQLite al desplegar.
+
+## Despliegue
+
+- **Railway** (actual): `Procfile` → `uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
+- **Render** (plan B): `render.yaml` en la raíz. No tengas los dos encendidos a la vez con la misma `DATABASE_URL` (el programador interno enviaría avisos duplicados).
+- Verificación rápida tras desplegar: `GET /health` debe responder `status: ok` y `/openapi.json` debe incluir `/waitlist`.
