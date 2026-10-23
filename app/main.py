@@ -151,8 +151,9 @@ def current_user(authorization: str | None = Header(default=None)) -> dict:
 
 
 def verified_user(user: dict = Depends(current_user)) -> dict:
-    """Usuario autenticado Y con email verificado. Exigido para endpoints caros."""
-    if not user.get("email_verified"):
+    """Usuario autenticado Y con email verificado (si la verificación está activa).
+    Exigido para endpoints caros."""
+    if auth.verification_required() and not user.get("email_verified"):
         raise HTTPException(403, "Verifica tu email para usar esta función. "
                                  "Revisa tu correo o pide un nuevo enlace.")
     return user
@@ -298,8 +299,9 @@ class ResendIn(BaseModel):
 # ── Auth endpoints ──
 @app.post("/auth/signup")
 def signup(body: SignupIn, request: Request):
-    """Registro. Crea el usuario SIN verificar y envía el correo de verificación.
-    No inicia sesión hasta que el email esté verificado (anti-abuso)."""
+    """Registro. Con REQUIRE_EMAIL_VERIFICATION=1 crea el usuario SIN verificar y envía el
+    correo de verificación (no inicia sesión hasta confirmarlo). Por defecto la verificación
+    está apagada: la cuenta queda lista y el cliente puede iniciar sesión de inmediato."""
     ip = request.client.host if request.client else "unknown"
     if auth.ip_signup_blocked(ip):
         raise HTTPException(429, "Demasiados registros desde esta red. Intenta más tarde.")
@@ -315,6 +317,9 @@ def signup(body: SignupIn, request: Request):
 
     auth.record_signup_attempt(ip)
     user = auth.create_user(email, body.password, ip=ip)
+    if not auth.verification_required():
+        auth.mark_email_verified(user["id"])
+        return {"ok": True, "email": email, "verificado": True, "mensaje": "Cuenta creada."}
     token = auth.create_verification_token(user["id"])
     res = email_send.send_verification(email, token)
 
@@ -360,11 +365,11 @@ def resend_verification(body: ResendIn):
 
 @app.post("/auth/login")
 def login(body: LoginIn):
-    """Inicia sesión. Exige email verificado. Devuelve un token de sesión."""
+    """Inicia sesión. Exige email verificado solo si la verificación está activa."""
     user = auth.authenticate(body.email, body.password)
     if not user:
         raise HTTPException(401, "Email o contraseña incorrectos.")
-    if not user["email_verified"]:
+    if auth.verification_required() and not user["email_verified"]:
         raise HTTPException(403, {"error": "email_no_verificado",
                                   "mensaje": "Confirma tu email antes de entrar. "
                                              "Revisa tu correo o pide otro enlace."})

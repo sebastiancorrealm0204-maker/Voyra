@@ -189,6 +189,12 @@ def create_user(email: str, password: str, ip: str = "") -> dict:
     return get_user(uid)
 
 
+def verification_required() -> bool:
+    """¿Se exige confirmar el email? Apagado por defecto; se enciende con
+    REQUIRE_EMAIL_VERIFICATION=1 (leído en cada llamada, sin reiniciar tests/config)."""
+    return os.environ.get("REQUIRE_EMAIL_VERIFICATION", "0") == "1"
+
+
 def mark_email_verified(user_id: str):
     with db.conn() as c:
         c.execute("UPDATE users SET email_verified=1 WHERE id=?", (user_id,))

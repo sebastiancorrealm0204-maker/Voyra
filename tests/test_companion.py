@@ -910,3 +910,17 @@ def test_segunda_reescritura_antes_de_recortar(monkeypatch):
     monkeypatch.setattr(llm, "chat", lambda system, h: next(intentos))
     r, info = verificacion.verificar_y_corregir("En Crepes & Waffles pide la bandeja paisa.", _bogota())
     assert r == "En Crepes & Waffles pide un crepe salado." and info["metodo"] == "reescritura"
+
+
+def test_sin_verificacion_signup_y_login_directo(monkeypatch):
+    """Con la verificación apagada (default en producción) no hace falta confirmar el email."""
+    monkeypatch.setenv("REQUIRE_EMAIL_VERIFICATION", "0")
+    from app.main import app
+    client = TestClient(app)
+    r = client.post("/auth/signup", json={"email": "directo@example.com", "password": "supersecret"})
+    assert r.status_code == 200
+    assert r.json()["verificado"] is True and "dev_verification_link" not in r.json()
+    r = client.post("/auth/login", json={"email": "directo@example.com", "password": "supersecret"})
+    assert r.status_code == 200 and r.json()["token"]
+    H = {"Authorization": f"Bearer {r.json()['token']}"}
+    assert client.get("/auth/me", headers=H).json()["email_verified"] is True
