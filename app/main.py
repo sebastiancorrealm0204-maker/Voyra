@@ -18,7 +18,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
-from . import (ciudades, context, db, engine, geo, llm, memoria, net, places_live, push, scheduler,
+from . import (ciudades, city_knowledge, context, db, engine, geo, llm, memoria, net, places_live, push, scheduler,
                search, seed_data, verificacion, watchers, auth, limits, email_send, social_enrich,
                waitlist)
 
@@ -959,6 +959,12 @@ def chat(tid: str, c: ChatIn, user: dict = Depends(verified_user)):
     db.insert("messages", {"trip_id": tid, "role": "user", "content": c.message})
     # Solo los últimos CHAT_HISTORY_MAX mensajes (antes: los 200 MÁS VIEJOS).
     history = context.historial(tid)
+    _idi = (trip.get("idioma") or "es").lower()
+    if _idi != "es" and history and history[-1]["role"] == "user":
+        # Recordatorio de idioma pegado al último mensaje (solo para el LLM; no se guarda): con el
+        # prompt largo en español y un historial en español, el modelo suele contestar en español.
+        history[-1] = {**history[-1],
+                       "content": history[-1]["content"] + f"\n\n[Reply in {city_knowledge.lang_name(_idi)}.]"}
 
     # ── PARALELISMO ──
     # La respuesta del chat NO depende de la intención: arranca YA en otro

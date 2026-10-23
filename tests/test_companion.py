@@ -946,3 +946,27 @@ def test_signup_guarda_datos_y_bloquea_celular_repetido(monkeypatch):
     # celular inválido / nombre muy corto -> 400
     assert client.post("/auth/signup", json={**body, "email": "c@example.com", "telefono": "12"}).status_code == 400
     assert client.post("/auth/signup", json={**body, "email": "d@example.com", "telefono": "+57 311 000 0000", "nombre": "A"}).status_code == 400
+
+
+def test_chat_en_ingles_recuerda_el_idioma_al_modelo(monkeypatch):
+    """Con idioma != es, el prompt termina con un recordatorio y el último mensaje lleva la instrucción."""
+    from app import llm
+    from app.main import app
+    capturado = {}
+
+    def falso_chat(system, history):
+        capturado["system"], capturado["history"] = system, history
+        return "Sure!"
+
+    monkeypatch.setattr(llm, "chat", falso_chat)
+    client = TestClient(app)
+    H = _auth_headers(client)
+    tid = client.post("/trips", json={"ciudad": "Bogotá", "idioma": "en"}, headers=H).json()["trip_id"]
+    assert client.post(f"/trips/{tid}/chat", json={"message": "where should I eat?"}, headers=H).status_code == 200
+    assert capturado["system"].rstrip().endswith("explain them in parentheses.")
+    assert capturado["history"][-1]["content"].endswith("[Reply in English.]")
+    # y en español no se agrega nada
+    tid2 = client.post("/trips", json={"ciudad": "Bogotá"}, headers=H).json()["trip_id"]
+    client.post(f"/trips/{tid2}/chat", json={"message": "hola"}, headers=H)
+    assert "[Reply in" not in capturado["history"][-1]["content"]
+    assert "FINAL REMINDER" not in capturado["system"]
