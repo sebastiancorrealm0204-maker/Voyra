@@ -56,7 +56,7 @@ ZONAS = {
     "Chapinero": (4.6486, -74.0620), "Chapinero Alto": (4.6420, -74.0610), "Zona G": (4.6580, -74.0570),
     "Zona T": (4.6680, -74.0530), "Quinta Camacho": (4.6540, -74.0630), "Usaquén": (4.6950, -74.0310),
     "Chicó": (4.6780, -74.0470), "La Candelaria": (4.5981, -74.0758), "La Macarena": (4.6120, -74.0680),
-    "Teusaquillo": (4.6350, -74.0780),
+    "Teusaquillo": (4.6350, -74.0780), "Rosales": (4.6600, -74.0490), "Parque 93": (4.6760, -74.0480),
 }
 RADIO_BIAS_M = 1800.0
 RADIO_MAX_M = 2500
@@ -194,8 +194,9 @@ def corroborar(nombre: str, resultados: list[dict]) -> dict:
     dominios, fuentes, extractos, cierre, otras = set(), [], [], False, set()
     for r in resultados:
         texto = f"{r.get('title', '')} {r.get('content', '')}"
-        if clave not in _norm(texto):
-            continue
+        tn = _norm(texto)
+        if clave not in tn or "bogot" not in tn:
+            continue  # sin «Bogotá» en el texto suele ser otra cosa con el mismo nombre (una canción, un periódico…)
         d = dominio(r.get("url", ""))
         if SENAL_CIERRE.search(texto):
             cierre = True

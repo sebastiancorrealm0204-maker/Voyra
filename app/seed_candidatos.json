@@ -300,5 +300,417 @@
    "las2orillas.co",
    "tripadvisor.com"
   ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Érase una vez café de especialidad",
+  "category": "cafe",
+  "zona": "Teusaquillo",
+  "dir": "Cra. 38a #25-76 Piso 1, Bogotá",
+  "maps_query": "Érase una vez café de especialidad Bogotá",
+  "lat": 4.631628,
+  "lng": -74.088428,
+  "place_id": "ChIJT7jmu0ubP44RnH6RHelE5CQ",
+  "rating": 4.8,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Café de especialidad en Teusaquillo con granos cuidadosamente seleccionados y una taza pensada como experiencia; 4,8 en Google con cerca de 900 reseñas.",
+  "confianza": "media",
+  "tags": [
+   "Café de especialidad"
+  ],
+  "_fuentes": [
+   "polomaps.com",
+   "tripadvisor.es"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Gamberro",
+  "category": "restaurante",
+  "zona": "Chicó",
+  "dir": "Cl. 90 #11-13 Loc 16, Bogotá",
+  "maps_query": "Gamberro Bogotá",
+  "lat": 4.672129,
+  "lng": -74.048999,
+  "place_id": "ChIJLRagFYyaP44RjFIwdGiEJQw",
+  "rating": 4.6,
+  "price_level": null,
+  "descripcion": "Cocina mediterránea con giro colombiano (fusión hispano-colombiana) en un local de diseño con barra en la planta baja. Una opción cuidada para cenar en Chicó.",
+  "confianza": "media_alta",
+  "tags": [
+   "Cocina de autor",
+   "Lujo y premium"
+  ],
+  "_fuentes": [
+   "alotea.com",
+   "joinpearl.co",
+   "tripadvisor.com"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Orígenes Café",
+  "category": "cafe",
+  "zona": "La Candelaria",
+  "dir": "Cl. 11 #2 - 98, La Candelaria, Bogotá",
+  "maps_query": "Orígenes Café Bogotá",
+  "lat": 4.596059,
+  "lng": -74.071792,
+  "place_id": "ChIJc8UFzwqZP44Ro72jIE5kGa8",
+  "rating": 4.8,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Café en La Candelaria con buena comida y buen servicio: destacan el capuchino (con leche de avena) y los desayunos con huevos. Abre los siete días de la semana.",
+  "confianza": "media",
+  "tags": [
+   "Café de especialidad",
+   "Brunch y desayunos"
+  ],
+  "_fuentes": [
+   "colombiabound.com",
+   "tripadvisor.es"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Momentino Wine Bar",
+  "category": "bar",
+  "zona": "Chapinero Alto",
+  "dir": "Cl. 61 #5-30, Chapinero, Bogotá, Cundinamarca",
+  "maps_query": "Momentino Wine Bar Bogotá",
+  "lat": 4.645982,
+  "lng": -74.059867,
+  "place_id": "ChIJf-CbPOubP44RCeryPrwpk8o",
+  "rating": 4.9,
+  "price_level": null,
+  "descripcion": "Bar de vinos en Chapinero Alto con más de 300 etiquetas y tapas a precios accesibles, en un ambiente informal y artístico.",
+  "confianza": "media",
+  "tags": [
+   "Cervecerías y vino"
+  ],
+  "_fuentes": [
+   "tripadvisor.com",
+   "tripsapien.com"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Calma Coffee & Drinks",
+  "category": "cafe",
+  "zona": "Quinta Camacho",
+  "dir": "Dg. 68 #11a-29, Bogotá",
+  "maps_query": "Calma Coffee & Drinks Bogotá",
+  "lat": 4.654257,
+  "lng": -74.061609,
+  "place_id": "ChIJId48DgCbP44Ryk9QXhxUeZo",
+  "rating": 4.9,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Café de especialidad en Quinta Camacho que además organiza talleres y eventos (de bouquets a sesiones de DJ). Buen plan si buscas algo más que un café.",
+  "confianza": "media",
+  "tags": [
+   "Café de especialidad",
+   "Planes tranquilos"
+  ],
+  "_fuentes": [
+   "kofitime.com",
+   "wanderboat.ai"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Anna & Otto",
+  "category": "restaurante",
+  "zona": "La Macarena",
+  "dir": "Carrera 4a #26c-35, Museo Nacional, Trv 6 #27 -50, Bogotá",
+  "maps_query": "Anna & Otto Bogotá",
+  "lat": 4.613219,
+  "lng": -74.06662,
+  "place_id": "ChIJ-Wz7xZmZP44RRGGowZUkKn0",
+  "rating": 4.6,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Pizzería artesanal de La Macarena: masa delgada y suave en el centro, crujiente en el borde, pensada para acompañar con vino.",
+  "confianza": "media",
+  "tags": [
+   "Cervecerías y vino"
+  ],
+  "_fuentes": [
+   "culturarecreacionydeporte.gov.co",
+   "tripadvisor.es"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Ilhe Habana",
+  "category": "restaurante",
+  "zona": "La Macarena",
+  "dir": "Cra 3a #26B-72, Bogotá",
+  "maps_query": "Ilhe Habana Bogotá",
+  "lat": 4.6125,
+  "lng": -74.065436,
+  "place_id": "ChIJVcKnCZqZP44Ro9bhaqCHxik",
+  "rating": 4.6,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Cocina cubana en La Macarena con más de 15 años de experiencia: ropa vieja, picadillo y otros clásicos de la isla.",
+  "confianza": "media",
+  "tags": [],
+  "_fuentes": [
+   "chipviajero.com",
+   "tripadvisor.es"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Matik Matik",
+  "category": "bar",
+  "zona": "Quinta Camacho",
+  "dir": "Cra. 11 #67-20, Chapinero, Bogotá",
+  "maps_query": "Matik Matik Bogotá",
+  "lat": 4.652965,
+  "lng": -74.061165,
+  "place_id": "ChIJaRzpRkSaP44R6Lyp4D-I9kc",
+  "rating": 4.5,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Bar dedicado a la música en Quinta Camacho, creado por un francés que cambió su vida de empresario por esta pasión: programación musical cuidada y ambiente de autor.",
+  "confianza": "media_alta",
+  "tags": [
+   "Vida nocturna",
+   "Joyas escondidas"
+  ],
+  "_fuentes": [
+   "2emelieu.wixsite.com",
+   "onthegrid.city",
+   "tripadvisor.es"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Sándwich Taller",
+  "category": "restaurante",
+  "zona": "La Macarena",
+  "dir": "Cra. 4a #27-57, Bogotá",
+  "maps_query": "Sándwich Taller Bogotá",
+  "lat": 4.61441,
+  "lng": -74.0663,
+  "place_id": "ChIJeYruF5qZP44RzXRhh9P1NmQ",
+  "rating": 4.6,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Sandwichería de estilo criollo colombiano en La Macarena, con más de 14 propuestas distintas.",
+  "confianza": "media",
+  "tags": [
+   "Gastronomía local"
+  ],
+  "_fuentes": [
+   "amp.lafm.com.co",
+   "tripadvisor.es"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "La Revolución de la Cuchara",
+  "category": "restaurante",
+  "zona": "Teusaquillo",
+  "dir": "Cra. 18 #58b-07, Teusaquillo, Bogotá",
+  "maps_query": "La Revolución de la Cuchara Bogotá",
+  "lat": 4.6465,
+  "lng": -74.069034,
+  "place_id": "ChIJc55uhkeaP44RvNODA5ZJzKw",
+  "rating": 4.6,
+  "price_level": "PRICE_LEVEL_INEXPENSIVE",
+  "descripcion": "Restaurante 100% vegano con menú del día y platos a la carta, a buen precio. Tiene varios comedores y es de las opciones vegetales más económicas de la ciudad.",
+  "confianza": "media_alta",
+  "tags": [
+   "Opciones veganas/vegetarianas",
+   "Económico / mochilero"
+  ],
+  "_fuentes": [
+   "colombiabound.com",
+   "happycow.net",
+   "vice.com"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "El Guapo",
+  "category": "restaurante",
+  "zona": "La Macarena",
+  "dir": "Cra. 4a #27 - 03, La Candelaria, Bogotá, Cundinamarca",
+  "maps_query": "El Guapo Bogotá",
+  "lat": 4.613932,
+  "lng": -74.066411,
+  "place_id": "ChIJ7SBIsG2ZP44RtSx8qwQG1_I",
+  "rating": 4.7,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Restaurante de La Macarena conocido por sus donas rellenas de postres famosos, una de sus propuestas estrella.",
+  "confianza": "media",
+  "tags": [
+   "Dulces y repostería"
+  ],
+  "_fuentes": [
+   "revistadiners.com.co",
+   "tripadvisor.es"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Jiménez Bistro",
+  "category": "restaurante",
+  "zona": "La Candelaria",
+  "dir": "C. del Carmen #12 c -85, Bogotá",
+  "maps_query": "Jiménez Bistro Bogotá",
+  "lat": 4.600601,
+  "lng": -74.071721,
+  "place_id": "ChIJ8YhwoqaZP44RMQBN0ZfP1Cs",
+  "rating": 4.5,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Café, comida y tragos en la plazoleta del Espacio Odeón, en el centro de Bogotá. Abre desde la mañana y los viernes y sábados hasta la madrugada.",
+  "confianza": "media",
+  "tags": [
+   "Brunch y desayunos",
+   "Planes tranquilos"
+  ],
+  "_fuentes": [
+   "revistadc.com",
+   "tripadvisor.es"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Pino Negro",
+  "category": "restaurante",
+  "zona": "Teusaquillo",
+  "dir": "Cl. 32a #19-44, Teusaquillo, Bogotá",
+  "maps_query": "Pino Negro Bogotá",
+  "lat": 4.621384,
+  "lng": -74.074626,
+  "place_id": "ChIJ448GL4KZP44RpCiGygpeZTw",
+  "rating": 4.7,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Buffet de almuerzo, principalmente vegano, de lunes a sábado (de 11 a. m. a 3 p. m.). Para comer vegetal y variado sin gastar mucho.",
+  "confianza": "media_alta",
+  "tags": [
+   "Opciones veganas/vegetarianas",
+   "Económico / mochilero"
+  ],
+  "_fuentes": [
+   "happycow.net",
+   "lacarte.menu",
+   "pulsin.app"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Mestizo Vegano",
+  "category": "restaurante",
+  "zona": "La Candelaria / Centro",
+  "dir": "Cl. 21 # 6 52 edificio, Bogotá",
+  "maps_query": "Mestizo Vegano Bogotá",
+  "lat": 4.606912,
+  "lng": -74.070807,
+  "place_id": "ChIJFyWBqZiZP44RifFo-FMck4w",
+  "rating": 4.7,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Restaurante vegano inspirado en los sabores de toda Latinoamérica: del ceviche de champiñones a platos más contundentes. Muy bien valorado en el centro.",
+  "confianza": "media",
+  "tags": [
+   "Opciones veganas/vegetarianas"
+  ],
+  "_fuentes": [
+   "happycow.net",
+   "tripadvisor.es"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Híbrido Café Bar",
+  "category": "bar",
+  "zona": "La Candelaria",
+  "dir": "Cra. 3 #81, La Candelaria, Bogotá",
+  "maps_query": "Híbrido Café Bar Bogotá",
+  "lat": 4.600502,
+  "lng": -74.069948,
+  "place_id": "ChIJ9UvuFaSZP44R9ozpnawOEBk",
+  "rating": 4.7,
+  "price_level": null,
+  "descripcion": "Bar bohemio que mezcla galería de arte, café y coctelería, con una chimenea que mantiene el lugar cálido. Los cócteles son su fuerte.",
+  "confianza": "media_alta",
+  "tags": [
+   "Arte y diseño",
+   "Vida nocturna",
+   "Planes tranquilos"
+  ],
+  "_fuentes": [
+   "myguidecolombia.com",
+   "tripadvisor.es",
+   "wanderboat.ai"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "The Coffee Corner",
+  "category": "cafe",
+  "zona": "Chapinero",
+  "dir": "Ak 7 #72 - 41, Chapinero, Bogotá, Cundinamarca",
+  "maps_query": "The Coffee Corner Bogotá",
+  "lat": 4.65569,
+  "lng": -74.055274,
+  "place_id": "ChIJY7__yEKaP44RRG-FWtF4_EM",
+  "rating": 4.6,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Café muy frecuentado por los locales en Chapinero (Avenida 7 con calle 72). Para una pausa tranquila.",
+  "confianza": "media_alta",
+  "tags": [
+   "Café de especialidad",
+   "Planes tranquilos"
+  ],
+  "_fuentes": [
+   "colombiabound.com",
+   "coool.cafe",
+   "tripadvisor.es"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Presente Café",
+  "category": "cafe",
+  "zona": "Teusaquillo",
+  "dir": "Cra. 26 #52 A - 03, Bogotá",
+  "maps_query": "Presente Café Bogotá",
+  "lat": 4.641569,
+  "lng": -74.075686,
+  "place_id": "ChIJ33475I2bP44RAx1OhjRfkEM",
+  "rating": 4.8,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Café de especialidad en Teusaquillo, escogido por la guía Polomaps de Bogotá y muy querido por el barrio.",
+  "confianza": "media_alta",
+  "tags": [
+   "Café de especialidad"
+  ],
+  "_fuentes": [
+   "coool.cafe",
+   "pluria.co",
+   "polomaps.com"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Banquete tradicional Colombiano",
+  "category": "restaurante",
+  "zona": "La Candelaria",
+  "dir": "Cl. 10 #3-48, La Candelaria, Bogotá",
+  "maps_query": "Banquete tradicional Colombiano Bogotá",
+  "lat": 4.595487,
+  "lng": -74.072783,
+  "place_id": "ChIJRYcwoPSZP44RrPvWYvGAm3o",
+  "rating": 4.7,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Cocina colombiana tradicional en plena Calle de la Fatiga, en el centro histórico. Sirve desayuno y almuerzo criollo.",
+  "confianza": "media_alta",
+  "tags": [
+   "Gastronomía local"
+  ],
+  "_fuentes": [
+   "polomaps.com",
+   "threads.com",
+   "tripadvisor.es"
+  ]
  }
 ]

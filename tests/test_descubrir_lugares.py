@@ -31,10 +31,10 @@ def test_duplicados_por_id_o_nombre_parecido():
 
 def test_corroborar_cuenta_dominios_distintos_y_solo_textos_que_lo_nombran():
     res = [
-        {"title": "Mejores cafés", "url": "https://www.guia.com/a", "content": "Café Nuevo tiene un tostión excelente."},
-        {"title": "Otro blog", "url": "https://blog.net/b", "content": "En Chapinero, Café Nuevo es imperdible."},
-        {"title": "Mismo blog", "url": "https://blog.net/c", "content": "Café Nuevo otra vez"},
-        {"title": "Sin relación", "url": "https://x.org/d", "content": "Una lista de panaderías cerró este año."},
+        {"title": "Mejores cafés", "url": "https://www.guia.com/a", "content": "Bogotá. Café Nuevo tiene un tostión excelente."},
+        {"title": "Otro blog", "url": "https://blog.net/b", "content": "Bogotá. En Chapinero, Café Nuevo es imperdible."},
+        {"title": "Mismo blog", "url": "https://blog.net/c", "content": "Bogotá. Café Nuevo otra vez"},
+        {"title": "Sin relación", "url": "https://x.org/d", "content": "Bogotá. Una lista de panaderías cerró este año."},
     ]
     c = d.corroborar("Café Nuevo", res)
     assert c["menciones"] == 2 and c["dominios"] == ["blog.net", "guia.com"] and not c["cierre"]
@@ -43,11 +43,11 @@ def test_corroborar_cuenta_dominios_distintos_y_solo_textos_que_lo_nombran():
 
 
 def test_senal_de_cierre_solo_si_el_texto_nombra_al_lugar():
-    con = d.corroborar("Bar Viejo", [{"title": "Bar Viejo cerró", "url": "https://a.com/x", "content": "Bar Viejo cerró tras 10 años"}])
+    con = d.corroborar("Bar Viejo", [{"title": "Bar Viejo cerró", "url": "https://a.com/x", "content": "Bogotá. Bar Viejo cerró tras 10 años"}])
     assert con["cierre"] and d.clasificar(con) == "descartado_cierre"
-    sin = d.corroborar("Bar Viejo", [{"title": "Bar Viejo", "url": "https://a.com/x", "content": "Bar Viejo, buen ambiente. Otro local cerró."}])
+    sin = d.corroborar("Bar Viejo", [{"title": "Bar Viejo", "url": "https://a.com/x", "content": "Bogotá. Bar Viejo, buen ambiente. Otro local cerró."}])
     assert sin["cierre"]  # el mismo texto que nombra al lugar y habla de cierre es suficiente para dudar
-    ajeno = d.corroborar("Bar Viejo", [{"title": "Otro", "url": "https://a.com/y", "content": "El local de al lado cerró"}])
+    ajeno = d.corroborar("Bar Viejo", [{"title": "Otro", "url": "https://a.com/y", "content": "Bogotá. El local de al lado cerró"}])
     assert not ajeno["cierre"] and ajeno["menciones"] == 0
 
 
@@ -109,11 +109,11 @@ def test_ruido_zonas_tiendas_y_colegios():
 
 def test_redes_y_web_propia_no_cuentan_como_recomendacion_independiente():
     res = [
-        {"title": "La Kasta", "url": "https://www.instagram.com/lakasta", "content": "La Kasta, parrilla"},
-        {"title": "La Kasta", "url": "https://www.lakasta.com.co/menu", "content": "La Kasta menú"},
-        {"title": "La Kasta", "url": "https://waze.com/x", "content": "La Kasta dirección"},
-        {"title": "Dónde comer", "url": "https://www.tripadvisor.es/y", "content": "La Kasta es muy popular"},
-        {"title": "Guía", "url": "https://guia.com/z", "content": "Recomendamos La Kasta por su parrilla"},
+        {"title": "La Kasta", "url": "https://www.instagram.com/lakasta", "content": "Bogotá. La Kasta, parrilla"},
+        {"title": "La Kasta", "url": "https://www.lakasta.com.co/menu", "content": "Bogotá. La Kasta menú"},
+        {"title": "La Kasta", "url": "https://waze.com/x", "content": "Bogotá. La Kasta dirección"},
+        {"title": "Dónde comer", "url": "https://www.tripadvisor.es/y", "content": "Bogotá. La Kasta es muy popular"},
+        {"title": "Guía", "url": "https://guia.com/z", "content": "Bogotá. Recomendamos La Kasta por su parrilla"},
     ]
     c = d.corroborar("La Kasta", res)
     assert c["dominios"] == ["guia.com", "tripadvisor.es"] and c["menciones"] == 2
@@ -125,12 +125,19 @@ def test_redes_y_web_propia_no_cuentan_como_recomendacion_independiente():
 
 def test_misma_fuente_con_varios_dominios_cuenta_una_vez_y_los_listados_no_cuentan():
     res = [
-        {"title": "Cuatro", "url": "https://www.tripadvisor.es/a", "content": "Cuatro Cocina Casual, muy rico"},
-        {"title": "Cuatro", "url": "https://en.tripadvisor.com.hk/b", "content": "Cuatro Cocina Casual reviews"},
-        {"title": "Cuatro", "url": "https://www.rappi.com.co/c", "content": "Pide Cuatro Cocina Casual a domicilio"},
-        {"title": "Cuatro", "url": "https://www.eltiempo.com/d", "content": "Cuatro Cocina Casual abrió en Chicó"},
+        {"title": "Cuatro", "url": "https://www.tripadvisor.es/a", "content": "Bogotá. Cuatro Cocina Casual, muy rico"},
+        {"title": "Cuatro", "url": "https://en.tripadvisor.com.hk/b", "content": "Bogotá. Cuatro Cocina Casual reviews"},
+        {"title": "Cuatro", "url": "https://www.rappi.com.co/c", "content": "Bogotá. Pide Cuatro Cocina Casual a domicilio"},
+        {"title": "Cuatro", "url": "https://www.eltiempo.com/d", "content": "Bogotá. Cuatro Cocina Casual abrió en Chicó"},
     ]
     c = d.corroborar("Cuatro Cocina Casual", res)
     assert c["dominios"] == ["eltiempo.com", "www.tripadvisor.es"] or c["menciones"] == 2
     assert c["menciones"] == 2 and "rappi.com.co" in c["otras"]
     assert d.familia("en.tripadvisor.com.hk") == "tripadvisor" and d.familia("las2orillas.co") == "las2orillas"
+
+
+def test_un_texto_sin_bogota_no_corrobora():
+    res = [{"title": "London Calling", "url": "https://es.wikipedia.org/x", "content": "London Calling es un álbum de The Clash"},
+           {"title": "London Calling Bogotá", "url": "https://guia.com/y", "content": "Bogotá. London Calling, pub en Bogotá con música"}]
+    c = d.corroborar("London Calling", res)
+    assert c["dominios"] == ["guia.com"]
