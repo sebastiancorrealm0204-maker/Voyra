@@ -37,12 +37,137 @@ EXCLUIR_MANUAL = {
     "Dalia Plant Power": "Google lo marca cerrado permanentemente.",
     "Mesa Salvaje": "Google lo marca cerrado permanentemente.",
     "Pan Fino": "Google lo marca cerrado permanentemente.",
+    "Club Colombia": "Cerró definitivamente en Bogotá (La República: «los restaurantes Harry's Bar y Club Colombia cerrarán definitivamente»).",
+    "Gordo": "Google no lo ubica en Carrera 4A #66-84; la sede operativa de Gordo Brooklyn está en Cra. 72 #145-60 (otra zona).",
+    "Misia": "Google no lo lista; la antigua sede de Tv. 6 #27-50 aparece hoy como BACU y la de Carrera 7 #67-39 es un Holiday Inn Express. Un blog lo da por cerrado.",
+    "Devoción": "Google no lo ubica en Carrera 6 #66-25 (solo hay un pin de dirección); no hay evidencia de una tienda vigente ahí.",
+    "Donostiarra": "No hay rastro de un restaurante así en Bogotá (ni en Google ni en prensa) en Carrera 5 #67-23.",
 }
 # Lugares reales que Google no halló con la búsqueda original: se re-buscan con una consulta mejor.
 BUSQUEDA_MEJORADA = {
     "Astoria Rooftop": "Astoria Rooftop Calle 85 #12-66 Bogotá",
     "Smoking Molly": "Smoking Molly Blues Jazz Restobar Bogotá",
 }
+# Correcciones revisadas una por una (oct. 2026): dirección/zona reales y place_id de la ficha CORRECTA en Google.
+AJUSTES_MANUALES = {
+    "Leo Cocina y Cava": {
+        "lat": 4.648032,
+        "lng": -74.056437,
+        "place_id": "ChIJf0x6pJuZP44RbF-3kBjiZLs",
+        "rating": 4.4,
+        "dir": "Calle 65 Bis #4-23, Chapinero Alto, Bogotá, Colombia",
+        "zona": "Chapinero Alto"
+    },
+    "Oda": {
+        "lat": 4.718735,
+        "lng": -74.03606,
+        "place_id": "ChIJwX6B3iqbP44RfYU44hHXmEk",
+        "rating": 4.6,
+        "dir": "Calle 140 #11-45, Torre HHC, Usaquén, Bogotá, Colombia",
+        "zona": "Cedritos / Norte",
+        "descripcion": "#76 en la lista extendida de Latin America's 50 Best 2025 y ganador del Sustainable Restaurant Award. Dentro del G Lounge (Cedritos, al norte de la ciudad): menú contemporáneo de ingredientes autóctonos con foco en sostenibilidad, de la chef Natalia Cocomá."
+    },
+    "Catación Pública": {
+        "lat": 4.696023,
+        "lng": -74.028417,
+        "place_id": "ChIJAUS02weQP44RlItRLPHS8So",
+        "rating": 4.8,
+        "dir": "Calle 120A #3A-57, Usaquén, Bogotá, Colombia",
+        "zona": "Usaquén"
+    },
+    "Amor Perfecto": {
+        "lat": 4.648912,
+        "lng": -74.055376,
+        "place_id": "ChIJwXLng0CaP44RdFS3YFjewS0",
+        "rating": 4.6,
+        "dir": "Carrera 4 #66-46, Chapinero Alto, Bogotá, Colombia",
+        "zona": "Chapinero Alto",
+        "descripcion": "Pionera colombiana del café de especialidad — acercó los cafés premium de origen único al consumidor local. Su sede de Chapinero Alto tiene laboratorio de café y hace catas públicas y cursos de barismo los fines de semana."
+    },
+    "Árbol del Pan": {
+        "lat": 4.648916,
+        "lng": -74.055953,
+        "place_id": "ChIJKYDV-UCaP44R8N8ovfrF4Gk",
+        "rating": 4.7,
+        "dir": "Calle 66 Bis #4-34, Chapinero Alto, Bogotá, Colombia",
+        "zona": "Chapinero Alto",
+        "descripcion": "Panadería artesanal encantadora y destino de brunch muy querido en Chapinero — de las panaderías mejor valoradas de la ciudad. Calle 66 Bis #4-34."
+    },
+    "Varietale": {
+        "lat": 4.628765,
+        "lng": -74.066364,
+        "place_id": "ChIJRyluYSiaP44RaoAGVqb67FI",
+        "rating": 4.7,
+        "dir": "Calle 41 #8-43, Bogotá, Colombia",
+        "zona": "Teusaquillo / La Javeriana"
+    },
+    "Arte y Pasión Café": {
+        "lat": 4.601618,
+        "lng": -74.072283,
+        "place_id": "ChIJqTYXeACZP44R1QhrzXqfB4g",
+        "dir": "Carrera 6 #15-32, La Candelaria, Bogotá, Colombia",
+        "zona": "La Candelaria / Centro"
+    },
+    "Abasto": {
+        "lat": 4.653186,
+        "lng": -74.059011,
+        "place_id": "ChIJhW3-hEOaP44RDcZUkVBVfpE",
+        "rating": 4.6,
+        "dir": "Calle 69A #9-09, Quinta Camacho, Bogotá, Colombia",
+        "zona": "Quinta Camacho"
+    },
+    "Tábula": {
+        "lat": 4.615786,
+        "lng": -74.067464,
+        "place_id": "ChIJrzt515qZP44RzbxTfqgiiuE",
+        "rating": 4.6,
+        "dir": "Calle 29 Bis #5-90, La Macarena, Bogotá, Colombia",
+        "zona": "La Macarena"
+    },
+    "Casa de Nariño": {
+        "lat": 4.595574,
+        "lng": -74.077447,
+        "place_id": "ChIJp_l-ogeZP44R5lkZJLO07t8",
+        "rating": 4.5
+    },
+    "Mirador de La Calera": {
+        "lat": 4.675752,
+        "lng": -74.023709,
+        "place_id": "ChIJU-WVq3CQP44RjX-H7NyVlbs",
+        "rating": 4.6
+    },
+    "Fundación Cardioinfantil": {
+        "lat": 4.741228,
+        "lng": -74.034068,
+        "place_id": "ChIJWwCslH6FP44RUIg2mrwjl7k",
+        "rating": 3.9
+    },
+    "El Corral (Zona T)": {
+        "lat": 4.667006,
+        "lng": -74.052815,
+        "place_id": "ChIJnWRNsIqaP44R8hyP3j2TmJQ",
+        "rating": 4.3
+    },
+    "Iglesia de San Francisco": {
+        "lat": 4.601898,
+        "lng": -74.073333,
+        "place_id": "ChIJrWmTMqGZP44RymsrzAQrfnc",
+        "rating": 4.6
+    },
+    "Parque Nacional Enrique Olaya Herrera": {
+        "lat": 4.623875,
+        "lng": -74.063069,
+        "place_id": "ChIJT3j00IeZP44RpQpxWMx8yx0",
+        "rating": 4.5
+    },
+    "Chorro de Quevedo": {
+        "lat": 4.597196,
+        "lng": -74.06977,
+        "place_id": "ChIJt3QY8qWZP44RArvZi8MtD24",
+        "rating": 4.6
+    }
+}
+
 SIN_AJUSTE_CATEGORIAS = {"supermercado", "farmacia", "transporte"}  # cadenas: muchas sedes con el mismo nombre
 DIST_MAX_M = 3000
 
@@ -98,6 +223,27 @@ def main() -> None:
             continue
         ajustes[n] = {"lat": round(g["lat"], 6), "lng": round(g["lng"], 6), "place_id": x["place_id"],
                       **({"rating": x["rating"]} if x.get("rating") else {})}
+
+    # Los textos «local» de lugares que cambian de barrio se reescriben para no mentir sobre la zona.
+    from app.local_bogota import LOCAL_BOGOTA
+    clave_nueva = {
+        "Oda": "Cocina sostenible premiada dentro del G Lounge, en Cedritos (norte de Bogotá).",
+        "Amor Perfecto": "Pionera del café de especialidad en Colombia — su sede de Chapinero Alto tiene laboratorio y catas públicas.",
+    }
+    for n, a in AJUSTES_MANUALES.items():
+        ajustes[n] = dict(a)
+        if n in clave_nueva and n in LOCAL_BOGOTA:
+            ajustes[n]["local"] = {**LOCAL_BOGOTA[n], "clave": clave_nueva[n]}
+        revisar.pop(n, None)
+    for n in excluir:
+        revisar.pop(n, None)
+        ajustes.pop(n, None)
+    # «Crepes & Waffles» (varias sedes) se conserva —el detector de platos reconoce el lugar por su nombre—,
+    # pero su pin apuntaba a la sede de la Calle 85, cerrada: se mueve a la sede abierta de Parque 93.
+    ref = ajustes.get("Crepes & Waffles (Parque 93)")
+    if ref:
+        ajustes["Crepes & Waffles"] = {"lat": ref["lat"], "lng": ref["lng"]}
+        revisar.pop("Crepes & Waffles", None)
 
     capa = {"generado": datetime.date.today().isoformat(), "fuente": ruta,
             "excluir": excluir, "confianza_baja": sorted(set(baja)), "ajustes": ajustes, "revisar": revisar}

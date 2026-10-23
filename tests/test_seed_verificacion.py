@@ -26,5 +26,5 @@ def test_la_capa_real_es_coherente():
     nombres = {p["name"] for p in seed_data.all_seeds()}
     assert not (set(capa["excluir"]) & nombres), "un lugar excluido sigue en la curación"
     for n, a in capa["ajustes"].items():
-        assert a["place_id"], n
+        assert a.get("place_id", "x"), n  # si trae place_id, no puede venir vacío (las entradas «varias sedes» no lo llevan)
         assert 4.4 < a["lat"] < 5.4 and -74.4 < a["lng"] < -73.5, f"{n}: coordenadas fuera de Bogotá y la Sabana"

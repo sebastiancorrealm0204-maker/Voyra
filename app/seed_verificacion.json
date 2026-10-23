@@ -9,7 +9,12 @@
   "Crepes & Waffles (Zona T / Calle 85)": "Google lo marca cerrado permanentemente.",
   "Dalia Plant Power": "Google lo marca cerrado permanentemente.",
   "Mesa Salvaje": "Google lo marca cerrado permanentemente.",
-  "Pan Fino": "Google lo marca cerrado permanentemente."
+  "Pan Fino": "Google lo marca cerrado permanentemente.",
+  "Club Colombia": "Cerró definitivamente en Bogotá (La República: «los restaurantes Harry's Bar y Club Colombia cerrarán definitivamente»).",
+  "Gordo": "Google no lo ubica en Carrera 4A #66-84; la sede operativa de Gordo Brooklyn está en Cra. 72 #145-60 (otra zona).",
+  "Misia": "Google no lo lista; la antigua sede de Tv. 6 #27-50 aparece hoy como BACU y la de Carrera 7 #67-39 es un Holiday Inn Express. Un blog lo da por cerrado.",
+  "Devoción": "Google no lo ubica en Carrera 6 #66-25 (solo hay un pin de dirección); no hay evidencia de una tienda vigente ahí.",
+  "Donostiarra": "No hay rastro de un restaurante así en Bogotá (ni en Google ni en prensa) en Carrera 5 #67-23."
  },
  "confianza_baja": [
   "Di Lucca",
@@ -758,33 +763,143 @@
    "lng": -74.072494,
    "place_id": "ChIJFdKWCiyaP44R6bmq8ftqTXo",
    "rating": 4.6
+  },
+  "Leo Cocina y Cava": {
+   "lat": 4.648032,
+   "lng": -74.056437,
+   "place_id": "ChIJf0x6pJuZP44RbF-3kBjiZLs",
+   "rating": 4.4,
+   "dir": "Calle 65 Bis #4-23, Chapinero Alto, Bogotá, Colombia",
+   "zona": "Chapinero Alto"
+  },
+  "Oda": {
+   "lat": 4.718735,
+   "lng": -74.03606,
+   "place_id": "ChIJwX6B3iqbP44RfYU44hHXmEk",
+   "rating": 4.6,
+   "dir": "Calle 140 #11-45, Torre HHC, Usaquén, Bogotá, Colombia",
+   "zona": "Cedritos / Norte",
+   "descripcion": "#76 en la lista extendida de Latin America's 50 Best 2025 y ganador del Sustainable Restaurant Award. Dentro del G Lounge (Cedritos, al norte de la ciudad): menú contemporáneo de ingredientes autóctonos con foco en sostenibilidad, de la chef Natalia Cocomá.",
+   "local": {
+    "clave": "Cocina sostenible premiada dentro del G Lounge, en Cedritos (norte de Bogotá).",
+    "pedir": "El menú contemporáneo de temporada; ingredientes autóctonos es el eje.",
+    "momento": "Reserva recomendada, sobre todo de noche.",
+    "practico": "Dentro del G Lounge, Zona G. Gama alta."
+   }
+  },
+  "Catación Pública": {
+   "lat": 4.696023,
+   "lng": -74.028417,
+   "place_id": "ChIJAUS02weQP44RlItRLPHS8So",
+   "rating": 4.8,
+   "dir": "Calle 120A #3A-57, Usaquén, Bogotá, Colombia",
+   "zona": "Usaquén"
+  },
+  "Amor Perfecto": {
+   "lat": 4.648912,
+   "lng": -74.055376,
+   "place_id": "ChIJwXLng0CaP44RdFS3YFjewS0",
+   "rating": 4.6,
+   "dir": "Carrera 4 #66-46, Chapinero Alto, Bogotá, Colombia",
+   "zona": "Chapinero Alto",
+   "descripcion": "Pionera colombiana del café de especialidad — acercó los cafés premium de origen único al consumidor local. Su sede de Chapinero Alto tiene laboratorio de café y hace catas públicas y cursos de barismo los fines de semana.",
+   "local": {
+    "clave": "Pionera del café de especialidad en Colombia — su sede de Chapinero Alto tiene laboratorio y catas públicas.",
+    "pedir": "Un café de origen único; fueron de los primeros en traer esto al consumidor local.",
+    "momento": "Combínalo con el mercado de pulgas de Usaquén el domingo.",
+    "practico": "Usaquén. Gama media."
+   }
+  },
+  "Árbol del Pan": {
+   "lat": 4.648916,
+   "lng": -74.055953,
+   "place_id": "ChIJKYDV-UCaP44R8N8ovfrF4Gk",
+   "rating": 4.7,
+   "dir": "Calle 66 Bis #4-34, Chapinero Alto, Bogotá, Colombia",
+   "zona": "Chapinero Alto",
+   "descripcion": "Panadería artesanal encantadora y destino de brunch muy querido en Chapinero — de las panaderías mejor valoradas de la ciudad. Calle 66 Bis #4-34."
+  },
+  "Varietale": {
+   "lat": 4.628765,
+   "lng": -74.066364,
+   "place_id": "ChIJRyluYSiaP44RaoAGVqb67FI",
+   "rating": 4.7,
+   "dir": "Calle 41 #8-43, Bogotá, Colombia",
+   "zona": "Teusaquillo / La Javeriana"
+  },
+  "Arte y Pasión Café": {
+   "lat": 4.601618,
+   "lng": -74.072283,
+   "place_id": "ChIJqTYXeACZP44R1QhrzXqfB4g",
+   "dir": "Carrera 6 #15-32, La Candelaria, Bogotá, Colombia",
+   "zona": "La Candelaria / Centro"
+  },
+  "Abasto": {
+   "lat": 4.653186,
+   "lng": -74.059011,
+   "place_id": "ChIJhW3-hEOaP44RDcZUkVBVfpE",
+   "rating": 4.6,
+   "dir": "Calle 69A #9-09, Quinta Camacho, Bogotá, Colombia",
+   "zona": "Quinta Camacho"
+  },
+  "Tábula": {
+   "lat": 4.615786,
+   "lng": -74.067464,
+   "place_id": "ChIJrzt515qZP44RzbxTfqgiiuE",
+   "rating": 4.6,
+   "dir": "Calle 29 Bis #5-90, La Macarena, Bogotá, Colombia",
+   "zona": "La Macarena"
+  },
+  "Casa de Nariño": {
+   "lat": 4.595574,
+   "lng": -74.077447,
+   "place_id": "ChIJp_l-ogeZP44R5lkZJLO07t8",
+   "rating": 4.5
+  },
+  "Mirador de La Calera": {
+   "lat": 4.675752,
+   "lng": -74.023709,
+   "place_id": "ChIJU-WVq3CQP44RjX-H7NyVlbs",
+   "rating": 4.6
+  },
+  "Fundación Cardioinfantil": {
+   "lat": 4.741228,
+   "lng": -74.034068,
+   "place_id": "ChIJWwCslH6FP44RUIg2mrwjl7k",
+   "rating": 3.9
+  },
+  "El Corral (Zona T)": {
+   "lat": 4.667006,
+   "lng": -74.052815,
+   "place_id": "ChIJnWRNsIqaP44R8hyP3j2TmJQ",
+   "rating": 4.3
+  },
+  "Iglesia de San Francisco": {
+   "lat": 4.601898,
+   "lng": -74.073333,
+   "place_id": "ChIJrWmTMqGZP44RymsrzAQrfnc",
+   "rating": 4.6
+  },
+  "Parque Nacional Enrique Olaya Herrera": {
+   "lat": 4.623875,
+   "lng": -74.063069,
+   "place_id": "ChIJT3j00IeZP44RpQpxWMx8yx0",
+   "rating": 4.5
+  },
+  "Chorro de Quevedo": {
+   "lat": 4.597196,
+   "lng": -74.06977,
+   "place_id": "ChIJt3QY8qWZP44RArvZi8MtD24",
+   "rating": 4.6
+  },
+  "Crepes & Waffles": {
+   "lat": 4.677364,
+   "lng": -74.048268
   }
  },
  "revisar": {
-  "Leo Cocina y Cava": "Google lo ubica a 4.2 km del punto curado: ¿otra sede u otro lugar?",
-  "Oda": "El nombre en Google es «Cra. 6 #66»: posible lugar equivocado.; Las coordenadas curadas están a 9986 m de las de Google.",
-  "Club Colombia": "Google lo ubica a 3.6 km del punto curado: ¿otra sede u otro lugar?",
-  "Crepes & Waffles": "Google lo marca como cerrado permanentemente: sacarlo de la curación.; Las coordenadas curadas están a 396 m de las de Google.",
-  "Catación Pública": "Google lo ubica a 176.6 km del punto curado: ¿otra sede u otro lugar?",
-  "Amor Perfecto": "Google lo ubica a 5.6 km del punto curado: ¿otra sede u otro lugar?",
-  "Árbol del Pan": "El nombre en Google es «Café Amor Perfecto Chapinero Alto»: posible lugar equivocado.; Las coordenadas curadas están a 312 m de las de Google.",
-  "Chorro de Quevedo": "El nombre en Google es «Cl. 12B #200»: posible lugar equivocado.",
   "Tour de grafiti por La Candelaria": "El nombre en Google es «Capital Graffiti Tours»: posible lugar equivocado.",
   "Quebrada La Vieja (senderismo)": "Google no devolvió ficha: puede haber cerrado o cambiado de nombre.",
-  "Parque Nacional Enrique Olaya Herrera": "Google no devolvió ficha: puede haber cerrado o cambiado de nombre.",
-  "Ciclovía dominical": "Google no devolvió ficha: puede haber cerrado o cambiado de nombre.",
-  "Gordo": "Google lo ubica a 9.3 km del punto curado: ¿otra sede u otro lugar?",
-  "Misia": "El nombre en Google es «Holiday Inn Express & Suites Bogota DC, an IHG Hotel»: posible lugar equivocado.; Las coordenadas curadas están a 524 m de las de Google.",
-  "Varietale": "Google lo ubica a 3.1 km del punto curado: ¿otra sede u otro lugar?",
-  "Devoción": "El nombre en Google es «Cra. 6 #6625»: posible lugar equivocado.; Las coordenadas curadas están a 852 m de las de Google.",
-  "Arte y Pasión Café": "Google lo ubica a 4.6 km del punto curado: ¿otra sede u otro lugar?",
-  "Iglesia de San Francisco": "Google lo ubica a 9.5 km del punto curado: ¿otra sede u otro lugar?",
-  "Casa de Nariño": "El nombre en Google es «Presidencia de la República de Colombia»: posible lugar equivocado.",
-  "Mirador de La Calera": "Google lo ubica a 3.4 km del punto curado: ¿otra sede u otro lugar?",
-  "Abasto": "El nombre en Google es «Arrieros Usaquen»: posible lugar equivocado.",
-  "Fundación Cardioinfantil": "El nombre en Google es «LaCardio»: posible lugar equivocado.; Las coordenadas curadas están a 1219 m de las de Google.",
-  "Tábula": "Google lo ubica a 4.6 km del punto curado: ¿otra sede u otro lugar?",
-  "Donostiarra": "El nombre en Google es «Cra. 5 #67-23»: posible lugar equivocado.",
-  "El Corral (Zona T)": "Google lo ubica a 3.4 km del punto curado: ¿otra sede u otro lugar?"
+  "Ciclovía dominical": "Google no devolvió ficha: puede haber cerrado o cambiado de nombre."
  }
 }
