@@ -17,6 +17,7 @@ def test_la_capa_excluye_y_ajusta(monkeypatch):
 
 def test_sin_archivo_la_curacion_queda_igual(monkeypatch):
     monkeypatch.setattr(seed_data, "_capa_verificacion", lambda: {"excluir": {}, "ajustes": {}, "confianza_baja": []})
+    monkeypatch.setattr(seed_data, "_candidatos_aprobados", lambda: [])
     assert len(seed_data.all_seeds()) == len(seed_data.BOGOTA) + len(seed_data.GUADALAJARA)
 
 

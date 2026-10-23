@@ -2566,6 +2566,20 @@ def _capa_verificacion() -> dict:
     return {k: data.get(k, v) for k, v in vacia.items()}
 
 
+def _candidatos_aprobados() -> list[dict]:
+    """Lugares nuevos aprobados con aprobar_candidatos.py (capa app/seed_candidatos.json).
+    Si el archivo no existe o está dañado, la curación queda tal cual."""
+    import json
+    import os
+    ruta = os.path.join(os.path.dirname(__file__), "seed_candidatos.json")
+    try:
+        with open(ruta, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return []
+    return [p for p in data if isinstance(p, dict) and p.get("name") and p.get("lat") is not None]
+
+
 def all_seeds() -> list[dict]:
     """Resuelve lat/lng de cada lugar.
 
@@ -2578,7 +2592,9 @@ def all_seeds() -> list[dict]:
 
     capa = _capa_verificacion()
     out = []
-    for p in BOGOTA + GUADALAJARA:
+    nombres_bogota = {q["name"] for q in BOGOTA}
+    nuevos = [q for q in _candidatos_aprobados() if q["name"] not in nombres_bogota]
+    for p in BOGOTA + nuevos + GUADALAJARA:
         if p["name"] in capa["excluir"] and p["city_display"] == "Bogotá":
             continue  # cerró o no es de la ciudad (ver app/seed_verificacion.json)
         if p["city_display"] == "Bogotá":

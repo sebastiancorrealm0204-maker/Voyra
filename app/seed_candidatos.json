@@ -1,0 +1,304 @@
+[
+ {
+  "city_display": "Bogotá",
+  "name": "Claustro de San Agustín",
+  "category": "atraccion",
+  "zona": "La Candelaria",
+  "dir": "Cra 8 #7-21, Bogotá",
+  "maps_query": "Claustro de San Agustín Bogotá",
+  "lat": 4.595211,
+  "lng": -74.078597,
+  "place_id": "ChIJUwvolgeZP44R1-KVzmLgCNQ",
+  "rating": 4.8,
+  "price_level": null,
+  "descripcion": "Claustro colonial del siglo XVIII en el centro histórico, hoy espacio de exposiciones de arte de la Universidad Nacional. Una parada tranquila entre los museos de La Candelaria; los lunes cierra.",
+  "confianza": "media_alta",
+  "tags": [
+   "Museos y galerías",
+   "Arquitectura"
+  ],
+  "_fuentes": [
+   "es.wikipedia.org",
+   "patrimoniocultural.bogota.unal.edu.co",
+   "universes.art",
+   "whichmuseum.com"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Pastelería Florida",
+  "category": "cafe",
+  "zona": "La Macarena",
+  "dir": "Cra. 7 #21-46, Bogotá",
+  "maps_query": "Pastelería Florida Bogotá",
+  "lat": 4.607363,
+  "lng": -74.070812,
+  "place_id": "ChIJs_r5rZiZP44RI6ovtlUC18k",
+  "rating": 4.4,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Pastelería de unos 84 años de tradición, famosa por el pan de queso, el pan de bono y los tamales tolimenses. Buen punto para un desayuno o algo de media tarde.",
+  "confianza": "media",
+  "tags": [
+   "Dulces y repostería",
+   "Gastronomía local"
+  ],
+  "_fuentes": [
+   "tasteatlas.com",
+   "tripadvisor.es"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Cacio & Pepe",
+  "category": "restaurante",
+  "zona": "Chicó",
+  "dir": "Cra. 11a #89 38, Bogotá",
+  "maps_query": "Cacio & Pepe Bogotá",
+  "lat": 4.671807,
+  "lng": -74.049179,
+  "place_id": "ChIJl0nMaYyaP44RySviL0RjmLA",
+  "rating": 4.6,
+  "price_level": "PRICE_LEVEL_EXPENSIVE",
+  "descripcion": "Taverna italiana en Chicó con pasta fresca diaria, pizzas y una buena selección de vinos. Conviene reservar.",
+  "confianza": "media",
+  "tags": [
+   "Cervecerías y vino"
+  ],
+  "_fuentes": [
+   "takami.co",
+   "tripadvisor.es"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Sitio Casa Candelaria",
+  "category": "restaurante",
+  "zona": "La Candelaria",
+  "dir": "Cra. 2 #11-33, La Candelaria, Bogotá",
+  "maps_query": "Sitio Casa Candelaria Bogotá",
+  "lat": 4.595804,
+  "lng": -74.070813,
+  "place_id": "ChIJFWB-Sa-ZP44Rc9kYgAC3uxs",
+  "rating": 4.7,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Comida colombiana casera en una casona de ambiente vintage del centro histórico, con buena variedad de platos y jugos naturales. Cómodo para almorzar sin salir de La Candelaria.",
+  "confianza": "media",
+  "tags": [
+   "Gastronomía local",
+   "Planes tranquilos"
+  ],
+  "_fuentes": [
+   "tripadvisor.es",
+   "visitbogota.co"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Chan Chan Latino",
+  "category": "restaurante",
+  "zona": "Chicó",
+  "dir": "Cra. 14 #93-14, Bogotá",
+  "maps_query": "Chan Chan Latino Bogotá",
+  "lat": 4.676554,
+  "lng": -74.05095,
+  "place_id": "ChIJr_Thf9SbP44RAVMuJdA4Phk",
+  "rating": 4.8,
+  "price_level": "PRICE_LEVEL_EXPENSIVE",
+  "descripcion": "Cocina caribeña y latina con toques cubanos y españoles, a un par de cuadras del Parque de la 93. Ambiente familiar y animado.",
+  "confianza": "media_alta",
+  "tags": [
+   "Gastronomía local"
+  ],
+  "_fuentes": [
+   "portafolio.co",
+   "s-club.co",
+   "tripadvisor.es"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "La Bruja",
+  "category": "restaurante",
+  "zona": "La Candelaria",
+  "dir": "Cl. 12 #3-45, Bogotá",
+  "maps_query": "La Bruja Bogotá",
+  "lat": 4.596959,
+  "lng": -74.071586,
+  "place_id": "ChIJD_N2A6aZP44RHiMUzWCYJl0",
+  "rating": 4.6,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Restaurante en una casona histórica de la zona colonial de La Candelaria: el edificio fue convento y luego seminario. Un almuerzo con historia, con servicio desde el mediodía.",
+  "confianza": "media",
+  "tags": [
+   "Planes tranquilos",
+   "Joyas escondidas"
+  ],
+  "_fuentes": [
+   "fantasmascandelaria.wordpress.com",
+   "tripadvisor.es"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Dos Gatos y Simone",
+  "category": "restaurante",
+  "zona": "La Candelaria",
+  "dir": "Cra. 2a #16A-12, Bogotá",
+  "maps_query": "Dos Gatos y Simone Bogotá",
+  "lat": 4.600897,
+  "lng": -74.068557,
+  "place_id": "ChIJ01GIY6SZP44RJ4Os9yvTj3c",
+  "rating": 4.6,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Escondite de La Candelaria con la fachada pintada de gatos: carta corta de cocina mexicana con toques colombianos, opciones vegetarianas y precios razonables.",
+  "confianza": "media_alta",
+  "tags": [
+   "Joyas escondidas",
+   "Opciones veganas/vegetarianas"
+  ],
+  "_fuentes": [
+   "colombiaconversa.com",
+   "tripadvisor.com",
+   "winstonwashere.com"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Doña Ceci",
+  "category": "bar",
+  "zona": "La Candelaria",
+  "dir": "Por Calle 15 y Carrera 3, Cra. 4 #12D-18, La Candelaria, Bogotá",
+  "maps_query": "Doña Ceci Bogotá",
+  "lat": 4.600272,
+  "lng": -74.070369,
+  "place_id": "ChIJ5wlSI6SZP44RJiFI3OzVh2s",
+  "rating": 4.4,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Bar-tienda de barrio en La Candelaria, de los de cerveza barata y mucha vida cultural: lo frecuentan universitarios, artistas y poetas, y la ciudad lo reconoce como sitio insigne. Abre hasta tarde.",
+  "confianza": "media_alta",
+  "tags": [
+   "Vida nocturna",
+   "Económico / mochilero",
+   "Joyas escondidas"
+  ],
+  "_fuentes": [
+   "cipres.sanmateo.edu.co",
+   "ctxplorer.com",
+   "las2orillas.co"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Valiente Café",
+  "category": "cafe",
+  "zona": "La Macarena",
+  "dir": "Cl. 26d #4-15, Bogotá",
+  "maps_query": "Valiente Café Bogotá",
+  "lat": 4.613259,
+  "lng": -74.066211,
+  "place_id": "ChIJh5_b9T2fP44R6pp2CzduXJk",
+  "rating": 4.9,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Café 100% vegano en La Macarena con empanadas, tartines y postres; bien atendido y cómodo para trabajar con el computador.",
+  "confianza": "media",
+  "tags": [
+   "Opciones veganas/vegetarianas",
+   "Planes tranquilos"
+  ],
+  "_fuentes": [
+   "happycow.net",
+   "herbivoros.net"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Incorrecto Cocina",
+  "category": "restaurante",
+  "zona": "Usaquén",
+  "dir": "Cl. 120a #3A - 93, Usaquén, Bogotá, Cundinamarca",
+  "maps_query": "Incorrecto Cocina Bogotá",
+  "lat": 4.696236,
+  "lng": -74.028829,
+  "place_id": "ChIJKTUApgeRP44RV5V5J9X-mIg",
+  "rating": 4.9,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Cocina criolla colombiana reinventada con técnicas modernas e ingredientes locales, en Usaquén. Tiene opciones veganas.",
+  "confianza": "media",
+  "tags": [
+   "Cocina de autor",
+   "Gastronomía local",
+   "Opciones veganas/vegetarianas"
+  ],
+  "_fuentes": [
+   "tripadvisor.es",
+   "visitbogota.co"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "El Goce Pagano",
+  "category": "bar",
+  "zona": "La Macarena",
+  "dir": "Dg. 20A #0-82, Bogotá",
+  "maps_query": "El Goce Pagano Bogotá",
+  "lat": 4.603524,
+  "lng": -74.066029,
+  "place_id": "ChIJn1DV65OYP44R7A-Gg9Sr5XY",
+  "rating": 4.5,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Restaurante que organiza noches de salsa semanales en La Macarena, con baile hasta la madrugada. Revisa los días: los lunes cierra.",
+  "confianza": "media",
+  "tags": [
+   "Antros y baile",
+   "Vida nocturna"
+  ],
+  "_fuentes": [
+   "salsavida.com",
+   "tripadvisor.es"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "The Monkey House",
+  "category": "bar",
+  "zona": "Chapinero",
+  "dir": "Cl. 70a #8-55, Bogotá",
+  "maps_query": "The Monkey House Bogotá",
+  "lat": 4.654396,
+  "lng": -74.057827,
+  "place_id": "ChIJxYFCDUOaP44RTS1wUPdvQwo",
+  "rating": 4.4,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Pub de ambiente relajado cerca de la Zona G con comida gourmet de buena calidad. Abre a partir de la tarde.",
+  "confianza": "media",
+  "tags": [
+   "Cervecerías y vino"
+  ],
+  "_fuentes": [
+   "thebogotapost.com",
+   "tripadvisor.es"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "El Mejor Ajiaco del Mundo",
+  "category": "restaurante",
+  "zona": "La Candelaria",
+  "dir": "Cl. 11 #6-20, Bogotá",
+  "maps_query": "El Mejor Ajiaco del Mundo Bogotá",
+  "lat": 4.597882,
+  "lng": -74.074615,
+  "place_id": "ChIJv_nSyKeZP44RM-kbCT_xP3g",
+  "rating": 4.5,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Cocina criolla en La Candelaria con el ajiaco como protagonista, además de bandeja paisa y arepas. Abre desde las 7 a. m. hasta media tarde: ideal para un almuerzo temprano.",
+  "confianza": "media",
+  "tags": [
+   "Gastronomía local"
+  ],
+  "_fuentes": [
+   "las2orillas.co",
+   "tripadvisor.com"
+  ]
+ }
+]
