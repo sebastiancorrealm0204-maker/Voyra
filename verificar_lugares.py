@@ -15,7 +15,8 @@ NO modifica nada: genera un reporte para que una persona decida (regla de confia
 Voyra: nada cambia en la curación sin revisión humana).
 
     pip install httpx                           # ya está en requirements.txt
-    export GOOGLE_MAPS_API_KEY=tu_key           # Places API (New) habilitada
+    # La key va en un archivo .env (junto a este script) con la línea:  GOOGLE_MAPS_API_KEY=tu_key
+    # (Places API (New) habilitada). También funciona como variable de entorno.
     python verificar_lugares.py                 # Bogotá, todos los lugares
     python verificar_lugares.py --limit 5       # prueba rápida
     python verificar_lugares.py --solo-problemas
@@ -38,6 +39,23 @@ import httpx
 
 from app import geo
 
+
+
+def cargar_env(path: str = ".env") -> None:
+    """Lee KEY=valor de un .env local (git lo ignora) sin pisar variables ya definidas.
+    Así la key de Google no tiene que pegarse en la consola ni en un chat."""
+    if not os.path.exists(path):
+        return
+    with open(path, encoding="utf-8") as f:
+        for ln in f:
+            ln = ln.strip()
+            if not ln or ln.startswith("#") or "=" not in ln:
+                continue
+            k, v = ln.split("=", 1)
+            os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+
+cargar_env()
 API_KEY = os.environ.get("GOOGLE_MAPS_API_KEY", "")
 DETAILS_URL = "https://places.googleapis.com/v1/places/{pid}"
 SEARCH_URL = "https://places.googleapis.com/v1/places:searchText"

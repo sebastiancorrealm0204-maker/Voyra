@@ -73,3 +73,14 @@ def test_normalizar_respuesta_de_google():
                       "regularOpeningHours": {"weekdayDescriptions": ["lunes: cerrado"]}})
     assert n["place_id"] == "abc" and n["nombre"] == "El Chato" and n["lat"] == 1.0
     assert n["horarios"] == ["lunes: cerrado"] and n["estado"] == "OPERATIONAL"
+
+
+def test_cargar_env_lee_el_archivo_sin_pisar_variables(tmp_path, monkeypatch):
+    envf = tmp_path / ".env"
+    envf.write_text('# comentario\nGOOGLE_TEST_A="abc"\nGOOGLE_TEST_B=ya_existe\n\nsin_igual\n', encoding="utf-8")
+    monkeypatch.delenv("GOOGLE_TEST_A", raising=False)
+    monkeypatch.setenv("GOOGLE_TEST_B", "valor_previo")
+    v.cargar_env(str(envf))
+    import os
+    assert os.environ["GOOGLE_TEST_A"] == "abc" and os.environ["GOOGLE_TEST_B"] == "valor_previo"
+    os.environ.pop("GOOGLE_TEST_A", None)
