@@ -22,7 +22,15 @@
    "patrimoniocultural.bogota.unal.edu.co",
    "universes.art",
    "whichmuseum.com"
-  ]
+  ],
+  "local": {
+   "clave": "Claustro colonial del siglo XVIII, monumento nacional, convertido en sala de exposiciones de la Universidad Nacional.",
+   "ver": "Las exposiciones de arte en cartelera (fue una de las sedes de la Bienal de Arte).",
+   "momento": "Abre de martes a domingo de 10:00 a 18:00.",
+   "ojo": "Los lunes está cerrado; la programación cambia, así que mira qué hay antes de ir.",
+   "dato": "Queda pegado a la Casa de Nariño (por su costado suroccidental): se combina fácil en la misma caminata.",
+   "practico": "horario según Google: lun cerrado; mar–dom 10:00–18:00."
+  }
  },
  {
   "city_display": "Bogotá",
@@ -45,7 +53,13 @@
   "_fuentes": [
    "tasteatlas.com",
    "tripadvisor.es"
-  ]
+  ],
+  "local": {
+   "clave": "Pastelería bogotana de más de 80 años para desayunar, almorzar o tomar onces.",
+   "pedir": "Pan de queso, pan de bono, tamales tolimenses y el pan de chocolate relleno de frutas y almendras.",
+   "momento": "Abre todos los días desde las 8 a. m.; sirve desayuno, almuerzo y onces.",
+   "practico": "Precio medio. horario según Google: lun–dom 8:00–19:00."
+  }
  },
  {
   "city_display": "Bogotá",
@@ -67,7 +81,13 @@
   "_fuentes": [
    "takami.co",
    "tripadvisor.es"
-  ]
+  ],
+  "local": {
+   "clave": "Taverna italiana de Chicó con pasta fresca diaria y una buena terraza.",
+   "pedir": "El spaghetti cacio e pepe (el de la casa) y las pizzas.",
+   "momento": "La terraza es buena para la tarde, con cócteles, pizza y música; conviene reservar.",
+   "practico": "Caro. horario según Google: lun–jue 12:00–22:00; vie–sáb 12:00–23:00; dom 12:00–21:00."
+  }
  },
  {
   "city_display": "Bogotá",
@@ -90,7 +110,14 @@
   "_fuentes": [
    "tripadvisor.es",
    "visitbogota.co"
-  ]
+  ],
+  "local": {
+   "clave": "Comida colombiana casera en una casona de ambiente vintage del centro histórico.",
+   "pedir": "Los jugos naturales y el pollo a la mexicana, que sus clientes recomiendan.",
+   "momento": "Los miércoles abre desde las 9 a. m. (para desayunar); el resto de días, desde las 11 a. m. hasta las 7 p. m.",
+   "ojo": "Los martes está cerrado.",
+   "practico": "Precio medio. horario según Google: lun 11:00–19:00; mar cerrado; mié 9:00–19:00; jue–dom 11:00–19:00."
+  }
  },
  {
   "city_display": "Bogotá",
@@ -104,7 +131,7 @@
   "place_id": "ChIJr_Thf9SbP44RAVMuJdA4Phk",
   "rating": 4.8,
   "price_level": "PRICE_LEVEL_EXPENSIVE",
-  "descripcion": "Cocina caribeña y latina con toques cubanos y españoles, a un par de cuadras del Parque de la 93. Ambiente familiar y animado.",
+  "descripcion": "Cocina caribeña y costeña con salsa en vivo, a un par de cuadras del Parque de la 93. Ambiente familiar y animado, con baile y show.",
   "confianza": "media_alta",
   "tags": [
    "Gastronomía local"
@@ -113,7 +140,13 @@
    "portafolio.co",
    "s-club.co",
    "tripadvisor.es"
-  ]
+  ],
+  "local": {
+   "clave": "Caribe y salsa en vivo a un par de cuadras del Parque de la 93.",
+   "pedir": "Cocina caribeña y costeña, con toques cubanos y españoles.",
+   "momento": "Para ir con música y baile: confirma qué noches hay salsa en vivo y show.",
+   "practico": "Caro. horario según Google: lun–vie 12:00–23:00; sáb 8:00–23:00; dom 8:00–17:00. Los sábados y domingos abre desde la mañana."
+  }
  },
  {
   "city_display": "Bogotá",
@@ -136,7 +169,13 @@
   "_fuentes": [
    "fantasmascandelaria.wordpress.com",
    "tripadvisor.es"
-  ]
+  ],
+  "local": {
+   "clave": "Almuerzo con historia en una casona de La Candelaria.",
+   "momento": "Tienen línea de reservas: reserva si vas en grupo.",
+   "dato": "La casona fue convento y luego el primer seminario menor de Bogotá, según una guía de la zona.",
+   "practico": "Precio medio. horario según Google: lun–jue 12:00–21:00; vie–sáb 12:00–22:00; dom 12:00–19:00."
+  }
  },
  {
   "city_display": "Bogotá",
@@ -160,7 +199,13 @@
    "colombiaconversa.com",
    "tripadvisor.com",
    "winstonwashere.com"
-  ]
+  ],
+  "local": {
+   "clave": "Escondite con fachada de gatos en Las Aguas, de cocina mexicana con toques colombianos.",
+   "pedir": "El aguacate (ellos mismos lo recomiendan como imperdible) y de postre la almojábana.",
+   "dato": "Tiene opciones vegetarianas y los platos son de tamaño justo para una persona.",
+   "practico": "Precio medio. horario según Google: lun–mié 12:00–20:00; jue–sáb 12:00–21:00; dom 12:00–17:00."
+  }
  },
  {
   "city_display": "Bogotá",
@@ -185,7 +230,14 @@
    "cipres.sanmateo.edu.co",
    "ctxplorer.com",
    "las2orillas.co"
-  ]
+  ],
+  "local": {
+   "clave": "La pola barata de toda la vida en el centro: bar de barrio convertido en sitio insigne.",
+   "pedir": "Una pola (cerveza) y quedarte en la conversación: lo frecuentan universitarios, artistas y poetas.",
+   "dato": "La ciudad lo reconoce como lugar emblemático y es casi un centro cultural de las escenas artísticas del centro.",
+   "momento": "Abre al mediodía y cierra de madrugada (más tarde viernes y sábado).",
+   "practico": "Precio medio. horario según Google: lun–jue 12:00–2:00; vie–sáb 12:00–3:00; dom 16:00–24:00."
+  }
  },
  {
   "city_display": "Bogotá",
@@ -208,7 +260,13 @@
   "_fuentes": [
    "happycow.net",
    "herbivoros.net"
-  ]
+  ],
+  "local": {
+   "clave": "Café vegano acogedor en La Macarena, cómodo para trabajar con el computador.",
+   "pedir": "Empanadas, tartines, tortas y postres; las bebidas con leches vegetales son su fuerte.",
+   "dato": "Te explican los métodos de extracción y el origen del café si preguntas.",
+   "practico": "Precio medio. horario según Google: lun–mar 10:00–19:00; mié 10:00–18:00; jue–vie 10:00–19:00; sáb 10:00–20:00; dom 10:00–18:00."
+  }
  },
  {
   "city_display": "Bogotá",
@@ -232,7 +290,14 @@
   "_fuentes": [
    "tripadvisor.es",
    "visitbogota.co"
-  ]
+  ],
+  "local": {
+   "clave": "Cocina criolla reinventada, para compartir, en la que el chef te cuenta la historia de cada plato.",
+   "momento": "Abre de miércoles a sábado de 12:00 a 21:00 y el domingo hasta las 18:00.",
+   "ojo": "Lunes y martes está cerrado.",
+   "dato": "Tiene opciones veganas.",
+   "practico": "Precio medio. horario según Google: lun–mar cerrado; mié–sáb 12:00–21:00; dom 12:00–18:00."
+  }
  },
  {
   "city_display": "Bogotá",
@@ -246,7 +311,7 @@
   "place_id": "ChIJn1DV65OYP44R7A-Gg9Sr5XY",
   "rating": 4.5,
   "price_level": "PRICE_LEVEL_MODERATE",
-  "descripcion": "Restaurante que organiza noches de salsa semanales en La Macarena, con baile hasta la madrugada. Revisa los días: los lunes cierra.",
+  "descripcion": "Restaurante y bar de La Macarena que vive de la salsa: noches de baile con shows y música hasta la madrugada. Abre solo viernes y sábados por la noche.",
   "confianza": "media",
   "tags": [
    "Antros y baile",
@@ -255,7 +320,13 @@
   "_fuentes": [
    "salsavida.com",
    "tripadvisor.es"
-  ]
+  ],
+  "local": {
+   "clave": "Noche de salsa en La Macarena: baile y shows hasta la madrugada.",
+   "momento": "Abre solo viernes y sábados por la noche; los shows son a las 11 p. m. y a la 1 a. m., según su Instagram.",
+   "ojo": "El resto de la semana está cerrado; tienen línea de reservas, conviene usarla.",
+   "practico": "Precio medio. horario según Google: lun–jue cerrado; vie 17:00–4:00; sáb 18:00–4:00; dom cerrado."
+  }
  },
  {
   "city_display": "Bogotá",
@@ -277,7 +348,13 @@
   "_fuentes": [
    "thebogotapost.com",
    "tripadvisor.es"
-  ]
+  ],
+  "local": {
+   "clave": "Gastropub de la Zona G (se presenta como el primero de Colombia).",
+   "pedir": "Fish and chips, Beef Wellington o meat pie, con una cerveza.",
+   "momento": "Los lunes abre solo desde las 4:30 p. m.; el resto de días, desde el mediodía.",
+   "practico": "Precio medio. horario según Google: lun 16:30–21:30; mar–mié 12:00–22:30; jue 12:00–23:00; vie 12:00–0:30; sáb 12:30–0:30; dom 12:00–20:00."
+  }
  },
  {
   "city_display": "Bogotá",
@@ -291,7 +368,7 @@
   "place_id": "ChIJv_nSyKeZP44RM-kbCT_xP3g",
   "rating": 4.5,
   "price_level": "PRICE_LEVEL_MODERATE",
-  "descripcion": "Cocina criolla en La Candelaria con el ajiaco como protagonista, además de bandeja paisa y arepas. Abre desde las 7 a. m. hasta media tarde: ideal para un almuerzo temprano.",
+  "descripcion": "Cocina criolla en La Candelaria con el ajiaco como protagonista, además de bandeja paisa y arepas. Abre desde las 7 a. m., todos los días.",
   "confianza": "media",
   "tags": [
    "Gastronomía local"
@@ -299,7 +376,12 @@
   "_fuentes": [
    "las2orillas.co",
    "tripadvisor.com"
-  ]
+  ],
+  "local": {
+   "clave": "Ajiaco santafereño en La Candelaria, desde las 7 de la mañana.",
+   "pedir": "El ajiaco (sopa de pollo con dos tipos de papa); también tienen bandeja paisa y arepas.",
+   "practico": "Precio medio. horario según Google: lun 7:00–18:00; mar–sáb 7:00–20:00; dom 7:00–18:00."
+  }
  },
  {
   "city_display": "Bogotá",
@@ -321,7 +403,13 @@
   "_fuentes": [
    "polomaps.com",
    "tripadvisor.es"
-  ]
+  ],
+  "local": {
+   "clave": "Café de especialidad en Teusaquillo con granos cuidadosamente seleccionados.",
+   "momento": "Abre de lunes a sábado de 9:00 a 19:00.",
+   "ojo": "Los domingos está cerrado.",
+   "practico": "Precio medio. horario según Google: lun–sáb 9:00–19:00; dom cerrado."
+  }
  },
  {
   "city_display": "Bogotá",
@@ -345,7 +433,13 @@
    "alotea.com",
    "joinpearl.co",
    "tripadvisor.com"
-  ]
+  ],
+  "local": {
+   "clave": "Alta cocina de mar y tierra con barra sofisticada en Chicó, abierto desde 2015.",
+   "momento": "Conviene reservar (tienen línea de reservas).",
+   "dato": "Es parte del grupo DLK.",
+   "practico": "horario según Google: lun–mié 12:00–21:00; jue–sáb 12:00–22:00; dom 12:00–17:00."
+  }
  },
  {
   "city_display": "Bogotá",
@@ -368,7 +462,13 @@
   "_fuentes": [
    "colombiabound.com",
    "tripadvisor.es"
-  ]
+  ],
+  "local": {
+   "clave": "Desayuno temprano en La Candelaria: abre desde las 6:30 a. m.",
+   "pedir": "El capuchino con leche de avena y los huevos.",
+   "momento": "Abre los siete días, incluso el domingo (de 7 a. m. a 3 p. m.).",
+   "practico": "Precio medio. horario según Google: lun–sáb 6:30–19:00; dom 7:00–15:00."
+  }
  },
  {
   "city_display": "Bogotá",
@@ -390,7 +490,13 @@
   "_fuentes": [
    "tripadvisor.com",
    "tripsapien.com"
-  ]
+  ],
+  "local": {
+   "clave": "Bar de vinos con más de 300 etiquetas y tapas, en Chapinero Alto.",
+   "dato": "Cada miércoles hay minicatas y dos sábados al mes, catas especiales; tiene tres espacios.",
+   "momento": "Abre desde las 4 p. m.; los domingos cierra.",
+   "practico": "horario según Google: lun–mar 16:00–22:00; mié 16:00–23:00; jue–sáb 16:00–24:00; dom cerrado."
+  }
  },
  {
   "city_display": "Bogotá",
@@ -413,7 +519,13 @@
   "_fuentes": [
    "kofitime.com",
    "wanderboat.ai"
-  ]
+  ],
+  "local": {
+   "clave": "Café de especialidad con talleres y eventos creativos en Quinta Camacho.",
+   "dato": "Hacen talleres (por ejemplo de bouquets) y eventos con DJ: pregunta por la agenda.",
+   "ojo": "Los lunes está cerrado.",
+   "practico": "Precio medio. horario según Google: lun cerrado; mar–vie 10:00–19:00; sáb 9:00–19:00; dom 9:00–16:00."
+  }
  },
  {
   "city_display": "Bogotá",
@@ -435,7 +547,12 @@
   "_fuentes": [
    "culturarecreacionydeporte.gov.co",
    "tripadvisor.es"
-  ]
+  ],
+  "local": {
+   "clave": "Pizza fina y crujiente para acompañar con vino, en La Macarena.",
+   "pedir": "La pizza de masa delgada, suave en el centro y crujiente en el borde.",
+   "practico": "Precio medio. horario según Google: lun–mié 12:00–21:00; jue–sáb 12:00–22:00; dom 12:00–18:00."
+  }
  },
  {
   "city_display": "Bogotá",
@@ -455,7 +572,14 @@
   "_fuentes": [
    "chipviajero.com",
    "tripadvisor.es"
-  ]
+  ],
+  "local": {
+   "clave": "Cocina cubana en La Macarena, con bar y galería.",
+   "pedir": "Ropa vieja, vaca frita, masas de cerdo y yuca, que sus clientes recomiendan.",
+   "momento": "De lunes a jueves solo abre al almuerzo (12:00 a 15:00); viernes y sábado se alarga hasta casi medianoche.",
+   "ojo": "Si vas de noche entre lunes y jueves, estará cerrado.",
+   "practico": "Precio medio. horario según Google: lun–jue 12:00–15:00; vie–sáb 12:00–23:45; dom 12:00–17:00."
+  }
  },
  {
   "city_display": "Bogotá",
@@ -469,7 +593,7 @@
   "place_id": "ChIJaRzpRkSaP44R6Lyp4D-I9kc",
   "rating": 4.5,
   "price_level": "PRICE_LEVEL_MODERATE",
-  "descripcion": "Bar dedicado a la música en Quinta Camacho, creado por un francés que cambió su vida de empresario por esta pasión: programación musical cuidada y ambiente de autor.",
+  "descripcion": "Espacio cultural para las músicas alternativas en Quinta Camacho, creado por un francés que cambió su vida de empresario por esta pasión. Programación musical cuidada, de noche.",
   "confianza": "media_alta",
   "tags": [
    "Vida nocturna",
@@ -479,7 +603,13 @@
    "2emelieu.wixsite.com",
    "onthegrid.city",
    "tripadvisor.es"
-  ]
+  ],
+  "local": {
+   "clave": "Espacio cultural de músicas alternativas en Quinta Camacho: se va por la música, de noche.",
+   "momento": "Abre de miércoles a sábado desde las 7 p. m.",
+   "ojo": "Lunes y martes está cerrado.",
+   "practico": "Precio medio. horario según Google: mié–vie 19:00–3:00; sáb 19:00–24:00 (Google también lo muestra abierto el domingo, pero confirma antes de ir)."
+  }
  },
  {
   "city_display": "Bogotá",
@@ -501,7 +631,12 @@
   "_fuentes": [
    "amp.lafm.com.co",
    "tripadvisor.es"
-  ]
+  ],
+  "local": {
+   "clave": "Sandwichería de estilo criollo colombiano con más de 14 propuestas, en La Macarena.",
+   "pedir": "El de pollo: lo marinan desde la víspera y es el que más seguidores tiene, según El Tiempo.",
+   "practico": "Precio medio. horario según Google: lun–sáb 12:00–23:00; dom 12:00–21:00."
+  }
  },
  {
   "city_display": "Bogotá",
@@ -525,7 +660,14 @@
    "colombiabound.com",
    "happycow.net",
    "vice.com"
-  ]
+  ],
+  "local": {
+   "clave": "Menú vegano del día, a buen precio, para la hora del almuerzo.",
+   "pedir": "El menú del día; en las reseñas destacan la cazuela, la avena y la torta.",
+   "momento": "Abre de lunes a sábado de 12:00 a 16:00.",
+   "ojo": "Los domingos cierra.",
+   "practico": "Económico. horario según Google: lun–sáb 12:00–16:00; dom cerrado."
+  }
  },
  {
   "city_display": "Bogotá",
@@ -539,7 +681,7 @@
   "place_id": "ChIJ7SBIsG2ZP44RtSx8qwQG1_I",
   "rating": 4.7,
   "price_level": "PRICE_LEVEL_MODERATE",
-  "descripcion": "Restaurante de La Macarena conocido por sus donas rellenas de postres famosos, una de sus propuestas estrella.",
+  "descripcion": "Fusión de cocina mexicana y coreana en La Macarena, famoso además por sus donas rellenas de postres conocidos.",
   "confianza": "media",
   "tags": [
    "Dulces y repostería"
@@ -547,7 +689,14 @@
   "_fuentes": [
    "revistadiners.com.co",
    "tripadvisor.es"
-  ]
+  ],
+  "local": {
+   "clave": "Fusión mexicana-coreana en La Macarena, con donas rellenas de postre.",
+   "pedir": "Las donas rellenas de postres conocidos (hay que probarlas) y los platos de fusión.",
+   "momento": "Abre de miércoles a sábado desde el mediodía y el domingo hasta las 5 p. m.",
+   "ojo": "Lunes y martes está cerrado.",
+   "practico": "Precio medio. horario según Google: lun–mar cerrado; mié–sáb 12:00–21:00; dom 12:00–17:00."
+  }
  },
  {
   "city_display": "Bogotá",
@@ -561,7 +710,7 @@
   "place_id": "ChIJ8YhwoqaZP44RMQBN0ZfP1Cs",
   "rating": 4.5,
   "price_level": "PRICE_LEVEL_MODERATE",
-  "descripcion": "Café, comida y tragos en la plazoleta del Espacio Odeón, en el centro de Bogotá. Abre desde la mañana y los viernes y sábados hasta la madrugada.",
+  "descripcion": "Café, comida y tragos con terraza en la plazoleta del Espacio Odeón, en el centro histórico. Abre desde la mañana; los viernes y sábados cierra a medianoche.",
   "confianza": "media",
   "tags": [
    "Brunch y desayunos",
@@ -570,7 +719,12 @@
   "_fuentes": [
    "revistadc.com",
    "tripadvisor.es"
-  ]
+  ],
+  "local": {
+   "clave": "Café, comida y tragos con terraza en el centro histórico.",
+   "momento": "Abre desde la mañana (10:00); los viernes y sábados cierra a medianoche.",
+   "practico": "Precio medio. horario según Google: lun 11:00–21:00; mar 11:00–22:00; mié 10:30–22:00; jue 10:00–22:30; vie–sáb 10:00–24:00; dom 10:00–18:00."
+  }
  },
  {
   "city_display": "Bogotá",
@@ -594,7 +748,13 @@
    "happycow.net",
    "lacarte.menu",
    "pulsin.app"
-  ]
+  ],
+  "local": {
+   "clave": "Buffet de almuerzo, principalmente vegano.",
+   "momento": "Es solo almuerzo: de lunes a sábado de 10:30 a 15:30.",
+   "ojo": "Los domingos cierra.",
+   "practico": "Precio medio. horario según Google: lun–sáb 10:30–15:30; dom cerrado."
+  }
  },
  {
   "city_display": "Bogotá",
@@ -616,7 +776,14 @@
   "_fuentes": [
    "happycow.net",
    "tripadvisor.es"
-  ]
+  ],
+  "local": {
+   "clave": "Cocina vegana inspirada en toda Latinoamérica, en el centro.",
+   "pedir": "El ceviche de champiñones, que quienes lo visitan destacan.",
+   "momento": "Abre al almuerzo: de lunes a sábado de 12:00 a 16:00.",
+   "ojo": "Los domingos cierra.",
+   "practico": "Precio medio. horario según Google: lun–sáb 12:00–16:00; dom cerrado."
+  }
  },
  {
   "city_display": "Bogotá",
@@ -641,7 +808,13 @@
    "myguidecolombia.com",
    "tripadvisor.es",
    "wanderboat.ai"
-  ]
+  ],
+  "local": {
+   "clave": "Bar bohemio con galería de arte y chimenea en La Candelaria.",
+   "pedir": "Los cócteles, bien valorados en las reseñas.",
+   "ojo": "Los domingos está cerrado.",
+   "practico": "horario según Google: lun–mié 12:00–24:00; jue–sáb 12:00–1:00; dom cerrado."
+  }
  },
  {
   "city_display": "Bogotá",
@@ -665,7 +838,12 @@
    "colombiabound.com",
    "coool.cafe",
    "tripadvisor.es"
-  ]
+  ],
+  "local": {
+   "clave": "Café dentro del Hilton, con ambiente de droguería de los 70 mezclada con bistró francés.",
+   "pedir": "El café de los tostadores Devoción.",
+   "practico": "Precio medio. horario según Google: lun–vie 6:30–21:00; sáb–dom 7:00–21:00."
+  }
  },
  {
   "city_display": "Bogotá",
@@ -688,7 +866,11 @@
    "coool.cafe",
    "pluria.co",
    "polomaps.com"
-  ]
+  ],
+  "local": {
+   "clave": "Café de especialidad del barrio Alfonso López, en Teusaquillo, escogido por la guía Polomaps.",
+   "practico": "Precio medio. horario según Google: lun–sáb 9:00–20:00; dom 10:00–18:00."
+  }
  },
  {
   "city_display": "Bogotá",
@@ -711,6 +893,11 @@
    "polomaps.com",
    "threads.com",
    "tripadvisor.es"
-  ]
+  ],
+  "local": {
+   "clave": "Almuerzo o cena colombiana tradicional en la Calle de la Fatiga.",
+   "momento": "Abre todos los días desde las 8 a. m.",
+   "practico": "Precio medio. horario según Google: lun–sáb 8:00–20:00; dom 8:00–21:00."
+  }
  }
 ]

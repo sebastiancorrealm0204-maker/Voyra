@@ -29,3 +29,16 @@ def test_la_capa_real_es_coherente():
     for n, a in capa["ajustes"].items():
         assert a.get("place_id", "x"), n  # si trae place_id, no puede venir vacío (las entradas «varias sedes» no lo llevan)
         assert 4.4 < a["lat"] < 5.4 and -74.4 < a["lng"] < -73.5, f"{n}: coordenadas fuera de Bogotá y la Sabana"
+
+
+def test_los_lugares_aprobados_traen_bloque_local_coherente():
+    """Cada lugar de la capa de aprobados debe llevar `local` con clave y practico (lo que usa el Companion)."""
+    import json
+    import os
+    ruta = os.path.join(os.path.dirname(seed_data.__file__), "seed_candidatos.json")
+    permitidos = {"clave", "pedir", "ver", "momento", "ojo", "dato", "practico"}
+    for p in json.load(open(ruta, encoding="utf-8")):
+        loc = p.get("local")
+        assert loc and loc.get("clave") and loc.get("practico"), p["name"]
+        assert set(loc) <= permitidos, (p["name"], set(loc) - permitidos)
+        assert all(isinstance(v, str) and v.strip() for v in loc.values()), p["name"]
