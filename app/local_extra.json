@@ -1,0 +1,40 @@
+{
+  "_nota": "Campos `ojo` y `dato` AÑADIDOS a lugares que ya tienen bloque LOCAL (solo rellenan lo que está vacío; nunca pisan app/local_bogota.py). Horarios: Google Places (oct. 2026). Otras fuentes entre paréntesis en el commit.",
+  "Jardín Botánico José Celestino Mutis": {
+    "ojo": "Los lunes cierra: abre de martes a viernes de 8:00 a 17:00 y los fines de semana de 9:00 a 17:00."
+  },
+  "Museo Nacional de Colombia": {
+    "ojo": "Los lunes cierra: de martes a viernes abre de 9:00 a 17:00 y sábados y domingos de 10:00 a 17:00."
+  },
+  "Museo Botero": {
+    "ojo": "Los martes cierra; el resto de la semana abre (los domingos desde las 10:00). Con menos gente: entre semana y temprano."
+  },
+  "Parque El Chicó (Museo)": {
+    "ojo": "Los lunes cierra, y el resto de la semana el museo hace una pausa de 13:00 a 14:00."
+  },
+  "Planetario de Bogotá": {
+    "ojo": "Los lunes cierra.",
+    "dato": "Las funciones de la cúpula se narran en español de Colombia."
+  },
+  "Mercado de las Pulgas de San Alejo": {
+    "ojo": "Solo abre los domingos (de 9:00 a 17:00): de lunes a sábado no hay nada."
+  },
+  "Parque de la 93": {
+    "ojo": "Es zona segura, pero con la precaución normal: evita los caminos solitarios muy tarde, cuida tus cosas y usa transporte de confianza."
+  },
+  "Plaza de Bolívar": {
+    "dato": "La plaza está abierta a toda hora; alrededor hay muchos vendedores ambulantes y restaurantes."
+  },
+  "Andrés D.C.": {
+    "dato": "Los domingos abre desde las 8 a. m.; el resto de la semana, desde el mediodía."
+  },
+  "Harry Sasson": {
+    "dato": "Un comensal recomienda dejar que el propio Harry Sasson elija los platos si se acerca a tu mesa y te lo ofrece."
+  },
+  "Central Cevichería": {
+    "dato": "Además del ceviche, sus clientes elogian las cazuelas."
+  },
+  "Plaza de Mercado La Perseverancia": {
+    "dato": "Los fines de semana abre desde las 6 a. m.: sirve para desayunar además de almorzar."
+  }
+}

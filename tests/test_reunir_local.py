@@ -41,3 +41,10 @@ def test_fragmentos_exigen_nombre_y_bogota_y_priorizan_pistas():
     f = r.mejores_fragmentos("Pino Negro", res)
     assert [x["url"] for x in f] == ["https://b.com/2", "https://a.com/1"]
     assert f[0]["pistas"] > f[1]["pistas"]
+
+
+def test_las_pistas_de_consejos_puntuan_mas():
+    res = [{"title": "Plaza X", "url": "https://a.com/1", "content": "Plaza X en Bogotá, una plaza."},
+           {"title": "Plaza X Bogotá", "url": "https://b.com/2", "content": "En Plaza X evita el domingo, está llena; ojo con los cobros y llega temprano. Bogotá"}]
+    f = r.mejores_fragmentos("Plaza X", res)
+    assert f[0]["url"] == "https://b.com/2" and f[0]["pistas"] >= 4

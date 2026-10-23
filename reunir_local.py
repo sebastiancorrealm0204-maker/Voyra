@@ -43,7 +43,12 @@ PRECIO = {"PRICE_LEVEL_FREE": "gratis", "PRICE_LEVEL_INEXPENSIVE": "económico",
 DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
 ABREV = {"lunes": "lun", "martes": "mar", "miércoles": "mié", "jueves": "jue", "viernes": "vie", "sábado": "sáb", "domingo": "dom"}
 PISTAS = re.compile(r"pide|pedir|recomend|especialidad|plato|estrella|imperdible|tip|consejo|reserv|mejor hora|fila|"
-                    r"favorito|famos|destaca|no te pierdas|llega|temprano|fin de semana|precio|efectivo", re.I)
+                    r"favorito|famos|destaca|no te pierdas|llega|temprano|fin de semana|precio|efectivo|"
+                    r"evita|cuidado|ojo|trampa|cobr|lleno|llena|gratis|entrada|boleta|tiquete|cierra|domingo", re.I)
+CONSULTAS = {
+    "nuevo": '"{n}" Bogotá qué pedir recomendaciones consejos',
+    "tips": '"{n}" Bogotá consejos tips evitar filas mejor hora cuidado',
+}
 
 
 # ─────────────────────────── lógica pura (con tests) ───────────────────────────
@@ -133,8 +138,8 @@ def hechos_google(cl: httpx.Client, place_id: str) -> dict:
     return _cache[k]
 
 
-def textos_tavily(cl: httpx.Client, nombre: str) -> list[dict]:
-    q = f"\"{nombre}\" Bogotá qué pedir recomendaciones consejos"
+def textos_tavily(cl: httpx.Client, nombre: str, plantilla: str = CONSULTAS["nuevo"]) -> list[dict]:
+    q = plantilla.format(n=nombre)
     k = f"t|{q}"
     if k not in _cache:
         r = cl.post(TAVILY_URL, json={"api_key": TAVILY_KEY, "query": q, "topic": "general", "search_depth": "basic",
@@ -152,42 +157,57 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Reúne evidencia para el dato local (no escribe nada en la curación).")
     ap.add_argument("--solo", default="", help="Nombres separados por comas (por defecto, todos los aprobados sin local)")
     ap.add_argument("--max-tavily", type=int, default=40)
+    ap.add_argument("--existentes", default="", help="Modo lugares ya curados: nombres separados por comas. "
+                    "Busca consejos/trampas (dato y ojo) y muestra su bloque `local` actual.")
     args = ap.parse_args()
     if not GOOGLE_KEY or not TAVILY_KEY:
         sys.exit("Faltan GOOGLE_MAPS_API_KEY y/o TAVILY_API_KEY (ponlas en .env).")
 
-    ruta = os.path.join("app", "seed_candidatos.json")
-    aprobados = json.load(open(ruta, encoding="utf-8"))
-    solo = [s.strip() for s in args.solo.split(",") if s.strip()]
-    lugares = [p for p in aprobados if (not solo or p["name"] in solo) and not p.get("local")]
-    print(f"{len(lugares)} lugares sin `local`; hasta {args.max_tavily} búsquedas de Tavily.")
+    existentes = [s.strip() for s in args.existentes.split(",") if s.strip()]
+    plantilla = CONSULTAS["tips"] if existentes else CONSULTAS["nuevo"]
+    if existentes:
+        from app import seed_data
+        por = {p["name"]: p for p in seed_data.all_seeds() if p["city_display"] == "Bogotá"}
+        faltan = [n for n in existentes if n not in por]
+        if faltan:
+            sys.exit(f"No están en la curación: {faltan}")
+        lugares = [por[n] for n in existentes]
+        print(f"{len(lugares)} lugares ya curados; hasta {args.max_tavily} búsquedas de Tavily (modo consejos).")
+    else:
+        ruta = os.path.join("app", "seed_candidatos.json")
+        aprobados = json.load(open(ruta, encoding="utf-8"))
+        solo = [s.strip() for s in args.solo.split(",") if s.strip()]
+        lugares = [p for p in aprobados if (not solo or p["name"] in solo) and not p.get("local")]
+        print(f"{len(lugares)} lugares sin `local`; hasta {args.max_tavily} búsquedas de Tavily.")
 
     _cargar_cache()
     salida = []
     with httpx.Client(timeout=25) as cl:
         for i, p in enumerate(lugares):
-            h = hechos_google(cl, p["place_id"])
+            h = hechos_google(cl, p["place_id"]) if p.get("place_id") else {"horario": "", "precio": ""}
             h["practico"] = practico_de(h)
             frags = []
             if i < args.max_tavily:
                 try:
-                    frags = mejores_fragmentos(p["name"], textos_tavily(cl, p["name"]))
+                    frags = mejores_fragmentos(p["name"], textos_tavily(cl, p["name"], plantilla))
                 except Exception as e:
                     print(f"   Tavily falló en {p['name']}: {e}")
                 time.sleep(0.3)
             print(f"[{i + 1}/{len(lugares)}] {p['name']}: {len(frags)} fragmentos · {h['practico'][:60]}")
             salida.append({"name": p["name"], "category": p["category"], "zona": p["zona"], "descripcion": p["descripcion"],
-                           "hechos": h, "fragmentos": frags})
+                           "local_actual": p.get("local") or {}, "hechos": h, "fragmentos": frags})
             if (i + 1) % 8 == 0:
                 _guardar_cache()
     _guardar_cache()
 
     os.makedirs("reportes", exist_ok=True)
-    base = f"reportes/local_bogota_{datetime.date.today().isoformat()}"
+    base = f"reportes/{'local_existentes' if existentes else 'local_bogota'}_{datetime.date.today().isoformat()}"
     json.dump(salida, open(base + ".json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     L = [f"# Evidencia para el dato local — {datetime.date.today().isoformat()}", ""]
     for s in salida:
         L += [f"## {s['name']} — {s['zona']} · {s['category']}", f"_Descripción actual:_ {s['descripcion']}", ""]
+        if s.get("local_actual"):
+            L.append("- LOCAL actual: " + " | ".join(f"{k}: {v}" for k, v in s["local_actual"].items()))
         if s["hechos"].get("resumen_google"):
             L.append(f"- Resumen de Google: {s['hechos']['resumen_google']}")
         L.append(f"- practico (Google): {s['hechos']['practico'] or '—'}")

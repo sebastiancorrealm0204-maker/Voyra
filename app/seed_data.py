@@ -2580,6 +2580,20 @@ def _candidatos_aprobados() -> list[dict]:
     return [p for p in data if isinstance(p, dict) and p.get("name") and p.get("lat") is not None]
 
 
+def _local_extra() -> dict:
+    """Campos `ojo`/`dato` añadidos a lugares que ya tienen bloque LOCAL (app/local_extra.json).
+    Solo rellenan lo que está vacío: lo escrito a mano en local_bogota.py siempre gana."""
+    import json
+    import os
+    ruta = os.path.join(os.path.dirname(__file__), "local_extra.json")
+    try:
+        with open(ruta, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    return {k: v for k, v in data.items() if isinstance(v, dict) and not k.startswith("_")}
+
+
 def all_seeds() -> list[dict]:
     """Resuelve lat/lng de cada lugar.
 
@@ -2591,6 +2605,7 @@ def all_seeds() -> list[dict]:
     from .local_bogota import LOCAL_BOGOTA  # conocimiento local por lugar (Bogotá)
 
     capa = _capa_verificacion()
+    extras = _local_extra()
     out = []
     nombres_bogota = {q["name"] for q in BOGOTA}
     nuevos = [q for q in _candidatos_aprobados() if q["name"] not in nombres_bogota]
@@ -2614,5 +2629,11 @@ def all_seeds() -> list[dict]:
         local = p.get("local")
         if local is None and p["city_display"] == "Bogotá":
             local = LOCAL_BOGOTA.get(p["name"])
+        extra = extras.get(p["name"]) if p["city_display"] == "Bogotá" else None
+        if extra and local:
+            local = dict(local)  # copia: no mutar LOCAL_BOGOTA
+            for k, v in extra.items():
+                if not local.get(k):
+                    local[k] = v
         out.append({**p, "lat": lat, "lng": lng, "local": local})
     return out
