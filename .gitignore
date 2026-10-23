@@ -20,3 +20,6 @@ public_key.pem
 
 # Tests
 .pytest_cache/
+
+# Reportes de verificación de la curación (se regeneran)
+reportes/
