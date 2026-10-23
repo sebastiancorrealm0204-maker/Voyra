@@ -2551,6 +2551,21 @@ GUADALAJARA = [
 _ZIPAQUIRA = (5.0190, -73.9905)
 
 
+def _capa_verificacion() -> dict:
+    """Capa generada por aplicar_verificacion.py sobre la curación (excluidos y ajustes verificados
+    contra Google). Si no existe el archivo, la curación queda tal cual está en este módulo."""
+    import json
+    import os
+    vacia = {"excluir": {}, "ajustes": {}, "confianza_baja": []}
+    ruta = os.path.join(os.path.dirname(__file__), "seed_verificacion.json")
+    try:
+        with open(ruta, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return vacia
+    return {k: data.get(k, v) for k, v in vacia.items()}
+
+
 def all_seeds() -> list[dict]:
     """Resuelve lat/lng de cada lugar.
 
@@ -2561,8 +2576,16 @@ def all_seeds() -> list[dict]:
     """
     from .local_bogota import LOCAL_BOGOTA  # conocimiento local por lugar (Bogotá)
 
+    capa = _capa_verificacion()
     out = []
     for p in BOGOTA + GUADALAJARA:
+        if p["name"] in capa["excluir"] and p["city_display"] == "Bogotá":
+            continue  # cerró o no es de la ciudad (ver app/seed_verificacion.json)
+        if p["city_display"] == "Bogotá":
+            if p["name"] in capa["ajustes"]:
+                p = {**p, **capa["ajustes"][p["name"]]}  # lat/lng/place_id/rating verificados con Google
+            if p["name"] in capa["confianza_baja"]:
+                p = {**p, "confianza": "baja"}
         if "lat" in p and "lng" in p:
             lat, lng = p["lat"], p["lng"]
         elif "afuera" in p["zona"].lower() or "boyac" in p["zona"].lower():

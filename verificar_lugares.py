@@ -271,6 +271,7 @@ def main() -> None:
                 "estado": (g or {}).get("estado"), "rating": (g or {}).get("rating"),
                 "rating_count": (g or {}).get("rating_count"), "horarios": (g or {}).get("horarios", []),
                 "google_maps_uri": (g or {}).get("google_maps_uri", ""), "hallazgos": hallazgos,
+                "google": {k: (g or {}).get(k) for k in ("nombre", "lat", "lng", "direccion")},
             })
             time.sleep(args.sleep)
 

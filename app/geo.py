@@ -103,7 +103,7 @@ ZONE_COORDS: dict[str, dict[str, tuple[float, float]]] = {
         "zona g": (4.6580, -74.0570),
         "zona t": (4.6680, -74.0530),
         "zona rosa": (4.6680, -74.0530),
-        "usaquen": (4.6950, -74.0310),
+        "usaquen": (4.6937, -74.0324),
         "aeropuerto": (4.7016, -74.1469),
         "en el hotel": (4.6580, -74.0570),  # default razonable: Zona G/Chapinero
     },

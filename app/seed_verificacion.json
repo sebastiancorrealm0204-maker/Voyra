@@ -1,0 +1,790 @@
+{
+ "generado": "2026-10-22",
+ "fuente": "reportes\\verificacion_bogota_2026-10-22.json",
+ "excluir": {
+  "Criterión": "Cerró en marzo de 2024 (anuncio de Jorge Rausch; planean reabrir con otro concepto). El Tiempo / El País.",
+  "Baum": "Cerró definitivamente (enero de 2020, presión inmobiliaria). La FM / Resident Advisor.",
+  "Villanos en Bermudas": "Cerró durante la pandemia. El Tiempo.",
+  "Oci.Mde": "Es un restaurante de Medellín (Provenza), no de Bogotá; Google no lo encuentra en la ciudad.",
+  "Crepes & Waffles (Zona T / Calle 85)": "Google lo marca cerrado permanentemente.",
+  "Dalia Plant Power": "Google lo marca cerrado permanentemente.",
+  "Mesa Salvaje": "Google lo marca cerrado permanentemente.",
+  "Pan Fino": "Google lo marca cerrado permanentemente."
+ },
+ "confianza_baja": [
+  "Di Lucca",
+  "La Sala de Laura"
+ ],
+ "ajustes": {
+  "El Chato": {
+   "lat": 4.647952,
+   "lng": -74.057071,
+   "place_id": "ChIJQclc-kSaP44RJgBygHivOB4",
+   "rating": 4.4
+  },
+  "Afluente": {
+   "lat": 4.642206,
+   "lng": -74.059694,
+   "place_id": "ChIJp2-bW3ubP44RfxtjR_I9OTY",
+   "rating": 4.8
+  },
+  "Humo Negro": {
+   "lat": 4.641729,
+   "lng": -74.061094,
+   "place_id": "ChIJJTHLru-bP44R2ZY-9uplUfQ",
+   "rating": 4.6
+  },
+  "El Cielo Bogotá": {
+   "lat": 4.651453,
+   "lng": -74.05465,
+   "place_id": "ChIJWT49HEKaP44ROyAodl5Lri0",
+   "rating": 4.5
+  },
+  "Mesa Franca": {
+   "lat": 4.646129,
+   "lng": -74.060129,
+   "place_id": "ChIJCStb0TuaP44Rv8CeFg9Jop4",
+   "rating": 4.5
+  },
+  "Salvo Patria": {
+   "lat": 4.643454,
+   "lng": -74.060057,
+   "place_id": "ChIJ1SRa6juaP44RBh-Fm_91DPo",
+   "rating": 4.6
+  },
+  "Prudencia": {
+   "lat": 4.595751,
+   "lng": -74.070689,
+   "place_id": "ChIJ6f1lSa-ZP44Ry90BHZYn4uc",
+   "rating": 4.7
+  },
+  "Mini-Mal": {
+   "lat": 4.642485,
+   "lng": -74.060344,
+   "place_id": "ChIJDwjZRjmaP44RRiWg-C6GDjE",
+   "rating": 4.7
+  },
+  "Harry Sasson": {
+   "lat": 4.659312,
+   "lng": -74.054582,
+   "place_id": "ChIJkdKNmV2aP44RJQpGQ2JO554",
+   "rating": 4.6
+  },
+  "La Cabrera": {
+   "lat": 4.651414,
+   "lng": -74.055549,
+   "place_id": "ChIJRbQdAW2bP44RjX-JIWZYygE",
+   "rating": 4.7
+  },
+  "Central Cevichería": {
+   "lat": 4.66925,
+   "lng": -74.05349,
+   "place_id": "ChIJIamrMouaP44Rr9BaZMNzugQ",
+   "rating": 4.6
+  },
+  "Pizzardi Artigianale": {
+   "lat": 4.665038,
+   "lng": -74.053716,
+   "place_id": "ChIJjSi_ypebP44RRJ8RDQeVbuM",
+   "rating": 4.8
+  },
+  "La Lucha Sanguchería": {
+   "lat": 4.668992,
+   "lng": -74.053707,
+   "place_id": "ChIJudmf0_SaP44R4kPvqABjcZY",
+   "rating": 4.5
+  },
+  "La Puerta Falsa": {
+   "lat": 4.598013,
+   "lng": -74.074814,
+   "place_id": "ChIJybfDx6eZP44RYZ5QuXtKwG0",
+   "rating": 4.3
+  },
+  "Restaurante La Puerta de la Tradición (Santa Fe)": {
+   "lat": 4.597936,
+   "lng": -74.074759,
+   "place_id": "ChIJm9W6zqeZP44R5F7ooNZMpsU",
+   "rating": 4
+  },
+  "Casa Vieja": {
+   "lat": 4.600499,
+   "lng": -74.069584,
+   "place_id": "ChIJmWD64aWZP44RHLwNoR7IXEg",
+   "rating": 4.3
+  },
+  "Andrés Carne de Res (Chía)": {
+   "lat": 4.854331,
+   "lng": -74.065428,
+   "place_id": "ChIJFRm5s4yHP44RffM5riPFkqs",
+   "rating": 4.5
+  },
+  "Tropicalia Coffee": {
+   "lat": 4.663761,
+   "lng": -74.050684,
+   "place_id": "ChIJE0prjS-bP44R92imaf-A6Nw",
+   "rating": 4.3
+  },
+  "Azahar Café": {
+   "lat": 4.678037,
+   "lng": -74.050155,
+   "place_id": "ChIJBSLYiJKaP44ROgBmQ7z-Ab0",
+   "rating": 4.6
+  },
+  "Café Cultor": {
+   "lat": 4.654937,
+   "lng": -74.058282,
+   "place_id": "ChIJK13F1EOaP44RDgle2lELJ50",
+   "rating": 4.6
+  },
+  "Libertario Coffee Roasters": {
+   "lat": 4.652733,
+   "lng": -74.05487,
+   "place_id": "ChIJkbNgZEKaP44RhIuGf13gfLg",
+   "rating": 4.6
+  },
+  "Colo Coffee": {
+   "lat": 4.667868,
+   "lng": -74.05454,
+   "place_id": "ChIJbTvTOfWaP44RQnHqSCoyz9I",
+   "rating": 4.6
+  },
+  "Brot Bakery & Café": {
+   "lat": 4.663056,
+   "lng": -74.050517,
+   "place_id": "ChIJ94JiAmGaP44R_w1-PH83TWw",
+   "rating": 4.6
+  },
+  "Masa (Rosales)": {
+   "lat": 4.651682,
+   "lng": -74.055005,
+   "place_id": "ChIJ41-LIkKaP44RIgGFoJ-zRu4",
+   "rating": 4.5
+  },
+  "Andrés D.C.": {
+   "lat": 4.666407,
+   "lng": -74.054408,
+   "place_id": "ChIJsXAk_TybP44REHFuyaadU8I",
+   "rating": 4.4
+  },
+  "Gaira Café Cumbia House": {
+   "lat": 4.68069,
+   "lng": -74.047552,
+   "place_id": "ChIJf0RGVpGaP44RAkq6w68SrIM",
+   "rating": 4.5
+  },
+  "Theatron": {
+   "lat": 4.645618,
+   "lng": -74.064159,
+   "place_id": "ChIJrWVrRjiaP44RI4GKwG_Gx6I",
+   "rating": 4.4
+  },
+  "Armando Records": {
+   "lat": 4.669988,
+   "lng": -74.072143,
+   "place_id": "ChIJCSM-xP6aP44RTZMKbmVEdFY",
+   "rating": 3
+  },
+  "Video Club": {
+   "lat": 4.650813,
+   "lng": -74.063501,
+   "place_id": "ChIJlUkDbkaaP44ROKkg2Ab-_to",
+   "rating": 4.3
+  },
+  "Apache Rooftop (Click Clack)": {
+   "lat": 4.675327,
+   "lng": -74.047489,
+   "place_id": "ChIJsWu4CY6aP44RDeD6pciLpJM",
+   "rating": 4.5
+  },
+  "Galería Café Libro": {
+   "lat": 4.675204,
+   "lng": -74.048019,
+   "place_id": "ChIJPXNe5I2aP44R7Rmq0qND358",
+   "rating": 4.4
+  },
+  "Taninos Park Wines": {
+   "lat": 4.627529,
+   "lng": -74.074648,
+   "place_id": "ChIJHZioyHybP44RfUT8hM2sOlc",
+   "rating": 4.6
+  },
+  "Museo del Oro": {
+   "lat": 4.601913,
+   "lng": -74.072041,
+   "place_id": "ChIJzXwPxqaZP44R7VGgkWDNj8E",
+   "rating": 4.8
+  },
+  "Museo Botero": {
+   "lat": 4.596698,
+   "lng": -74.07335,
+   "place_id": "ChIJrZGCnaiZP44RrOFDQSLfni8",
+   "rating": 4.8
+  },
+  "Museo Nacional de Colombia": {
+   "lat": 4.615609,
+   "lng": -74.068607,
+   "place_id": "ChIJz3onhISZP44RI5mCru8jqzs",
+   "rating": 4.7
+  },
+  "MAMBO — Museo de Arte Moderno": {
+   "lat": 4.610405,
+   "lng": -74.069274,
+   "place_id": "ChIJMZ9WEZmZP44Rd9Enj8ETJSI",
+   "rating": 4.6
+  },
+  "Quinta de Bolívar": {
+   "lat": 4.602455,
+   "lng": -74.063004,
+   "place_id": "ChIJRWhokbyZP44ReHF-qDIy_tg",
+   "rating": 4.7
+  },
+  "Biblioteca Luis Ángel Arango": {
+   "lat": 4.596839,
+   "lng": -74.072717,
+   "place_id": "ChIJxwI5nqiZP44R54J9v66d10o",
+   "rating": 4.8
+  },
+  "Teatro Colón": {
+   "lat": 4.596667,
+   "lng": -74.07442,
+   "place_id": "ChIJh-twfKiZP44R8KxnYB6zDHE",
+   "rating": 4.9
+  },
+  "Maloka": {
+   "lat": 4.654882,
+   "lng": -74.109399,
+   "place_id": "ChIJvT-ZVJCbP44RkmHezHMdjpM",
+   "rating": 4.3
+  },
+  "Plaza de Bolívar": {
+   "lat": 4.59819,
+   "lng": -74.076053,
+   "place_id": "ChIJj-XP7KeZP44RdhQ1NSu3nAk",
+   "rating": 4.6
+  },
+  "Cerro de Monserrate": {
+   "lat": 4.60557,
+   "lng": -74.055446,
+   "place_id": "ChIJgTfkDnSZP44RhIG9_bKIQTg",
+   "rating": 4.7
+  },
+  "Mirador Torre Colpatria": {
+   "lat": 4.61113,
+   "lng": -74.070229,
+   "place_id": "ChIJZS1OOpmZP44RsVQLJAFGDD4",
+   "rating": 4.5
+  },
+  "Parque El Virrey": {
+   "lat": 4.674143,
+   "lng": -74.053973,
+   "place_id": "ChIJI_2_fa-bP44RLSsvxir4x2I",
+   "rating": 5
+  },
+  "Jardín Botánico José Celestino Mutis": {
+   "lat": 4.668439,
+   "lng": -74.097356,
+   "place_id": "ChIJKy8crgqbP44RqGHYK0w3TjY",
+   "rating": 4.7
+  },
+  "Parque Metropolitano Simón Bolívar": {
+   "lat": 4.678419,
+   "lng": -74.082356,
+   "place_id": "ChIJt18wXkGbP44RrtziQHXso3o",
+   "rating": 4.2
+  },
+  "Parque de la 93": {
+   "lat": 4.676532,
+   "lng": -74.048416,
+   "place_id": "ChIJv2aRGpKaP44RWFk0TJsnKRw",
+   "rating": 4.6
+  },
+  "Mercado de pulgas de Usaquén": {
+   "lat": 4.693704,
+   "lng": -74.032433,
+   "place_id": "ChIJgTfkDnSZP44RZrAvqWEv_XM",
+   "rating": 4.6
+  },
+  "Plaza de Mercado de Paloquemao": {
+   "lat": 4.618206,
+   "lng": -74.082659,
+   "place_id": "ChIJaR9BiXmZP44RTIL-vKlrSqE",
+   "rating": 4.4
+  },
+  "Plaza de Mercado La Perseverancia": {
+   "lat": 4.616465,
+   "lng": -74.066279,
+   "place_id": "ChIJ6evPsZqZP44RlRfeO2VNgmI",
+   "rating": 4.4
+  },
+  "Centro Comercial Andino": {
+   "lat": 4.666848,
+   "lng": -74.052573,
+   "place_id": "ChIJiQWeU_WaP44RchzwSWRT-Fg",
+   "rating": 4.5
+  },
+  "Hacienda Santa Bárbara": {
+   "lat": 4.693555,
+   "lng": -74.032959,
+   "place_id": "ChIJa36-_KaaP44RRcp7pSnSs08",
+   "rating": 4.3
+  },
+  "Artesanías de Colombia (San Diego)": {
+   "lat": 4.602293,
+   "lng": -74.067125,
+   "place_id": "ChIJZQpgZqOZP44RlU8iahYRm4A",
+   "rating": 4.7
+  },
+  "Tour en bici por Bogotá": {
+   "lat": 4.597233,
+   "lng": -74.070982,
+   "place_id": "ChIJ0ZJvw6WZP44RVsqVGKUK2JA",
+   "rating": 4.9
+  },
+  "Catedral de Sal de Zipaquirá": {
+   "lat": 5.0187,
+   "lng": -74.009917,
+   "place_id": "ChIJAXt7UCBwQI4RfyOsloFI3wA",
+   "rating": 4.7
+  },
+  "Mina de Sal de Nemocón": {
+   "lat": 5.063949,
+   "lng": -73.874749,
+   "place_id": "ChIJMbdi8eJsQI4RebMHi5Te4eI",
+   "rating": 4.8
+  },
+  "Parque Natural Chicaque": {
+   "lat": 4.606344,
+   "lng": -74.304754,
+   "place_id": "ChIJD2yOU9ObP44RCkjtPCpuWCg",
+   "rating": 4.7
+  },
+  "Suesca (senderismo y escalada)": {
+   "lat": 5.094834,
+   "lng": -73.79136,
+   "place_id": "ChIJSaCeCiMTQI4RH8ANegSkjk4",
+   "rating": 4.8
+  },
+  "Selma": {
+   "lat": 4.647802,
+   "lng": -74.056894,
+   "place_id": "ChIJOSQgPxabP44Rr4qZnncV59E",
+   "rating": 4.3
+  },
+  "Debora": {
+   "lat": 4.650911,
+   "lng": -74.055398,
+   "place_id": "ChIJoYhK7ymbP44RIzU7fCm7iV4",
+   "rating": 4.6
+  },
+  "Cuzco": {
+   "lat": 4.677117,
+   "lng": -74.04928,
+   "place_id": "ChIJv5g6a5KaP44RN9fvqhJ1cJU",
+   "rating": 4.6
+  },
+  "Osaka": {
+   "lat": 4.669481,
+   "lng": -74.053652,
+   "place_id": "ChIJlxMszfSaP44RkW1l_XWn5B0",
+   "rating": 4.7
+  },
+  "Mistral": {
+   "lat": 4.664317,
+   "lng": -74.054224,
+   "place_id": "ChIJUW35-L6bP44RXUhniJYqjv4",
+   "rating": 4.2
+  },
+  "La Tavola Rústica": {
+   "lat": 4.669495,
+   "lng": -74.050515,
+   "place_id": "ChIJG4DmPhibP44RxsuqPtijRE4",
+   "rating": 4.5
+  },
+  "Watakushi": {
+   "lat": 4.667458,
+   "lng": -74.053535,
+   "place_id": "ChIJzZzASvWaP44RF2U2wds2Tno",
+   "rating": 4.6
+  },
+  "La Cervecería Libre": {
+   "lat": 4.667853,
+   "lng": -74.053932,
+   "place_id": "ChIJ2Y4cNPWaP44RNTAQDwwfk1M",
+   "rating": 4.3
+  },
+  "Capital Cocina": {
+   "lat": 4.598015,
+   "lng": -74.077182,
+   "place_id": "ChIJLZCMQWeZP44RU4d0h1NjdJA",
+   "rating": 4.3
+  },
+  "Café San Alberto (Candelaria)": {
+   "lat": 4.602713,
+   "lng": -74.072281,
+   "place_id": "ChIJAYVxV-uZP44ReDguW5X_lhk",
+   "rating": 4.4
+  },
+  "Café Quindío Premium": {
+   "lat": 4.693992,
+   "lng": -74.032851,
+   "place_id": "ChIJWy89s6eaP44RHmljwnXblrk",
+   "rating": 4.5
+  },
+  "Astoria Rooftop": {
+   "lat": 4.669104,
+   "lng": -74.05318,
+   "place_id": "ChIJPTNkN9qbP44R2ncGzVOIvbE",
+   "rating": 4.4
+  },
+  "Federal Rooftop": {
+   "lat": 4.667795,
+   "lng": -74.053306,
+   "place_id": "ChIJzQMm-x-bP44RyYOYLlXeT7Q",
+   "rating": 4.7
+  },
+  "Sky 15 Rooftop": {
+   "lat": 4.655754,
+   "lng": -74.055486,
+   "place_id": "ChIJvQuL7D-bP44RVuJqfrrTlUs",
+   "rating": 4.1
+  },
+  "El Mono Bandido": {
+   "lat": 4.704938,
+   "lng": -74.048694,
+   "place_id": "ChIJG5NZbjmZP44Rm4dHXLSVXZ0",
+   "rating": 4.8
+  },
+  "Catedral Primada de Colombia": {
+   "lat": 4.598037,
+   "lng": -74.075304,
+   "place_id": "ChIJj-XP7KeZP44RggthLR2n4rI",
+   "rating": 4.7
+  },
+  "Centro Cultural Gabriel García Márquez": {
+   "lat": 4.597876,
+   "lng": -74.074263,
+   "place_id": "ChIJD5gmM6aZP44RBcte7Sijr60",
+   "rating": 4.7
+  },
+  "Museo de Bogotá": {
+   "lat": 4.595844,
+   "lng": -74.073112,
+   "place_id": "ChIJr5rIk6iZP44RA7dB2TwmSco",
+   "rating": 4.7
+  },
+  "Planetario de Bogotá": {
+   "lat": 4.612117,
+   "lng": -74.068918,
+   "place_id": "ChIJJ114z5uZP44RoKQT0bYQ0_s",
+   "rating": 4.6
+  },
+  "Parque de los Novios": {
+   "lat": 4.65485,
+   "lng": -74.08113,
+   "place_id": "ChIJl5vN4LObP44RfQjTCGvSWG4",
+   "rating": 4.6
+  },
+  "Parque El Chicó (Museo)": {
+   "lat": 4.67389,
+   "lng": -74.044785,
+   "place_id": "ChIJgTfkDnSZP44RXvFRQMSX2dk",
+   "rating": 4.6
+  },
+  "Cerro El Cable (senderismo)": {
+   "lat": 4.627861,
+   "lng": -74.049688,
+   "place_id": "ChIJGQFtLWybP44RyIrEFrreDSM",
+   "rating": 4.7
+  },
+  "Parque Simón Bolívar — Lago": {
+   "lat": 4.678419,
+   "lng": -74.082356,
+   "place_id": "ChIJt18wXkGbP44RrtziQHXso3o",
+   "rating": 4.2
+  },
+  "Centro Comercial El Retiro": {
+   "lat": 4.666166,
+   "lng": -74.053959,
+   "place_id": "ChIJ-xtZ8V-aP44RmjptypScTzw",
+   "rating": 4.5
+  },
+  "Mercado de las Pulgas de San Alejo": {
+   "lat": 4.610388,
+   "lng": -74.070001,
+   "place_id": "ChIJkcmZQ5mZP44RLv4wbYb5PPY",
+   "rating": 4.4
+  },
+  "Sorella": {
+   "lat": 4.648887,
+   "lng": -74.056402,
+   "place_id": "ChIJeVkhD2CbP44RXtVOE5ic59s",
+   "rating": 4.7
+  },
+  "Fiero": {
+   "lat": 4.649072,
+   "lng": -74.056922,
+   "place_id": "ChIJ-dbNZ0-bP44RLUE4yUlE4Ig",
+   "rating": 4.7
+  },
+  "Insurgentes": {
+   "lat": 4.641667,
+   "lng": -74.061364,
+   "place_id": "ChIJvdF0YzmaP44RHoFOR8OpkVQ",
+   "rating": 4.5
+  },
+  "Cecilia": {
+   "lat": 4.694634,
+   "lng": -74.032175,
+   "place_id": "ChIJY3nEGQCbP44ROLln06UJOew",
+   "rating": 4.4
+  },
+  "Armadillo": {
+   "lat": 4.6541,
+   "lng": -74.053851,
+   "place_id": "ChIJdafOhkKaP44R3qijmfkGFyA",
+   "rating": 4.7
+  },
+  "Quinua y Amaranto": {
+   "lat": 4.595827,
+   "lng": -74.071714,
+   "place_id": "ChIJ--ONsKiZP44R_-Ayc3uFOok",
+   "rating": 4.7
+  },
+  "Pajares Salinas": {
+   "lat": 4.678816,
+   "lng": -74.044127,
+   "place_id": "ChIJedCE-5CaP44RONFsVbZxyyU",
+   "rating": 4.7
+  },
+  "Masa (Quinta Camacho)": {
+   "lat": 4.651682,
+   "lng": -74.055005,
+   "place_id": "ChIJ41-LIkKaP44RIgGFoJ-zRu4",
+   "rating": 4.5
+  },
+  "Bogotá Beer Company (Zona T)": {
+   "lat": 4.667255,
+   "lng": -74.053314,
+   "place_id": "ChIJxY4QtYqaP44Rwll3XybO8UA",
+   "rating": 4.6
+  },
+  "Smoking Molly": {
+   "lat": 4.615845,
+   "lng": -74.067258,
+   "place_id": "ChIJc1Wa2ZqZP44RMZdn1pFSE-Q",
+   "rating": 4.5
+  },
+  "Cementerio Central": {
+   "lat": 4.616359,
+   "lng": -74.074904,
+   "place_id": "ChIJbSmHfCqaP44RiG7lK14yrAA",
+   "rating": 3.9
+  },
+  "Usaquén (centro histórico)": {
+   "lat": 4.696714,
+   "lng": -74.030858,
+   "place_id": "ChIJAzTzPKiaP44RCZTlEhFZFLg",
+   "rating": 4.6
+  },
+  "Monumento a los Héroes / Zona": {
+   "lat": 4.668186,
+   "lng": -74.060309,
+   "place_id": "ChIJCxc-ZfaaP44Rbhr4nPRkTok",
+   "rating": 3.7
+  },
+  "Fundación Santa Fe de Bogotá": {
+   "lat": 4.695643,
+   "lng": -74.033027,
+   "place_id": "ChIJ1TOi722bP44RGjUTWZCMfNI",
+   "rating": 4
+  },
+  "Clínica del Country": {
+   "lat": 4.668707,
+   "lng": -74.056804,
+   "place_id": "ChIJC8Wg-PSaP44R-9UgF0KTN84",
+   "rating": 3.8
+  },
+  "Clínica Shaio": {
+   "lat": 4.698252,
+   "lng": -74.073075,
+   "place_id": "ChIJxSc-FNeaP44RP97LB7vQxD8",
+   "rating": 3.7
+  },
+  "Clínica Reina Sofía": {
+   "lat": 4.706957,
+   "lng": -74.051532,
+   "place_id": "ChIJs3s2v0qFP44ReDBETBcmZf8",
+   "rating": 3.9
+  },
+  "Hospital Universitario San Ignacio": {
+   "lat": 4.629254,
+   "lng": -74.067649,
+   "place_id": "ChIJP9Bm-CiaP44REh0ux0amw-I",
+   "rating": 3
+  },
+  "Centro Comercial Unicentro": {
+   "lat": 4.703455,
+   "lng": -74.042194,
+   "place_id": "ChIJDySgbrKaP44RzUogN8V8YJY",
+   "rating": 4.5
+  },
+  "Centro Comercial Gran Estación": {
+   "lat": 4.647399,
+   "lng": -74.101919,
+   "place_id": "ChIJBaV-TJWbP44RMxYdS4GUjNI",
+   "rating": 4.5
+  },
+  "Centro Comercial Santafé": {
+   "lat": 4.762519,
+   "lng": -74.047899,
+   "place_id": "ChIJqz-1z5OFP44RokFO6MMUE34",
+   "rating": 4.5
+  },
+  "Pesquera Jaramillo": {
+   "lat": 4.704698,
+   "lng": -74.050818,
+   "place_id": "ChIJNRTvIbWaP44R6pu5MJ550gM",
+   "rating": 4.3
+  },
+  "La Bifería": {
+   "lat": 4.693898,
+   "lng": -74.047378,
+   "place_id": "ChIJlf30K7qaP44RJfPxEWgK_zk",
+   "rating": 4.3
+  },
+  "Quiebracanto": {
+   "lat": 4.603195,
+   "lng": -74.070646,
+   "place_id": "ChIJjZFO3KOZP44RGrQvYhn4xqU",
+   "rating": 4.6
+  },
+  "Son Havana": {
+   "lat": 4.656186,
+   "lng": -74.059644,
+   "place_id": "ChIJS49bqkSaP44RKn0-65lhU1E",
+   "rating": 4.7
+  },
+  "Cinemateca de Bogotá": {
+   "lat": 4.603161,
+   "lng": -74.067672,
+   "place_id": "ChIJyYha0JiZP44RbZ0OS7z22do",
+   "rating": 4.8
+  },
+  "Museo de Arte Moderno de Bogotá (MAMBO)": {
+   "lat": 4.610405,
+   "lng": -74.069274,
+   "place_id": "ChIJMZ9WEZmZP44Rd9Enj8ETJSI",
+   "rating": 4.6
+  },
+  "Graffiti Tour La Candelaria": {
+   "lat": 4.601955,
+   "lng": -74.071947,
+   "place_id": "ChIJFcfrX2KZP44R0YPjFq3yE1A",
+   "rating": 5
+  },
+  "Media Torta": {
+   "lat": 4.600344,
+   "lng": -74.065917,
+   "place_id": "ChIJdyLLz6SZP44RiZXD2fYHdX4",
+   "rating": 4.6
+  },
+  "Clínica de Marly": {
+   "lat": 4.63671,
+   "lng": -74.065495,
+   "place_id": "ChIJj70-qDqaP44RPLoUPiijUbk",
+   "rating": 3.7
+  },
+  "Crepes & Waffles (Parque 93)": {
+   "lat": 4.677364,
+   "lng": -74.048268,
+   "place_id": "ChIJ8zXy6pGaP44RidpaK8PW7G4",
+   "rating": 4.6
+  },
+  "Juan Valdez Café (Zona G)": {
+   "lat": 4.667578,
+   "lng": -74.053322,
+   "place_id": "ChIJFaZSUiGbP44RHrX89DHNrjU",
+   "rating": 4.5
+  },
+  "Centro Comercial Atlantis Plaza": {
+   "lat": 4.666214,
+   "lng": -74.055611,
+   "place_id": "ChIJAZwshl-aP44RvavmGroSNFE",
+   "rating": 4.4
+  },
+  "Centro Comercial Titán Plaza": {
+   "lat": 4.694708,
+   "lng": -74.086188,
+   "place_id": "ChIJyTRGFCWbP44Ry7R4a62jOao",
+   "rating": 4.6
+  },
+  "Caballete y Berenjena": {
+   "lat": 4.69811,
+   "lng": -74.031412,
+   "place_id": "ChIJb1VLNaiaP44R1gb5INzTYoc"
+  },
+  "Pianta": {
+   "lat": 4.64221,
+   "lng": -74.061308,
+   "place_id": "ChIJqw0SruCbP44RPbVt5VIP34A",
+   "rating": 4.5
+  },
+  "Casa Lėlytė": {
+   "lat": 4.646521,
+   "lng": -74.05685,
+   "place_id": "ChIJYZPhg0CaP44R7dBM8LviB7A",
+   "rating": 4.6
+  },
+  "A Seis Manos": {
+   "lat": 4.60855,
+   "lng": -74.07135,
+   "place_id": "ChIJf57FM5-ZP44Ri3DTHRNPfYM",
+   "rating": 4.6
+  },
+  "Les Amis": {
+   "lat": 4.67189,
+   "lng": -74.055239,
+   "place_id": "ChIJ9zfRaK2aP44R5v0Vp4kiQhw",
+   "rating": 4.6
+  },
+  "Al Agua Patos": {
+   "lat": 4.690515,
+   "lng": -74.050822,
+   "place_id": "ChIJFeRy2L6aP44Rhgnw8-la-Mw",
+   "rating": 4.5
+  },
+  "Bogotá Coffee Roasters": {
+   "lat": 4.631826,
+   "lng": -74.072494,
+   "place_id": "ChIJFdKWCiyaP44R6bmq8ftqTXo",
+   "rating": 4.6
+  }
+ },
+ "revisar": {
+  "Leo Cocina y Cava": "Google lo ubica a 4.2 km del punto curado: ¿otra sede u otro lugar?",
+  "Oda": "El nombre en Google es «Cra. 6 #66»: posible lugar equivocado.; Las coordenadas curadas están a 9986 m de las de Google.",
+  "Club Colombia": "Google lo ubica a 3.6 km del punto curado: ¿otra sede u otro lugar?",
+  "Crepes & Waffles": "Google lo marca como cerrado permanentemente: sacarlo de la curación.; Las coordenadas curadas están a 396 m de las de Google.",
+  "Catación Pública": "Google lo ubica a 176.6 km del punto curado: ¿otra sede u otro lugar?",
+  "Amor Perfecto": "Google lo ubica a 5.6 km del punto curado: ¿otra sede u otro lugar?",
+  "Árbol del Pan": "El nombre en Google es «Café Amor Perfecto Chapinero Alto»: posible lugar equivocado.; Las coordenadas curadas están a 312 m de las de Google.",
+  "Chorro de Quevedo": "El nombre en Google es «Cl. 12B #200»: posible lugar equivocado.",
+  "Tour de grafiti por La Candelaria": "El nombre en Google es «Capital Graffiti Tours»: posible lugar equivocado.",
+  "Quebrada La Vieja (senderismo)": "Google no devolvió ficha: puede haber cerrado o cambiado de nombre.",
+  "Parque Nacional Enrique Olaya Herrera": "Google no devolvió ficha: puede haber cerrado o cambiado de nombre.",
+  "Ciclovía dominical": "Google no devolvió ficha: puede haber cerrado o cambiado de nombre.",
+  "Gordo": "Google lo ubica a 9.3 km del punto curado: ¿otra sede u otro lugar?",
+  "Misia": "El nombre en Google es «Holiday Inn Express & Suites Bogota DC, an IHG Hotel»: posible lugar equivocado.; Las coordenadas curadas están a 524 m de las de Google.",
+  "Varietale": "Google lo ubica a 3.1 km del punto curado: ¿otra sede u otro lugar?",
+  "Devoción": "El nombre en Google es «Cra. 6 #6625»: posible lugar equivocado.; Las coordenadas curadas están a 852 m de las de Google.",
+  "Arte y Pasión Café": "Google lo ubica a 4.6 km del punto curado: ¿otra sede u otro lugar?",
+  "Iglesia de San Francisco": "Google lo ubica a 9.5 km del punto curado: ¿otra sede u otro lugar?",
+  "Casa de Nariño": "El nombre en Google es «Presidencia de la República de Colombia»: posible lugar equivocado.",
+  "Mirador de La Calera": "Google lo ubica a 3.4 km del punto curado: ¿otra sede u otro lugar?",
+  "Abasto": "El nombre en Google es «Arrieros Usaquen»: posible lugar equivocado.",
+  "Fundación Cardioinfantil": "El nombre en Google es «LaCardio»: posible lugar equivocado.; Las coordenadas curadas están a 1219 m de las de Google.",
+  "Tábula": "Google lo ubica a 4.6 km del punto curado: ¿otra sede u otro lugar?",
+  "Donostiarra": "El nombre en Google es «Cra. 5 #67-23»: posible lugar equivocado.",
+  "El Corral (Zona T)": "Google lo ubica a 3.4 km del punto curado: ¿otra sede u otro lugar?"
+ }
+}
