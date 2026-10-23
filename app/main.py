@@ -285,6 +285,9 @@ class PushSubIn(BaseModel):
 class SignupIn(BaseModel):
     email: str
     password: str
+    nombre: str = ""
+    telefono: str = ""   # con código de país, ej. "+57 300 123 4567"; único por cuenta
+    pais: str = ""
 
 
 class LoginIn(BaseModel):
@@ -313,10 +316,29 @@ def signup(body: SignupIn, request: Request):
     if not ok:
         raise HTTPException(400, msg)
     if auth.get_user_by_email(email):
-        raise HTTPException(409, "Ese email ya está registrado. Inicia sesión.")
+        raise HTTPException(409, {"error": "email_exists",
+                                  "mensaje": "Ese email ya está registrado. Inicia sesión."})
+    nombre = body.nombre.strip()
+    if body.nombre and len(nombre) < 2:
+        raise HTTPException(400, "Escribe tu nombre.")
+    telefono = ""
+    if body.telefono.strip():
+        telefono = auth.normalize_phone(body.telefono)
+        if not telefono:
+            raise HTTPException(400, "Celular inválido. Incluye el código de país.")
+        if auth.get_user_by_phone(telefono):
+            raise HTTPException(409, {"error": "phone_exists",
+                                      "mensaje": "Ese celular ya tiene una cuenta. Inicia sesión."})
 
     auth.record_signup_attempt(ip)
-    user = auth.create_user(email, body.password, ip=ip)
+    try:
+        user = auth.create_user(email, body.password, ip=ip, nombre=nombre,
+                                telefono=telefono, pais=body.pais)
+    except ValueError as e:  # carrera: otro registro idéntico justo antes
+        code = "phone_exists" if "celular" in str(e) else "email_exists"
+        raise HTTPException(409, {"error": code, "mensaje": str(e)})
+    if nombre or telefono:
+        auth.set_profile(user["id"], {"nombre": nombre, "telefono": telefono})
     if not auth.verification_required():
         auth.mark_email_verified(user["id"])
         return {"ok": True, "email": email, "verificado": True, "mensaje": "Cuenta creada."}

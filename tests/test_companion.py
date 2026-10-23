@@ -924,3 +924,25 @@ def test_sin_verificacion_signup_y_login_directo(monkeypatch):
     assert r.status_code == 200 and r.json()["token"]
     H = {"Authorization": f"Bearer {r.json()['token']}"}
     assert client.get("/auth/me", headers=H).json()["email_verified"] is True
+
+
+def test_signup_guarda_datos_y_bloquea_celular_repetido(monkeypatch):
+    monkeypatch.setenv("REQUIRE_EMAIL_VERIFICATION", "0")
+    from app.main import app
+    client = TestClient(app)
+    body = {"email": "ana@example.com", "password": "supersecret", "nombre": "Ana Ruiz",
+            "telefono": "+57 300 123 4567", "pais": "Colombia"}
+    assert client.post("/auth/signup", json=body).status_code == 200
+    r = client.post("/auth/login", json={"email": "ana@example.com", "password": "supersecret"})
+    H = {"Authorization": f"Bearer {r.json()['token']}"}
+    perfil = client.get("/auth/me", headers=H).json()["perfil"]
+    assert perfil["nombre"] == "Ana Ruiz" and perfil["telefono"] == "+573001234567"
+    # mismo email -> 409 email_exists
+    r = client.post("/auth/signup", json=body)
+    assert r.status_code == 409 and r.json()["detail"]["error"] == "email_exists"
+    # otro email, mismo celular (distinto formato) -> 409 phone_exists
+    r = client.post("/auth/signup", json={**body, "email": "otra@example.com", "telefono": "+573001234567"})
+    assert r.status_code == 409 and r.json()["detail"]["error"] == "phone_exists"
+    # celular inválido / nombre muy corto -> 400
+    assert client.post("/auth/signup", json={**body, "email": "c@example.com", "telefono": "12"}).status_code == 400
+    assert client.post("/auth/signup", json={**body, "email": "d@example.com", "telefono": "+57 311 000 0000", "nombre": "A"}).status_code == 400

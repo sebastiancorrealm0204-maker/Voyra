@@ -48,6 +48,11 @@ CREATE TABLE IF NOT EXISTS users (
   -- Datos globales del viajero (JSON de texto): nombre, contacto de emergencia,
   -- alergias, preferencias, nº de pasaporte… Sirven en TODOS sus viajes.
   profile TEXT,
+  -- Datos del registro, visibles y filtrables en el Table Editor de Supabase.
+  -- `telefono` va normalizado (+573001234567) y es ÚNICO: un celular, una cuenta.
+  nombre TEXT,
+  telefono TEXT,
+  pais TEXT,
   -- Límites diarios POR USUARIO. NULL = usar el default del plan (env var).
   -- Un número aquí MANDA para ese usuario. Editable desde el Table Editor de
   -- Supabase: cambias el número, guardas, y aplica al instante sin redeploy.
@@ -90,7 +95,8 @@ def init_auth():
             # que es seguro de correr múltiples veces (no falla si ya existe).
             for col, decl in (("profile", "TEXT"), ("limit_maps", "INTEGER"),
                               ("limit_chat", "INTEGER"), ("limit_document", "INTEGER"),
-                              ("limit_scan", "INTEGER"), ("limit_trips", "INTEGER")):
+                              ("limit_scan", "INTEGER"), ("limit_trips", "INTEGER"),
+                              ("nombre", "TEXT"), ("telefono", "TEXT"), ("pais", "TEXT")):
                 c.execute(
                     f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} {decl}"
                 )
@@ -103,9 +109,12 @@ def init_auth():
             user_cols = {r["name"] for r in c.execute("PRAGMA table_info(users)").fetchall()}
             for col, decl in (("profile", "TEXT"), ("limit_maps", "INTEGER"),
                               ("limit_chat", "INTEGER"), ("limit_document", "INTEGER"),
-                              ("limit_scan", "INTEGER"), ("limit_trips", "INTEGER")):
+                              ("limit_scan", "INTEGER"), ("limit_trips", "INTEGER"),
+                              ("nombre", "TEXT"), ("telefono", "TEXT"), ("pais", "TEXT")):
                 if col not in user_cols:
                     c.execute(f"ALTER TABLE users ADD COLUMN {col} {decl}")
+        # Un celular, una cuenta. Los NULL no chocan entre sí (usuarios sin celular).
+        c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_telefono ON users(telefono)")
 
 
 # ── Hashing de contraseña ──
@@ -174,17 +183,39 @@ def get_user(user_id: str) -> dict | None:
     return dict(r) if r else None
 
 
-def create_user(email: str, password: str, ip: str = "") -> dict:
-    """Crea el usuario (sin verificar). Lanza ValueError si el email ya existe."""
+def normalize_phone(raw: str) -> str:
+    """Deja solo dígitos y un '+' inicial. '' si no tiene al menos 7 dígitos."""
+    raw = (raw or "").strip()
+    digits = re.sub(r"\D", "", raw)
+    if len(digits) < 7 or len(digits) > 15:
+        return ""
+    return ("+" if raw.startswith("+") else "") + digits
+
+
+def get_user_by_phone(phone: str) -> dict | None:
+    if not phone:
+        return None
+    with db.conn() as c:
+        r = c.execute("SELECT * FROM users WHERE telefono=?", (phone,)).fetchone()
+    return dict(r) if r else None
+
+
+def create_user(email: str, password: str, ip: str = "", nombre: str = "",
+                telefono: str = "", pais: str = "") -> dict:
+    """Crea el usuario (sin verificar). Lanza ValueError si el email o el celular ya existen.
+    `telefono` debe venir ya normalizado (normalize_phone) o vacío."""
     email = normalize_email(email)
     if get_user_by_email(email):
         raise ValueError("Ese email ya está registrado.")
+    if telefono and get_user_by_phone(telefono):
+        raise ValueError("Ese celular ya está registrado.")
     uid = db.new_id()
     with db.conn() as c:
         c.execute(
-            "INSERT INTO users (id, email, password_hash, email_verified, plan, created_at, signup_ip) "
-            "VALUES (?,?,?,?,?,?,?)",
-            (uid, email, _hash_password(password), 0, "free", time.time(), ip or ""),
+            "INSERT INTO users (id, email, password_hash, email_verified, plan, created_at, signup_ip, "
+            "nombre, telefono, pais) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (uid, email, _hash_password(password), 0, "free", time.time(), ip or "",
+             (nombre or "").strip() or None, telefono or None, (pais or "").strip() or None),
         )
     return get_user(uid)
 
