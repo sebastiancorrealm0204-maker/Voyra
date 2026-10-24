@@ -274,6 +274,46 @@ _GENERICAS = {"museo", "parque", "centro", "cerro", "plaza", "restaurante", "igl
               "calle", "avenida", "catedral", "torre", "zona", "bogota", "colombia"}
 
 
+# Palabras de lugares en los otros idiomas → su forma en español (los nombres curados están en español).
+# Así «museum of gold», «musée de l'or» o «Goldmuseum» llegan a «Museo del Oro».
+_A_ES = {
+    "museum": "museo", "musee": "museo", "museu": "museo", "museen": "museo",
+    "gold": "oro", "ouro": "oro", "goldmuseum": "museo oro",
+    "cathedral": "catedral", "cathedrale": "catedral", "kathedrale": "catedral", "cattedrale": "catedral",
+    "square": "plaza", "place": "plaza", "platz": "plaza", "piazza": "plaza", "praca": "plaza",
+    "park": "parque", "parc": "parque", "parco": "parque", "parkplatz": "parque",
+    "theater": "teatro", "theatre": "teatro", "theatro": "teatro", "teatre": "teatro",
+    "library": "biblioteca", "bibliotheque": "biblioteca", "bibliothek": "biblioteca", "biblioteque": "biblioteca",
+    "church": "iglesia", "eglise": "iglesia", "kirche": "iglesia", "chiesa": "iglesia", "igreja": "iglesia",
+    "market": "mercado", "marche": "mercado", "markt": "mercado", "mercato": "mercado",
+    "hill": "cerro", "mountain": "cerro", "colline": "cerro", "berg": "cerro", "monte": "cerro",
+    "garden": "jardin", "gardens": "jardin", "jardim": "jardin", "garten": "jardin", "giardino": "jardin",
+    "botanical": "botanico", "botanique": "botanico", "botanischer": "botanico", "botanico": "botanico",
+    "national": "nacional", "nationale": "nacional", "nazionale": "nacional",
+    "modern": "moderno", "moderne": "moderno", "moderna": "moderno",
+    "art": "arte", "kunst": "arte",
+    "flea": "pulgas", "puces": "pulgas", "floh": "pulgas",
+    "salt": "sal", "sel": "sal", "salz": "sal",
+    "old": "antiguo", "downtown": "centro", "center": "centro", "centre": "centro",
+    "mall": "centro comercial",
+}
+# Palabras vacías de cualquier idioma: no cuentan al comparar nombres.
+_VACIAS = {"de", "del", "la", "el", "los", "las", "of", "the", "des", "du", "le", "les", "l", "di", "da", "do", "das",
+           "der", "die", "den", "dem", "a", "al", "en", "in", "to", "and", "y", "e", "et", "und", "o", "um", "uma", "un", "une",
+           "ein", "eine", "il", "lo", "gli", "i", "mi", "my", "mon", "ma", "mein", "meu"}
+
+
+def _palabras_es(txt: str) -> set[str]:
+    """Palabras de contenido de un texto, con las de lugar traducidas al español y sin vacías."""
+    n = re.sub(r"\bl or\b", "oro", _norm(txt))  # «musée de l'or»
+    out: set[str] = set()
+    for w in n.split():
+        if w in _VACIAS:
+            continue
+        out.update(_A_ES.get(w, w).split())
+    return out - _VACIAS
+
+
 def detectar_destino(mensaje: str, lugares: list[dict]) -> dict | None:
     """Si el mensaje pide cómo llegar a un sitio que conocemos, devuelve el destino:
     {'tipo': 'aeropuerto'} | {'tipo': 'hotel'} | {'tipo': 'lugar', 'lat', 'lng', 'nombre'}. Si no, None.
@@ -282,6 +322,7 @@ def detectar_destino(mensaje: str, lugares: list[dict]) -> dict | None:
         return None
     n = _norm(mensaje)
     palabras = set(n.split())
+    msg_es = _palabras_es(mensaje)
     mejor, puntaje = None, 0
     for p in lugares:
         pn = _norm(re.sub(r"\(.*?\)", "", p.get("name", "")))  # «Usaquén (centro histórico)» → «usaquen»
@@ -293,6 +334,13 @@ def detectar_destino(mensaje: str, lugares: list[dict]) -> dict | None:
             score = 100 + len(pn)                       # nombre completo en el mensaje
         elif toks and toks <= palabras:
             score = 10 * len(toks) + len(pn) / 100      # todas sus palabras distintivas aparecen
+        if not score:
+            cont = _palabras_es(re.sub(r"\(.*?\)", "", p.get("name", "")))
+            comun = len(cont & msg_es)
+            if len(cont) >= 2 and comun == len(cont):
+                score = 50 + 10 * len(cont)             # «museum of gold» ⊇ {museo, oro}
+            elif comun >= 2 and (len(cont) - comun <= 1 or (len(cont) >= 4 and comun / len(cont) >= 0.4)):
+                score = 20 + 10 * comun                 # «salt cathedral» ≈ «Catedral de Sal de Zipaquirá»
         if score > puntaje:
             mejor, puntaje = p, score
     if mejor:

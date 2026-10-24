@@ -417,3 +417,26 @@ def test_errores_http_se_traducen_con_la_cabecera(monkeypatch):
     assert r.status_code == 404 and r.json()["detail"].startswith("[en] ")
     r = c.post("/trips/no-existe/chat", json={"message": "hola"}, headers=H)
     assert not r.json()["detail"].startswith("[")
+
+
+@pytest.mark.parametrize("msg,esperado", [
+    ("como ir al museum of gold", "Museo del Oro"),
+    ("how do I get to the Gold Museum", "Museo del Oro"),
+    ("comment aller au musée de l'or", "Museo del Oro"),
+    ("wie komme ich zum Goldmuseum", "Museo del Oro"),
+    ("como chegar ao museu do ouro", "Museo del Oro"),
+    ("how do I get to the Botero Museum", "Museo Botero"),
+    ("directions to Bolivar Square", "Plaza de Bolívar"),
+    ("how to get to the botanical garden", "Jardín Botánico José Celestino Mutis"),
+])
+def test_destinos_curados_se_reconocen_en_otros_idiomas(msg, esperado):
+    lugares = [{"name": n, "lat": 4.6, "lng": -74.07} for n in (
+        "Museo del Oro", "Museo Botero", "Museo Nacional de Colombia", "Plaza de Bolívar",
+        "Jardín Botánico José Celestino Mutis", "TransMilenio — Estación Museo del Oro", "Parque El Virrey")]
+    d = t.detectar_destino(msg, lugares)
+    assert d and d["nombre"] == esperado
+
+
+def test_una_palabra_generica_sola_no_es_un_destino():
+    lugares = [{"name": "Museo del Oro", "lat": 4.6, "lng": -74.07}, {"name": "Museo Botero", "lat": 4.6, "lng": -74.07}]
+    assert t.detectar_destino("how do I get to the museum", lugares) is None
