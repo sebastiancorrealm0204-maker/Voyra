@@ -18,7 +18,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
-from . import (ciudades, city_knowledge, context, db, engine, geo, llm, memoria, net, places_live, push, scheduler,
+from . import (transporte as transporte_mod, ciudades, city_knowledge, context, db, engine, geo, llm, memoria, net, places_live, push, scheduler,
                search, seed_data, verificacion, watchers, auth, limits, email_send, social_enrich,
                waitlist)
 
@@ -807,6 +807,57 @@ def nearby_chain(tid: str, q: str, orig_lat: float | None = None,
             "nota": None if resultados else (
                 "No encontré nada cerca." if places_live.disponible()
                 else "Búsqueda en vivo no configurada (falta GOOGLE_MAPS_API_KEY).")}
+
+
+class TransporteIn(BaseModel):
+    destino: str | None = None        # "hotel" | "aeropuerto" | nombre de un lugar curado
+    nombre: str | None = None         # nombre a mostrar si se manda lat/lng
+    lat: float | None = None
+    lng: float | None = None
+    origen_lat: float | None = None   # GPS del teléfono; si falta, se usa la ubicación guardada del viaje
+    origen_lng: float | None = None
+    salida_min: int = 0               # en cuántos minutos sale (0 = ahora)
+
+
+@app.post("/trips/{tid}/transporte")
+def transporte(tid: str, body: TransporteIn, user: dict = Depends(verified_user)):
+    """Cómo llegar: taxi (con el trancón), TransMilenio/SITP y a pie, con una recomendación.
+    Sin Routes API responde en modo demo (`fuente: "demo"`); con ella, usa tráfico real."""
+    trip = own_trip(tid, user)
+    # ── destino
+    clave = (body.destino or "").strip().lower()
+    if body.lat is not None and body.lng is not None:
+        dest = (body.lat, body.lng, body.nombre or body.destino or "")
+    elif clave == "hotel":
+        if trip.get("lat_hotel") is None or trip.get("lng_hotel") is None:
+            raise HTTPException(404, {"error": "hotel_sin_ubicacion",
+                                      "mensaje": "Aún no ubico tu hotel en el mapa."})
+        dest = (trip["lat_hotel"], trip["lng_hotel"], trip.get("hotel") or "Hotel")
+    elif clave == "aeropuerto":
+        dest = transporte_mod.AEROPUERTO
+    else:
+        lugar = transporte_mod.buscar_lugar(body.destino or "", db.places_for_city(trip.get("ciudad") or "Bogotá"))
+        if not lugar:
+            raise HTTPException(404, {"error": "destino_no_encontrado",
+                                      "mensaje": "No encontré ese destino. Elige uno de la lista."})
+        dest = (float(lugar["lat"]), float(lugar["lng"]), lugar["name"])
+    # ── origen: GPS del teléfono > ubicación guardada > hotel/zona conocida
+    olat, olng = body.origen_lat, body.origen_lng
+    if olat is None or olng is None:
+        olat, olng = trip.get("lat_actual"), trip.get("lng_actual")
+    if olat is None or olng is None:
+        coords = geo.resolve_origin(trip)
+        if coords:
+            olat, olng = coords
+    if olat is None or olng is None:
+        raise HTTPException(422, {"error": "sin_origen",
+                                  "mensaje": "No tengo tu ubicación. Comparte tu GPS o elige tu zona."})
+    # Solo gastamos cuota si de verdad vamos a pegarle a Google (hay key).
+    if transporte_mod.disponible():
+        _consume_or_429(user, "maps")
+    out = transporte_mod.rutas((float(olat), float(olng), trip.get("zona_actual") or ""), dest, body.salida_min)
+    out["restante_maps"] = limits.remaining(user["id"], "maps")
+    return out
 
 
 @app.get("/trips/{tid}/airport")
