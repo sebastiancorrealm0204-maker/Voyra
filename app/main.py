@@ -854,7 +854,7 @@ def _origen_del_viaje(trip: dict, lat: float | None = None, lng: float | None = 
 
 
 def _bloque_rutas(trip: dict, user: dict, mensaje: str) -> tuple[str, dict | None]:
-    """Si el mensaje pide cómo llegar a un sitio (curado o cualquiera que Google encuentre), trae la ruta REAL.
+    """Si el mensaje pide cómo llegar a un lugar CURADO (o al hotel / aeropuerto), trae la ruta REAL.
     Devuelve (bloque para el prompt, ruta para pintar la tarjeta «Cómo llegar» en el chat). Cualquier fallo
     (sin Routes, sin cuota, sin ubicación) degrada a lo que se pueda y el chat sigue normal."""
     if (trip.get("ciudad") or "Bogotá") != "Bogotá":
@@ -870,13 +870,13 @@ def _bloque_rutas(trip: dict, user: dict, mensaje: str) -> tuple[str, dict | Non
     try:
         d = transporte_mod.detectar_destino(mensaje, db.places_for_city(trip.get("ciudad") or "Bogotá"))
         if not d:
-            libre = transporte_mod.destino_libre(mensaje)  # «quiero ir a la Universidad Javeriana»
-            g = transporte_mod.geocodificar_lugar(libre, trip.get("ciudad") or "Bogotá") if libre else None
-            if g:
-                d = {"tipo": "lugar", **g}
-            elif libre:
-                return ("RUTAS: el usuario quiere llegar a «%s» pero no lo ubico con certeza. Pídele la dirección o "
-                        "el barrio exacto; no inventes la ruta." % libre), None
+            libre = transporte_mod.destino_libre(mensaje)
+            if libre:
+                # Solo damos ruta a lugares de nuestra curación (más hotel y aeropuerto): ese es el valor de Voyra.
+                return ("RUTAS: el usuario pregunta cómo llegar a «%s», que NO está en nuestra curación. No calcules ni "
+                        "inventes la ruta ni tiempos. Dile con naturalidad que ahí no te metes, y ofrécele 1-2 lugares "
+                        "CURADOS parecidos o cercanos a su zona (de los que tienes en LUGARES) con los que sí puedes ayudarle "
+                        "a llegar." % libre), None
         if not d:
             return alerta, None
         if d["tipo"] == "aeropuerto":

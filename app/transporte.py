@@ -304,7 +304,8 @@ def detectar_destino(mensaje: str, lugares: list[dict]) -> dict | None:
     return None
 
 
-# ── destino «libre»: un sitio que NO está en la lista curada («quiero ir a la Universidad Javeriana») ──
+# ── destino «libre»: el usuario nombra un sitio que NO está en nuestra curación. No se calcula ruta (el valor de
+#    Voyra es recomendar lugares curados): solo se detecta para que el Companion lo diga y ofrezca alternativas. ──
 _DESTINO_LIBRE = re.compile(
     r"(?:\b(?:ir|llegar|llego|voy|vamos|iré|quiero ir|quiero llegar)\s+(?:a la|a los|a las|al|a|hasta|hacia|para)\s+"
     r"|\b(?:go to|get to|going to|get me to|take me to|travel to|to the|directions to|route to)\s+"
@@ -332,43 +333,6 @@ def destino_libre(mensaje: str) -> str | None:
     if len(re.sub(r"[^A-Za-zÁ-ú]", "", d)) < 3 or n in _NO_LUGAR or n.split()[0] in ("mi", "my", "mon", "ma", "mein", "meu", "minha", "il"):
         return None  # «mi casa», «my place»: no sabemos dónde es
     return d
-
-
-_cache_geo = net.TTLCache(ttl_s=24 * 3600, maxsize=512)
-_SIN = object()
-
-
-def geocodificar_lugar(texto: str, ciudad: str = "Bogotá") -> dict | None:
-    """Busca un sitio por nombre con Google Places (sesgado a la ciudad). {'lat','lng','nombre'} o None."""
-    if not API_KEY or not texto.strip():
-        return None
-    ck = f"{ciudad}|{texto}".lower()
-    hit = _cache_geo.get(ck, _SIN)
-    if hit is not _SIN:
-        return dict(hit) if hit else None
-    try:
-        r = net.request(
-            "POST", "https://places.googleapis.com/v1/places:searchText", retries=1, timeout=8,
-            headers={"Content-Type": "application/json", "X-Goog-Api-Key": API_KEY,
-                     "X-Goog-FieldMask": "places.displayName,places.location,places.formattedAddress"},
-            json={"textQuery": f"{texto}, {ciudad}", "languageCode": "es", "maxResultCount": 1,
-                  "locationBias": {"circle": {"center": {"latitude": 4.65, "longitude": -74.08}, "radius": 25000.0}}})
-        pl = (r.json().get("places") or []) if r.status_code == 200 else []
-    except Exception as e:
-        log.warning("geocodificar_lugar_fallo error=%s", type(e).__name__)
-        return None
-    if not pl:
-        _cache_geo.set(ck, None)
-        return None
-    loc = pl[0]["location"]
-    out = {"lat": float(loc["latitude"]), "lng": float(loc["longitude"]),
-           "nombre": (pl[0].get("displayName") or {}).get("text") or texto}
-    # Un resultado fuera del área de Bogotá no sirve para «cómo llego»: lo descartamos.
-    if geo.haversine_km(4.65, -74.08, out["lat"], out["lng"]) > 60:
-        _cache_geo.set(ck, None)
-        return None
-    _cache_geo.set(ck, out)
-    return dict(out)
 
 
 _MOTIVOS = {

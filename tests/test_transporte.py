@@ -378,20 +378,24 @@ def _ruta_falsa(destino):
     }
 
 
-def test_chat_devuelve_la_tarjeta_de_ruta_tambien_para_lugares_no_curados(monkeypatch):
+def test_chat_da_tarjeta_solo_para_lugares_curados(monkeypatch):
     from app import llm
     monkeypatch.setattr(t, "API_KEY", "x")
-    monkeypatch.setattr(llm, "chat", lambda system, history: "ok")
-    monkeypatch.setattr(t, "geocodificar_lugar", lambda txt, ciudad="Bogotá": {"lat": 4.63, "lng": -74.06, "nombre": "Pontificia Universidad Javeriana"})
+    capturado = {}
+    monkeypatch.setattr(llm, "chat", lambda system, history: capturado.__setitem__("system", system) or "ok")
     monkeypatch.setattr(t, "rutas", lambda o, d, s=0: _ruta_falsa(d[2]))
     c, H = _cliente()
     tid = c.post("/trips", json={"ciudad": "Bogotá", "hotel": "H", "zona_actual": "Zona G"}, headers=H).json()["trip_id"]
-    r = c.post(f"/trips/{tid}/chat", json={"message": "quiero ir a la Universidad Javeriana"}, headers=H)
+    # curado → tarjeta
+    r = c.post(f"/trips/{tid}/chat", json={"message": "¿Cómo llego al Museo del Oro?"}, headers=H)
     assert r.status_code == 200, r.text
-    assert r.json()["ruta"]["destino"]["nombre"] == "Pontificia Universidad Javeriana"
-    # una charla normal no trae tarjeta
-    r = c.post(f"/trips/{tid}/chat", json={"message": "recomiéndame un café"}, headers=H)
+    assert r.json()["ruta"]["destino"]["nombre"] == "Museo del Oro"
+    # fuera de la curación → sin tarjeta, sin ruta, y el Companion recibe la instrucción de ofrecer curados
+    r = c.post(f"/trips/{tid}/chat", json={"message": "quiero ir a la Universidad Javeriana"}, headers=H)
     assert r.json()["ruta"] is None
+    assert "NO está en nuestra curación" in capturado["system"] and "Universidad Javeriana" in capturado["system"]
+    # charla normal → sin tarjeta
+    assert c.post(f"/trips/{tid}/chat", json={"message": "recomiéndame un café"}, headers=H).json()["ruta"] is None
 
 
 def test_la_cabecera_de_idioma_alinea_el_viaje_y_el_companion(monkeypatch):
