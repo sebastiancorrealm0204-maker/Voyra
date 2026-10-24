@@ -330,3 +330,35 @@ def test_endpoint_del_termometro_pide_sesion_y_responde(monkeypatch):
     c, H = _cliente()
     r = c.get("/transporte/trafico", headers=H)
     assert r.status_code == 200 and r.json()["disponible"] is False
+
+
+# ─────────────────────────── alertas de movilidad ───────────────────────────
+def test_filtrar_alertas_deja_solo_movilidad_en_bogota():
+    crudos = [
+        {"title": "Paro de transportadores bloquea la Autopista Norte en Bogotá", "content": "Hoy hay bloqueos en Bogotá.", "url": "u1", "fecha": "2026-10-23T10:00:00Z"},
+        {"title": "Marcha en Medellín por la paz", "content": "Manifestación en Medellín", "url": "u2"},
+        {"title": "Receta de ajiaco bogotano", "content": "El mejor ajiaco de Bogotá", "url": "u3"},
+        {"title": "Paro de transportadores bloquea la Autopista Norte en Bogotá", "content": "duplicado", "url": "u1"},
+        {"title": "TransMilenio cerrará estaciones por marcha", "content": "Marcha en el centro de Bogotá", "url": "u4"},
+    ]
+    r = t.filtrar_alertas(crudos)
+    assert [a["url"] for a in r] == ["u1", "u4"]
+    assert r[0]["fecha"] == "2026-10-23"
+
+
+def test_alertas_sin_tavily_no_inventa(monkeypatch):
+    from app import search
+    monkeypatch.setattr(search, "MODE", "mock")
+    assert t.alertas() == {"disponible": False, "alertas": []}
+
+
+def test_bloque_alertas_vacio_y_con_datos():
+    assert t.bloque_alertas({"alertas": []}) == ""
+    b = t.bloque_alertas({"alertas": [{"titulo": "Paro en la Norte", "fecha": "2026-10-23"}]})
+    assert "Paro en la Norte" in b and "cautela" in b
+
+
+def test_pregunta_movilidad_detecta_paro_en_varios_idiomas():
+    for m in ["¿hay paro hoy?", "is there a strike today", "y la marcha de mañana", "how do I get to Usaquén"]:
+        assert t._PREGUNTA_MOVILIDAD.search(m), m
+    assert not t._PREGUNTA_MOVILIDAD.search("recomiéndame un café")

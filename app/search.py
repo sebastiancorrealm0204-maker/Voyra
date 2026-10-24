@@ -26,32 +26,32 @@ MODE = "real" if TAVILY_API_KEY else "mock"
 _cache = net.TTLCache(ttl_s=float(os.environ.get("SEARCH_CACHE_TTL_S", "1800")), maxsize=512)
 
 
-def search(query: str, max_results: int = 3, topic: str = "general") -> list[dict]:
+def search(query: str, max_results: int = 3, topic: str = "general", days: int | None = None) -> list[dict]:
     """Devuelve [{title, content, url}, ...]. Lista vacía en modo mock o si falla."""
     if MODE == "mock":
         return []
-    ck = (query.strip().lower(), topic, int(max_results))
+    ck = (query.strip().lower(), topic, int(max_results), days)
     cacheado = _cache.get(ck)
     if cacheado is not None:
         return [dict(r) for r in cacheado]
     try:
-        resp = net.request(
-            "POST", "https://api.tavily.com/search", retries=1,
-            json={
-                "api_key": TAVILY_API_KEY,
-                "query": query,
-                "topic": topic,  # "news" o "general"
-                "search_depth": "basic",
-                "max_results": max_results,
-                "include_answer": False,
-                "include_raw_content": False,
-            },
-            timeout=15,
-        )
+        cuerpo = {
+            "api_key": TAVILY_API_KEY,
+            "query": query,
+            "topic": topic,  # "news" o "general"
+            "search_depth": "basic",
+            "max_results": max_results,
+            "include_answer": False,
+            "include_raw_content": False,
+        }
+        if days and topic == "news":
+            cuerpo["days"] = int(days)  # solo noticias de los últimos N días
+        resp = net.request("POST", "https://api.tavily.com/search", retries=1, json=cuerpo, timeout=15)
         resp.raise_for_status()
         data = resp.json()
         out = [
-            {"title": r.get("title", ""), "content": r.get("content", ""), "url": r.get("url", "")}
+            {"title": r.get("title", ""), "content": r.get("content", ""), "url": r.get("url", ""),
+             "fecha": r.get("published_date") or ""}
             for r in data.get("results", [])
         ]
         _cache.set(ck, [dict(r) for r in out])

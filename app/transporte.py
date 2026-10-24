@@ -397,6 +397,72 @@ def trafico() -> dict:
         return res
 
 
+# ─────────────────────────── alertas de movilidad (paros, marchas, bloqueos) ───────────────────────────
+_CLAVE_MOVILIDAD = re.compile(
+    r"\b(paro|paros|marcha|marchas|manifestaci|protesta|bloqueo|bloqueos|plant[oó]n|disturbio|cierre|cierres|"
+    r"cerrad[ao]|desv[ií]o|transmilenio|sitp|trancon|trancón|movilidad|pico y placa)", re.I)
+_ES_BOGOTA = re.compile(r"bogot[aá]|transmilenio|sitp|distrito capital", re.I)
+_cache_alertas = net.TTLCache(ttl_s=float(os.environ.get("ALERTAS_TTL_S", "1800")), maxsize=2)
+_lock_alertas = threading.Lock()
+
+
+def filtrar_alertas(resultados: list[dict], max_n: int = 3) -> list[dict]:
+    """De los resultados de búsqueda deja solo lo que habla de movilidad EN Bogotá. Sin duplicados por URL/título."""
+    vistos, out = set(), []
+    for r in resultados:
+        titulo, cuerpo = (r.get("title") or "").strip(), (r.get("content") or "").strip()
+        texto = f"{titulo} {cuerpo}"
+        if not titulo or not _CLAVE_MOVILIDAD.search(texto) or not _ES_BOGOTA.search(texto):
+            continue
+        k = (r.get("url") or titulo).lower()
+        if k in vistos:
+            continue
+        vistos.add(k)
+        out.append({"titulo": titulo[:140], "resumen": cuerpo[:220].rstrip(), "url": r.get("url", ""),
+                    "fecha": (r.get("fecha") or "")[:10]})
+        if len(out) >= max_n:
+            break
+    return out
+
+
+def alertas() -> dict:
+    """Paros, marchas y cierres que afectan moverse por Bogotá en los últimos 2 días (Tavily, noticias).
+    Una sola búsqueda compartida por todos los viajeros, cacheada ALERTAS_TTL_S (30 min). Sin Tavily: lista vacía."""
+    from . import search
+    if search.MODE == "mock":
+        return {"disponible": False, "alertas": []}
+    hit = _cache_alertas.get("a")
+    if hit is not None:
+        return hit
+    with _lock_alertas:
+        hit = _cache_alertas.get("a")
+        if hit is not None:
+            return hit
+        crudos = search.search("Bogotá paro marcha manifestación bloqueo cierre vías TransMilenio hoy",
+                               max_results=8, topic="news", days=2)
+        res = {"disponible": True, "actualizado": datetime.datetime.now(TZ).isoformat(timespec="minutes"),
+               "alertas": filtrar_alertas(crudos)}
+        _cache_alertas.set("a", res)
+        return res
+
+
+_PREGUNTA_MOVILIDAD = re.compile(
+    r"\b(paro|marcha|manifestaci|protesta|bloqueo|plant[oó]n|strike|protest|demonstration|gr[eè]ve|streik|sciopero|"
+    r"transmilenio|trancon|trancón|tr[aá]fico|traffic|how do i get|c[oó]mo llego|como chego|comment aller|wie komme)", re.I)
+
+
+def bloque_alertas(a: dict) -> str:
+    """Alertas para el prompt del Companion (solo si hay). Son titulares de prensa: se citan como tal, sin exagerar."""
+    if not a.get("alertas"):
+        return ""
+    L = ["ALERTAS DE MOVILIDAD EN BOGOTÁ (titulares de prensa de los últimos 2 días; pueden no afectar la ruta del usuario):"]
+    for x in a["alertas"]:
+        L.append(f"- {x['titulo']}" + (f" ({x['fecha']})" if x["fecha"] else ""))
+    L.append("REGLA: si el usuario va a moverse o pregunta por paros/tráfico, menciónalo brevemente y con cautela "
+             "(«según prensa de hoy…»), sugiere confirmar antes de salir. No lo menciones si no es relevante a su pregunta.")
+    return "\n".join(L)
+
+
 # ─────────────────────────── modo demo (sin Routes API) ───────────────────────────
 def _opciones_demo(o, d, ahora: datetime.datetime) -> dict:
     """Estimaciones por distancia, para probar la pantalla sin la API. NO inventa líneas ni estaciones."""

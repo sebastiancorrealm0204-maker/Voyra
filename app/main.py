@@ -823,12 +823,20 @@ def _origen_del_viaje(trip: dict, lat: float | None = None, lng: float | None = 
 def _bloque_rutas(trip: dict, user: dict, mensaje: str) -> str:
     """Si el mensaje pide cómo llegar a un sitio conocido, trae la ruta REAL y la devuelve como bloque para el
     prompt. Cualquier fallo (sin Routes, sin cuota, sin ubicación) devuelve "" y el chat sigue normal."""
-    if not transporte_mod.disponible():
+    if (trip.get("ciudad") or "Bogotá") != "Bogotá":
         return ""
+    alerta = ""
+    try:
+        if transporte_mod._PREGUNTA_MOVILIDAD.search(mensaje):
+            alerta = transporte_mod.bloque_alertas(transporte_mod.alertas())
+    except Exception as e:
+        log.warning("alertas_error error=%s", type(e).__name__)
+    if not transporte_mod.disponible():
+        return alerta
     try:
         d = transporte_mod.detectar_destino(mensaje, db.places_for_city(trip.get("ciudad") or "Bogotá"))
         if not d:
-            return ""
+            return alerta
         if d["tipo"] == "aeropuerto":
             dest = transporte_mod.AEROPUERTO
         elif d["tipo"] == "hotel":
@@ -839,21 +847,28 @@ def _bloque_rutas(trip: dict, user: dict, mensaje: str) -> str:
             dest = (d["lat"], d["lng"], d["nombre"])
         olat, olng = _origen_del_viaje(trip)
         if olat is None or olng is None:
-            return ""
+            return alerta
         limits.check_and_consume(user["id"], "maps")
         ruta = transporte_mod.rutas((float(olat), float(olng), trip.get("zona_actual") or ""), dest, 0)
-        return transporte_mod.bloque_chat(ruta) if ruta["fuente"] == "google" else ""
+        bloque = transporte_mod.bloque_chat(ruta) if ruta["fuente"] == "google" else ""
+        return "\n\n".join(x for x in (bloque, alerta) if x)
     except limits.QuotaError:
-        return ""
+        return alerta
     except Exception as e:  # una ruta fallida nunca rompe el chat
         log.warning("bloque_rutas_error error=%s", type(e).__name__)
-        return ""
+        return alerta
 
 
 @app.get("/transporte/trafico")
 def transporte_trafico(user: dict = Depends(current_user)):
     """Termómetro de tráfico de Bogotá (4 corredores). Medición compartida y cacheada (20 min)."""
     return transporte_mod.trafico()
+
+
+@app.get("/transporte/alertas")
+def transporte_alertas(user: dict = Depends(current_user)):
+    """Paros, marchas y cierres que afectan la movilidad en Bogotá (noticias de 2 días, cacheado 30 min)."""
+    return transporte_mod.alertas()
 
 
 class TransporteIn(BaseModel):
@@ -1270,6 +1285,7 @@ def health():
     cuerpo = {"status": "ok" if not degradado else "degraded",
             "db": db_estado, "scheduler": scheduler.running(), "llm_breakers": breakers,
             "llm_mode": llm.MODE, "search_mode": search.MODE,
+            "transporte": "google" if transporte_mod.disponible() else "demo",
             "push_enabled": push.enabled(), "places_live": places_live.MODE,
             "email_mode": email_send.mode(),
             "limits": {"free": limits.FREE_LIMITS,
