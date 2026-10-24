@@ -847,7 +847,9 @@ def _bloque_rutas(trip: dict, user: dict, mensaje: str) -> str:
             dest = (d["lat"], d["lng"], d["nombre"])
         olat, olng = _origen_del_viaje(trip)
         if olat is None or olng is None:
-            return alerta
+            sin_origen = ("RUTAS: el usuario pide cómo llegar pero NO tengo su ubicación. Pregúntale en qué zona o "
+                          "dirección está (o que comparta su ubicación) antes de dar tiempos; no inventes la ruta.")
+            return "\n\n".join(x for x in (sin_origen, alerta) if x)
         limits.check_and_consume(user["id"], "maps")
         ruta = transporte_mod.rutas((float(olat), float(olng), trip.get("zona_actual") or ""), dest, 0)
         bloque = transporte_mod.bloque_chat(ruta) if ruta["fuente"] == "google" else ""
