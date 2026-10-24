@@ -382,6 +382,12 @@ def score_event(system: str, source: str, payload: str, category: str,
         "coincide claramente, simplemente describe el lugar por lo que es, sin inventar nada. "
         "Inventar platos o afinidades destruye la confianza."
     )
+    idioma = ((extra or {}).get("_idioma") or "es").lower()
+    if idioma != "es":
+        from . import city_knowledge
+        prompt += (f"\nIDIOMA (CRÍTICO): escribe 'titulo', 'mensaje' y 'accion' en {city_knowledge.lang_name(idioma)}, "
+                   "NUNCA en español (conserva en español solo los nombres propios de lugares, platos y barrios). "
+                   "'razon' puede ir en español.")
     out = _parse_json(_call(SCORING_PROVIDER, system, [{"role": "user", "content": prompt}]))
     out["_mode"] = SCORING_PROVIDER
     return out

@@ -362,3 +362,54 @@ def test_pregunta_movilidad_detecta_paro_en_varios_idiomas():
     for m in ["¿hay paro hoy?", "is there a strike today", "y la marcha de mañana", "how do I get to Usaquén"]:
         assert t._PREGUNTA_MOVILIDAD.search(m), m
     assert not t._PREGUNTA_MOVILIDAD.search("recomiéndame un café")
+
+
+from app import traducir as _traducir  # noqa: E402
+
+
+# ───────────── integración: chat con tarjeta de ruta + idioma por cabecera ─────────────
+def _ruta_falsa(destino):
+    return {
+        "fuente": "google", "origen": {"nombre": "Zona T"}, "destino": {"nombre": destino},
+        "opciones": {"taxi": {"min": 40, "min_sin_trafico": 30, "km": 10.7, "precio": {"min": 25000, "max": 38000}}},
+        "trancon": {"nivel": "pesado", "ratio": 1.6, "extra_min": 14}, "hora_pico": False,
+        "recomendacion": {"modo": "taxi", "motivo": "taxi_mas_rapido"},
+        "enlaces": {"uber": "u", "maps_transporte": "m", "maps_caminar": "c"},
+    }
+
+
+def test_chat_devuelve_la_tarjeta_de_ruta_tambien_para_lugares_no_curados(monkeypatch):
+    from app import llm
+    monkeypatch.setattr(t, "API_KEY", "x")
+    monkeypatch.setattr(llm, "chat", lambda system, history: "ok")
+    monkeypatch.setattr(t, "geocodificar_lugar", lambda txt, ciudad="Bogotá": {"lat": 4.63, "lng": -74.06, "nombre": "Pontificia Universidad Javeriana"})
+    monkeypatch.setattr(t, "rutas", lambda o, d, s=0: _ruta_falsa(d[2]))
+    c, H = _cliente()
+    tid = c.post("/trips", json={"ciudad": "Bogotá", "hotel": "H", "zona_actual": "Zona G"}, headers=H).json()["trip_id"]
+    r = c.post(f"/trips/{tid}/chat", json={"message": "quiero ir a la Universidad Javeriana"}, headers=H)
+    assert r.status_code == 200, r.text
+    assert r.json()["ruta"]["destino"]["nombre"] == "Pontificia Universidad Javeriana"
+    # una charla normal no trae tarjeta
+    r = c.post(f"/trips/{tid}/chat", json={"message": "recomiéndame un café"}, headers=H)
+    assert r.json()["ruta"] is None
+
+
+def test_la_cabecera_de_idioma_alinea_el_viaje_y_el_companion(monkeypatch):
+    from app import llm
+    capturado = {}
+    monkeypatch.setattr(llm, "chat", lambda system, history: capturado.setdefault("system", system) and "ok")
+    c, H = _cliente()
+    tid = c.post("/trips", json={"ciudad": "Bogotá", "hotel": "H", "idioma": "es"}, headers=H).json()["trip_id"]
+    r = c.post(f"/trips/{tid}/chat", json={"message": "hola"}, headers={**H, "X-UI-Lang": "en"})
+    assert r.status_code == 200
+    assert "FINAL REMINDER" in capturado["system"] and "English" in capturado["system"]
+    assert c.get(f"/trips/{tid}", headers=H).json()["idioma"] == "en"
+
+
+def test_errores_http_se_traducen_con_la_cabecera(monkeypatch):
+    monkeypatch.setattr(_traducir, "_llamar_llm", lambda textos, lang: [f"[{lang}] {x}" for x in textos])
+    c, H = _cliente()
+    r = c.post("/trips/no-existe/chat", json={"message": "hola"}, headers={**H, "X-UI-Lang": "en"})
+    assert r.status_code == 404 and r.json()["detail"].startswith("[en] ")
+    r = c.post("/trips/no-existe/chat", json={"message": "hola"}, headers=H)
+    assert not r.json()["detail"].startswith("[")

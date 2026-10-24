@@ -119,7 +119,10 @@ def ingest(trip_id: str, source: str, category: str, operational: bool, payload:
         })
         return {"decision_id": did, "filter": filtro, "score": None, "decision": decision, "notification": None}
 
-    r = _score(lambda: context.build(trip), source, payload, category, operational, extra)
+    # El idioma del viaje viaja aparte (clave privada, no se persiste en la notificación): el título y el mensaje
+    # de la señal deben salir en el idioma del usuario, no en el del prompt.
+    r = _score(lambda: context.build(trip), source, payload, category, operational,
+               {**(extra or {}), "_idioma": (trip.get("idioma") or "es").lower()})
     score = max(int(r["score"]), 90) if operational else int(r["score"])
     decision = "push" if score >= 70 else "feed" if score >= 40 else "silence"
     if decision == "push" and not operational and db.user_active_within(trip_id, EN_APP_MINUTOS):

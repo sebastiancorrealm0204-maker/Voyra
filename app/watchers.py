@@ -143,7 +143,8 @@ def _texto_checkin(trip: dict, instruccion: str, tipo: str) -> str:
         return llm.chat(context.build(trip), history)
     except Exception as e:
         log.warning("checkin_fallback tipo=%s trip=%s error=%s", tipo, trip["id"], type(e).__name__)
-        return _CHECKIN_FALLBACK[tipo]
+        from . import traducir
+        return traducir.traducir([_CHECKIN_FALLBACK[tipo]], trip.get("idioma") or "es")[0]
 
 
 def check_in(trip_id: str) -> dict:

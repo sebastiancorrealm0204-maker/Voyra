@@ -17,10 +17,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
+from starlette.concurrency import run_in_threadpool
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import (transporte as transporte_mod, ciudades, city_knowledge, context, db, engine, geo, llm, memoria, net, places_live, push, scheduler,
                search, seed_data, verificacion, watchers, auth, limits, email_send, social_enrich,
-               waitlist)
+               waitlist, traducir)
 
 # Logging estructurado (clave=valor) en un solo formato para toda la app. Railway
 # captura stdout; LOG_LEVEL=DEBUG para depurar.
@@ -91,6 +93,7 @@ async def _log_requests(request: Request, call_next):
     """Log por request (método, ruta, status, duración) + X-Request-ID para
     poder cruzar un error del front con la línea del log."""
     rid = request.headers.get("x-request-id") or uuid.uuid4().hex[:12]
+    traducir.fijar_ui_lang(request.headers.get("x-ui-lang"))  # idioma de la interfaz de ESTE request
     t0 = time.perf_counter()
     response = await call_next(request)
     dur_ms = (time.perf_counter() - t0) * 1000
@@ -108,6 +111,24 @@ def _es_db_saturada(exc: Exception) -> bool:
         return True
     import sqlite3
     return isinstance(exc, sqlite3.OperationalError) and "locked" in str(exc).lower()
+
+
+@app.exception_handler(StarletteHTTPException)
+async def _http_traducido(request: Request, exc: StarletteHTTPException):
+    """Errores HTTP con el mensaje en el idioma de la interfaz (los textos están en español en todo el backend).
+    Los códigos (`error`) y el status no cambian; solo se traduce el texto que ve el usuario. Fail-safe: si la
+    traducción falla, sale el original."""
+    detail = exc.detail
+    lang = traducir.ui_lang()
+    if lang and lang != "es":
+        try:
+            if isinstance(detail, str):
+                detail = (await run_in_threadpool(traducir.traducir, [detail], lang))[0]
+            elif isinstance(detail, dict) and isinstance(detail.get("mensaje"), str):
+                detail = {**detail, "mensaje": (await run_in_threadpool(traducir.traducir, [detail["mensaje"]], lang))[0]}
+        except Exception:
+            log.warning("http_traduccion_fallo path=%s", request.url.path)
+    return JSONResponse({"detail": detail}, status_code=exc.status_code, headers=getattr(exc, "headers", None))
 
 
 @app.exception_handler(Exception)
@@ -177,6 +198,15 @@ def own_trip(tid: str, user: dict) -> dict:
     # Trips legacy sin dueño: se permiten (compat con datos previos a auth).
     if owner is not None and owner != user["id"]:
         raise HTTPException(403, "Este viaje no es tuyo.")
+    # Idioma único: si la interfaz está en otro idioma que el viaje, el viaje se alinea (Companion, notificaciones,
+    # voz y pantallas hablan lo mismo). No depende de que el cliente haya alcanzado a hacer un PATCH aparte.
+    ui = traducir.ui_lang()
+    if ui and ui != (trip.get("idioma") or "es"):
+        try:
+            db.update_trip(tid, {"idioma": ui})
+            trip = {**trip, "idioma": ui}
+        except Exception:
+            log.warning("sync_idioma_fallo trip=%s", tid)
     return trip
 
 
@@ -772,8 +802,11 @@ def scan(tid: str, user: dict = Depends(verified_user)):
 def nearby(tid: str, user: dict = Depends(current_user)):
     """Recomendaciones desde la base curada, rankeadas por distancia real a zona_actual.
     Usa SOLO la curación local (sin costo de API), así que no consume cuota."""
-    own_trip(tid, user)
-    return watchers.nearby_recommendations(tid)
+    trip = own_trip(tid, user)
+    out = watchers.nearby_recommendations(tid)
+    if out.get("nota"):
+        out = {**out, "nota": traducir.traducir([out["nota"]], trip.get("idioma") or "es")[0]}
+    return out
 
 
 @app.get("/trips/{tid}/nearby-chain")
@@ -820,11 +853,12 @@ def _origen_del_viaje(trip: dict, lat: float | None = None, lng: float | None = 
     return lat, lng
 
 
-def _bloque_rutas(trip: dict, user: dict, mensaje: str) -> str:
-    """Si el mensaje pide cómo llegar a un sitio conocido, trae la ruta REAL y la devuelve como bloque para el
-    prompt. Cualquier fallo (sin Routes, sin cuota, sin ubicación) devuelve "" y el chat sigue normal."""
+def _bloque_rutas(trip: dict, user: dict, mensaje: str) -> tuple[str, dict | None]:
+    """Si el mensaje pide cómo llegar a un sitio (curado o cualquiera que Google encuentre), trae la ruta REAL.
+    Devuelve (bloque para el prompt, ruta para pintar la tarjeta «Cómo llegar» en el chat). Cualquier fallo
+    (sin Routes, sin cuota, sin ubicación) degrada a lo que se pueda y el chat sigue normal."""
     if (trip.get("ciudad") or "Bogotá") != "Bogotá":
-        return ""
+        return "", None
     alerta = ""
     try:
         if transporte_mod._PREGUNTA_MOVILIDAD.search(mensaje):
@@ -832,16 +866,24 @@ def _bloque_rutas(trip: dict, user: dict, mensaje: str) -> str:
     except Exception as e:
         log.warning("alertas_error error=%s", type(e).__name__)
     if not transporte_mod.disponible():
-        return alerta
+        return alerta, None
     try:
         d = transporte_mod.detectar_destino(mensaje, db.places_for_city(trip.get("ciudad") or "Bogotá"))
         if not d:
-            return alerta
+            libre = transporte_mod.destino_libre(mensaje)  # «quiero ir a la Universidad Javeriana»
+            g = transporte_mod.geocodificar_lugar(libre, trip.get("ciudad") or "Bogotá") if libre else None
+            if g:
+                d = {"tipo": "lugar", **g}
+            elif libre:
+                return ("RUTAS: el usuario quiere llegar a «%s» pero no lo ubico con certeza. Pídele la dirección o "
+                        "el barrio exacto; no inventes la ruta." % libre), None
+        if not d:
+            return alerta, None
         if d["tipo"] == "aeropuerto":
             dest = transporte_mod.AEROPUERTO
         elif d["tipo"] == "hotel":
             if trip.get("lat_hotel") is None or trip.get("lng_hotel") is None:
-                return ""
+                return "", None
             dest = (trip["lat_hotel"], trip["lng_hotel"], trip.get("hotel") or "Hotel")
         else:
             dest = (d["lat"], d["lng"], d["nombre"])
@@ -849,16 +891,17 @@ def _bloque_rutas(trip: dict, user: dict, mensaje: str) -> str:
         if olat is None or olng is None:
             sin_origen = ("RUTAS: el usuario pide cómo llegar pero NO tengo su ubicación. Pregúntale en qué zona o "
                           "dirección está (o que comparta su ubicación) antes de dar tiempos; no inventes la ruta.")
-            return "\n\n".join(x for x in (sin_origen, alerta) if x)
+            return "\n\n".join(x for x in (sin_origen, alerta) if x), None
         limits.check_and_consume(user["id"], "maps")
         ruta = transporte_mod.rutas((float(olat), float(olng), trip.get("zona_actual") or ""), dest, 0)
+        ruta["restante_maps"] = limits.remaining(user["id"], "maps")
         bloque = transporte_mod.bloque_chat(ruta) if ruta["fuente"] == "google" else ""
-        return "\n\n".join(x for x in (bloque, alerta) if x)
+        return "\n\n".join(x for x in (bloque, alerta) if x), ruta
     except limits.QuotaError:
-        return alerta
+        return alerta, None
     except Exception as e:  # una ruta fallida nunca rompe el chat
         log.warning("bloque_rutas_error error=%s", type(e).__name__)
-        return alerta
+        return alerta, None
 
 
 @app.get("/transporte/trafico")
@@ -867,10 +910,23 @@ def transporte_trafico(user: dict = Depends(current_user)):
     return transporte_mod.trafico()
 
 
+class TraducirIn(BaseModel):
+    textos: list[str] = Field(..., max_length=60)
+    idioma: str | None = None
+
+
+@app.post("/i18n/traducir")
+def i18n_traducir(body: TraducirIn, user: dict = Depends(current_user)):
+    """Traduce textos dinámicos (en español) al idioma de la interfaz. Caché global por frase: una vez traducida,
+    es gratis para todos. Si no hay LLM, devuelve el original."""
+    lang = (body.idioma or traducir.ui_lang() or "es").lower()
+    return {"idioma": lang, "textos": traducir.traducir([t[:1200] for t in body.textos], lang)}
+
+
 @app.get("/transporte/alertas")
 def transporte_alertas(user: dict = Depends(current_user)):
     """Paros, marchas y cierres que afectan la movilidad en Bogotá (noticias de 2 días, cacheado 30 min)."""
-    return transporte_mod.alertas()
+    return traducir.profundo(transporte_mod.alertas(), traducir.ui_lang(), omitir={"actualizado"})
 
 
 class TransporteIn(BaseModel):
@@ -923,8 +979,8 @@ def airport_arrival(tid: str, user: dict = Depends(current_user)):
     """Modo aeropuerto: timeline de llegada (migración → equipaje → salida) +
     opciones de transporte con tips anti-estafa, curado por aeropuerto y con
     tiempos en vivo si hay búsqueda configurada."""
-    own_trip(tid, user)
-    return watchers.airport_arrival(tid)
+    trip = own_trip(tid, user)
+    return traducir.profundo(watchers.airport_arrival(tid), trip.get("idioma") or "es")
 
 
 @app.get("/destinations/{city}/places")
@@ -1056,6 +1112,26 @@ def get_messages(tid: str, user: dict = Depends(current_user)):
     return {"messages": msgs}
 
 
+_TXT_CHAT = {
+    "demanda": {
+        "es": "Ahora mismo tengo mucha demanda y no alcancé a responderte. Dame unos segundos y reenvíame el mensaje.",
+        "en": "I'm getting a lot of requests right now and couldn't answer in time. Give me a few seconds and send your message again.",
+        "pt": "Estou com muita demanda agora e não consegui te responder a tempo. Me dê alguns segundos e reenvie a mensagem.",
+        "fr": "J'ai beaucoup de demandes en ce moment et je n'ai pas pu te répondre à temps. Laisse-moi quelques secondes et renvoie ton message.",
+        "de": "Gerade ist bei mir viel los und ich konnte nicht rechtzeitig antworten. Gib mir ein paar Sekunden und sende die Nachricht noch einmal.",
+        "it": "Ho molte richieste in questo momento e non sono riuscito a risponderti in tempo. Dammi qualche secondo e rimanda il messaggio.",
+    },
+    "conexion": {
+        "es": "Se me trabó la conexión un momento y no alcancé a procesar eso. Mándamelo de nuevo y lo retomo al instante.",
+        "en": "My connection hiccuped for a moment and I couldn't process that. Send it again and I'll pick it right back up.",
+        "pt": "Minha conexão travou por um instante e não consegui processar isso. Mande de novo e eu retomo na hora.",
+        "fr": "Ma connexion a eu un petit raté et je n'ai pas pu traiter ça. Renvoie-le-moi et je reprends tout de suite.",
+        "de": "Meine Verbindung hat kurz gehakt und ich konnte das nicht verarbeiten. Schick es noch einmal, dann mache ich sofort weiter.",
+        "it": "La connessione ha avuto un intoppo e non sono riuscito a elaborare. Rimandalo e riprendo subito.",
+    },
+}
+
+
 @app.post("/trips/{tid}/chat")
 def chat(tid: str, c: ChatIn, user: dict = Depends(verified_user)):
     trip = own_trip(tid, user)
@@ -1081,7 +1157,7 @@ def chat(tid: str, c: ChatIn, user: dict = Depends(verified_user)):
     # busca la cadena en Google. Antes era router → chat → extracción en serie
     # (hasta 3 llamadas LLM una tras otra); ahora el turno dura ~lo que la más
     # lenta de ellas.
-    rutas = "" if es_tap else _bloque_rutas(trip, user, c.message)
+    rutas, ruta_card = ("", None) if es_tap else _bloque_rutas(trip, user, c.message)
     system = context.build(trip, mensaje=c.message, memoria=memoria.bloque(user["id"], tid), rutas=rutas)
     fut_reply = _fanout.submit(llm.chat, system, history)
 
@@ -1108,12 +1184,10 @@ def chat(tid: str, c: ChatIn, user: dict = Depends(verified_user)):
     try:
         reply = fut_reply.result()
     except llm.RateLimited:
-        reply = ("Ahora mismo tengo mucha demanda y no alcancé a responderte. "
-                 "Dame unos segundos y reenvíame el mensaje.")
+        reply = _TXT_CHAT["demanda"].get(_idi, _TXT_CHAT["demanda"]["es"])
     except Exception as e:
         log.warning("chat_fallback trip=%s error=%s", tid, type(e).__name__)
-        reply = ("Se me trabó la conexión un momento y no alcancé a procesar eso. "
-                 "Mándamelo de nuevo y lo retomo al instante.")
+        reply = _TXT_CHAT["conexion"].get(_idi, _TXT_CHAT["conexion"]["es"])
     # Verificación que corrige: si la respuesta atribuye a un lugar curado algo
     # que su ficha no respalda (caso real: "Crepes & Waffles" + "bandeja paisa"),
     # se reescribe o recorta ANTES de guardarla y mostrarla. Se guarda la versión
@@ -1127,7 +1201,7 @@ def chat(tid: str, c: ChatIn, user: dict = Depends(verified_user)):
 
     return {"reply": reply, "planes_propuestos": propuestas, "chain_results": chain_results,
             "intencion": intencion, "restante_chat": limits.remaining(user["id"], "chat"),
-            "verificacion": verificacion_info}
+            "verificacion": verificacion_info, "ruta": ruta_card}
 
 
 def _resultado_o(fut, default, nombre: str):

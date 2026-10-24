@@ -262,6 +262,11 @@ CREATE TABLE IF NOT EXISTS webhook_events (
   trip_id TEXT NOT NULL,
   created_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS traducciones (
+  id TEXT PRIMARY KEY,          -- sha1(idioma|texto original): una frase se traduce una vez para todos
+  texto TEXT NOT NULL,
+  created_at REAL NOT NULL
+);
 """
 
 # Índices secundarios. Antes solo existían los de las PRIMARY KEY, así que cada
