@@ -52,26 +52,38 @@ def test_recomendacion(op, nivel, esperado):
 RUTA_TRANSITO = {
     "duration": "2400s",
     "legs": [{"steps": [
-        {"travelMode": "WALK", "staticDuration": "300s", "distanceMeters": 380},
+        {"travelMode": "WALK", "staticDuration": "180s", "distanceMeters": 250},
+        {"travelMode": "WALK", "staticDuration": "120s", "distanceMeters": 130},   # Google parte la caminata en pasos de esquina
         {"travelMode": "TRANSIT", "staticDuration": "1500s", "transitDetails": {
             "stopCount": 9, "stopDetails": {"departureStop": {"name": "Portal El Dorado"}, "arrivalStop": {"name": "Museo del Oro"}},
-            "transitLine": {"nameShort": "M86", "color": "#ff0000", "vehicle": {"type": "BUS", "name": {"text": "TransMilenio"}}}}},
+            "transitLine": {"nameShort": "M86", "color": "#ff0000", "agencies": [{"name": "Transmilenio-Dual"}],
+                            "vehicle": {"type": "BUS", "name": {"text": "Autobús"}}}}},
         {"travelMode": "TRANSIT", "staticDuration": "420s", "transitDetails": {
             "stopCount": 3, "stopDetails": {"departureStop": {"name": "Museo del Oro"}, "arrivalStop": {"name": "Las Aguas"}},
-            "transitLine": {"name": "B27", "vehicle": {"type": "BUS", "name": {"text": "SITP"}}}}},
-        {"travelMode": "WALK", "staticDuration": "180s", "distanceMeters": 200},
+            "transitLine": {"name": "B27", "agencies": [{"name": "Zonal-Urbano"}], "vehicle": {"type": "BUS", "name": {"text": "Autobús"}}}}},
+        {"travelMode": "WALK", "staticDuration": "100s", "distanceMeters": 120},
+        {"travelMode": "WALK", "staticDuration": "80s", "distanceMeters": 80},
     ]}],
 }
 
 
 def test_parseo_de_transito_de_google():
     r = t.parsear_transito(RUTA_TRANSITO)
-    assert r["min"] == 40 and r["transbordos"] == 1 and r["caminata_min"] == 8
+    assert r["min"] == 40 and r["transbordos"] == 1 and r["caminata_min"] == 8  # 180+120+100+80 s
     tipos = [p["tipo"] for p in r["pasos"]]
     assert tipos == ["caminar", "transporte", "transporte", "caminar"]
     bus = r["pasos"][1]
     assert bus["linea"] == "M86" and bus["vehiculo"] == "TransMilenio" and bus["desde"] == "Portal El Dorado"
     assert bus["hasta"] == "Museo del Oro" and bus["paradas"] == 9
+    assert r["pasos"][2]["vehiculo"] == "SITP"                      # Zonal-Urbano → SITP
+    assert r["pasos"][0] == {"tipo": "caminar", "min": 5, "metros": 380}   # los dos pasos de caminata, unidos
+    assert r["pasos"][3] == {"tipo": "caminar", "min": 3, "metros": 200}
+
+
+def test_etiqueta_de_agencia():
+    assert t.etiqueta_agencia(["Transmilenio-Dual"]) == "TransMilenio"
+    assert t.etiqueta_agencia(["Zonal-Urbano"]) == "SITP"
+    assert t.etiqueta_agencia(["Otra"], "Autobús") == "Autobús" and t.etiqueta_agencia([]) == ""
 
 
 def test_buscar_lugar_ignora_tildes_y_mayusculas():
@@ -88,6 +100,17 @@ DESTINO = (4.5981, -74.0758, "La Candelaria")
 @pytest.fixture(autouse=True)
 def _sin_cache():
     t._cache = t.net.TTLCache(ttl_s=300, maxsize=16)
+
+
+@pytest.fixture(autouse=True)
+def _db_temporal(tmp_path):
+    """Base de datos propia: sin esto, correr este archivo solo usaba voyra.db y chocaba con usuarios de otras corridas."""
+    from app import auth, db, limits, seed_data
+    db.DB_PATH = str(tmp_path / "transporte.db")
+    db.init_db()
+    auth.init_auth()
+    limits.init_limits()
+    db.seed_destination_places(seed_data.all_seeds())
 
 
 def test_sin_routes_api_responde_en_modo_demo(monkeypatch):

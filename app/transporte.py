@@ -106,22 +106,43 @@ def _segundos(valor: str | None) -> float:
         return 0.0
 
 
+def etiqueta_agencia(nombres: list[str], respaldo: str = "") -> str:
+    """Google llama «Autobús» a todo; la agencia sí distingue: Transmilenio-Dual → TransMilenio,
+    Zonal-Urbano → SITP. Si no reconoce la agencia, deja el texto que dio Google."""
+    j = " ".join(nombres or []).lower()
+    if "transmilenio" in j or "troncal" in j or "alimentador" in j:
+        return "TransMilenio"
+    if "zonal" in j or "sitp" in j:
+        return "SITP"
+    return respaldo
+
+
 def parsear_transito(route: dict) -> dict:
     """Respuesta de Routes (modo TRANSIT) → {min, caminata_min, transbordos, pasos[]}.
     Pasos: {tipo: 'caminar', min, metros} | {tipo: 'transporte', linea, vehiculo, desde, hasta, paradas, color}"""
     pasos, caminata_s, buses = [], 0.0, 0
+    pend_s = pend_m = 0.0  # caminata acumulada: Google la parte en muchos pasos de una esquina; la unimos
+
+    def volcar():
+        nonlocal pend_s, pend_m
+        if pend_s >= 45:
+            pasos.append({"tipo": "caminar", "min": max(1, round(pend_s / 60)), "metros": int(pend_m)})
+        pend_s = pend_m = 0.0
+
     for leg in route.get("legs", []):
         for st in leg.get("steps", []):
             dur = _segundos(st.get("staticDuration"))
             td = st.get("transitDetails")
             if td:
+                volcar()
                 ln = td.get("transitLine", {}) or {}
                 paradas = td.get("stopDetails", {}) or {}
                 buses += 1
                 pasos.append({
                     "tipo": "transporte",
                     "linea": ln.get("nameShort") or ln.get("name") or "",
-                    "vehiculo": ((ln.get("vehicle", {}) or {}).get("name", {}) or {}).get("text", "") or "",
+                    "vehiculo": etiqueta_agencia([a.get("name", "") for a in ln.get("agencies", []) or []],
+                                                 ((ln.get("vehicle", {}) or {}).get("name", {}) or {}).get("text", "") or ""),
                     "tipo_vehiculo": (ln.get("vehicle", {}) or {}).get("type", ""),
                     "desde": (paradas.get("departureStop", {}) or {}).get("name", ""),
                     "hasta": (paradas.get("arrivalStop", {}) or {}).get("name", ""),
@@ -131,8 +152,9 @@ def parsear_transito(route: dict) -> dict:
                 })
             else:
                 caminata_s += dur
-                if dur >= 60:
-                    pasos.append({"tipo": "caminar", "min": round(dur / 60), "metros": st.get("distanceMeters", 0)})
+                pend_s += dur
+                pend_m += st.get("distanceMeters", 0) or 0
+    volcar()
     total_s = _segundos(route.get("duration"))
     return {"min": round(total_s / 60), "caminata_min": round(caminata_s / 60),
             "transbordos": max(0, buses - 1), "pasos": pasos}
@@ -179,6 +201,7 @@ _MASK = ",".join([
     "routes.duration", "routes.staticDuration", "routes.distanceMeters",
     "routes.legs.steps.staticDuration", "routes.legs.steps.distanceMeters", "routes.legs.steps.travelMode",
     "routes.legs.steps.transitDetails",
+    "routes.legs.steps.transitDetails.transitLine.agencies",
 ])
 
 
