@@ -43,10 +43,10 @@ def _env_int(name: str, default: int) -> int:
 
 
 FREE_LIMITS = {
-    "maps":     _env_int("LIMIT_MAPS_PER_DAY", 15),    # búsquedas Google Places en vivo
-    "chat":     _env_int("LIMIT_CHAT_PER_DAY", 40),    # mensajes al LLM
-    "document": _env_int("LIMIT_DOCS_PER_DAY", 10),    # documentos extraídos (visión = caro)
-    "scan":     _env_int("LIMIT_SCAN_PER_DAY", 5),     # scans Tavily
+    "maps":     _env_int("LIMIT_MAPS_PER_DAY", 6),     # búsquedas Google Places en vivo
+    "chat":     _env_int("LIMIT_CHAT_PER_DAY", 15),    # mensajes al LLM
+    "document": _env_int("LIMIT_DOCS_PER_DAY", 3),     # documentos extraídos (visión = caro)
+    "scan":     _env_int("LIMIT_SCAN_PER_DAY", 2),      # scans Tavily
 }
 
 # Mapea cada recurso a su columna de override por-usuario en la tabla `users`.
