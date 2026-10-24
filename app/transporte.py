@@ -24,6 +24,8 @@ estimación (taxímetro: base + km + tiempo, configurable por variables de entor
 import datetime
 import logging
 import os
+import re
+import threading
 import urllib.parse
 from zoneinfo import ZoneInfo
 
@@ -61,8 +63,14 @@ def disponible() -> bool:
 def nivel_trancon(con_trafico_s: float, sin_trafico_s: float) -> dict:
     """Qué tan mal está el tráfico: cociente entre el tiempo con tráfico y el tiempo sin tráfico."""
     ratio = (con_trafico_s / sin_trafico_s) if sin_trafico_s else 1.0
+    extra = max(0, round((con_trafico_s - sin_trafico_s) / 60))
     nivel = "fluido" if ratio < 1.15 else "moderado" if ratio < 1.4 else "pesado" if ratio < 1.8 else "trancon"
-    return {"nivel": nivel, "ratio": round(ratio, 2), "extra_min": max(0, round((con_trafico_s - sin_trafico_s) / 60))}
+    # En trayectos cortos la proporción exagera (15 → 22 min es «x1,5» pero son solo 7 min): exigimos minutos reales.
+    if nivel in ("pesado", "trancon") and extra < 8:
+        nivel = "moderado"
+    if nivel == "moderado" and extra < 3:
+        nivel = "fluido"
+    return {"nivel": nivel, "ratio": round(ratio, 2), "extra_min": extra}
 
 
 def precio_taxi(km: float, min_con_trafico: float) -> dict:
@@ -251,6 +259,142 @@ def _opciones_google(o, d, salida) -> dict:
     if km_linea <= CAMINAR_MAX_KM:
         op["caminar"] = {"min": round(km / CAMINAR_KMH * 60), "km": round(km, 1)}
     return {"opciones": op, "trancon": trancon}
+
+
+# ─────────────────────────── el chat: «¿cómo llego a…?» ───────────────────────────
+_PIDE_RUTA = re.compile(
+    r"(c[oó]mo (llego|voy|ir|me muevo|salgo|se llega)|como llegar|llegar a|\bir (a|al)\b|\bvoy (a|al)\b|"
+    r"cu[aá]nto (tarda|demora|se demora|cuesta)|\bruta\b|tranc[oó]n|transmilenio|\bsitp\b|\btaxi\b|\buber\b|\bbus\b|"
+    r"how (do i|can i|to|long)|get to|getting to|directions|\broute\b|traffic|"
+    r"comment (aller|je vais|y aller)|aller (\u00e0|au)\b|combien de temps|wie komme|wie lange|anreise|"
+    r"come (arrivo|si arriva|vado)|arrivare|quanto (ci vuole|tempo)|como (chego|ir|vou)|chegar)", re.I)
+_AEROPUERTO = re.compile(r"aeropuerto|airport|a[eé]roport|flughafen|aeroporto|el dorado|eldorado", re.I)
+_HOTEL = re.compile(r"\b(mi hotel|my hotel|mon h[oô]tel|mein hotel|il mio hotel|meu hotel|al hotel|to the hotel|\bhotel\b)", re.I)
+_GENERICAS = {"museo", "parque", "centro", "cerro", "plaza", "restaurante", "iglesia", "teatro", "mercado", "cafe",
+              "calle", "avenida", "catedral", "torre", "zona", "bogota", "colombia"}
+
+
+def detectar_destino(mensaje: str, lugares: list[dict]) -> dict | None:
+    """Si el mensaje pide cómo llegar a un sitio que conocemos, devuelve el destino:
+    {'tipo': 'aeropuerto'} | {'tipo': 'hotel'} | {'tipo': 'lugar', 'lat', 'lng', 'nombre'}. Si no, None.
+    Exige una palabra de transporte/ruta Y un destino reconocible (pocos falsos positivos)."""
+    if not mensaje or not _PIDE_RUTA.search(mensaje):
+        return None
+    n = _norm(mensaje)
+    palabras = set(n.split())
+    mejor, puntaje = None, 0
+    for p in lugares:
+        pn = _norm(re.sub(r"\(.*?\)", "", p.get("name", "")))  # «Usaquén (centro histórico)» → «usaquen»
+        if not pn:
+            continue
+        toks = {w for w in pn.split() if len(w) >= 5 and w not in _GENERICAS}
+        score = 0
+        if len(pn) >= 4 and pn in n:
+            score = 100 + len(pn)                       # nombre completo en el mensaje
+        elif toks and toks <= palabras:
+            score = 10 * len(toks) + len(pn) / 100      # todas sus palabras distintivas aparecen
+        if score > puntaje:
+            mejor, puntaje = p, score
+    if mejor:
+        return {"tipo": "lugar", "lat": float(mejor["lat"]), "lng": float(mejor["lng"]), "nombre": mejor["name"]}
+    if _AEROPUERTO.search(mensaje):
+        return {"tipo": "aeropuerto"}
+    if _HOTEL.search(mensaje):
+        return {"tipo": "hotel"}
+    return None
+
+
+_MOTIVOS = {
+    "cerca": "está cerca, caminar es lo más rápido",
+    "trancon_gana_transporte": "con el trancón de ahora el transporte público le gana al taxi",
+    "similar_y_mas_barato": "tarda casi lo mismo que el taxi y sale mucho más barato",
+    "taxi_mas_rapido": "el taxi es bastante más rápido en este trayecto",
+    "solo_taxi": "es la única opción disponible",
+    "solo_transporte": "es la única opción disponible",
+}
+_MODOS = {"taxi": "taxi/app", "transporte": "transporte público", "caminar": "a pie"}
+
+
+def _miles(n: int) -> str:
+    return f"{int(n):,}".replace(",", ".")
+
+
+def bloque_chat(r: dict) -> str:
+    """Resumen de una ruta REAL (Google) para el prompt del Companion. Solo con datos que sí tenemos."""
+    op = r["opciones"]
+    L = [f"RUTAS EN VIVO (Google, tráfico de AHORA) de «{r['origen']['nombre'] or 'su ubicación'}» a «{r['destino']['nombre']}»:"]
+    tx = op.get("taxi")
+    if tx:
+        L.append(f"- Taxi/app: {tx['min']} min con tráfico (normalmente {tx['min_sin_trafico']}), unos {tx['km']} km, "
+                 f"precio ESTIMADO {_miles(tx['precio']['min'])}–{_miles(tx['precio']['max'])} COP.")
+    tr = op.get("transporte")
+    if tr:
+        tramos = [f"{p.get('vehiculo') or 'Bus'} {p.get('linea', '')} ({p.get('desde', '')} → {p.get('hasta', '')})".replace("  ", " ")
+                  for p in tr["pasos"] if p["tipo"] == "transporte"]
+        detalle = " + ".join(tramos) if tramos else "sin detalle de líneas"
+        L.append(f"- Transporte público: {tr['min']} min · {detalle} · {tr['transbordos']} transbordo(s) · "
+                 f"caminata total {tr['caminata_min']} min.")
+    if op.get("caminar"):
+        L.append(f"- A pie: {op['caminar']['min']} min ({op['caminar']['km']} km).")
+    tf = r["trancon"]
+    L.append(f"- Tráfico ahora: {tf['nivel']} (+{tf['extra_min']} min sobre lo normal)." + (" Es hora pico: TransMilenio va muy lleno." if r.get("hora_pico") else ""))
+    rec = r["recomendacion"]
+    if rec["modo"]:
+        L.append(f"- Conviene: {_MODOS[rec['modo']]} ({_MOTIVOS.get(rec['motivo'], '')}).")
+    L.append("REGLA: si el usuario pregunta cómo llegar, responde con ESTOS datos (tiempos, precio estimado, líneas) y "
+             "recomienda UNA opción con criterio de local. No inventes líneas, estaciones ni precios que no estén aquí; "
+             "el precio del taxi es una estimación, dilo así.")
+    return "\n".join(L)
+
+
+# ─────────────────────────── termómetro de tráfico ───────────────────────────
+CORREDORES = [
+    {"id": "norte_centro", "o": (4.6860, -74.0560), "d": (4.5981, -74.0758)},
+    {"id": "aeropuerto_centro", "o": (4.7016, -74.1469), "d": (4.5981, -74.0758)},
+    {"id": "usaquen_zonat", "o": (4.6950, -74.0310), "d": (4.6680, -74.0530)},
+    {"id": "chapinero_aeropuerto", "o": (4.6486, -74.0620), "d": (4.7016, -74.1469)},
+]
+# Una sola medición compartida por TODOS los viajeros: el costo no crece con los usuarios.
+_cache_trafico = net.TTLCache(ttl_s=float(os.environ.get("TRAFICO_TTL_S", "1200")), maxsize=2)
+_lock_trafico = threading.Lock()
+
+
+def trafico() -> dict:
+    """Estado del tráfico en 4 corredores de Bogotá (carro, con tráfico real). Se refresca a lo sumo cada
+    TRAFICO_TTL_S (20 min) y solo cuando alguien lo pide. Sin Routes API: {'disponible': False} (no se inventa nada)."""
+    if not disponible():
+        return {"disponible": False, "corredores": []}
+    hit = _cache_trafico.get("t")
+    if hit is not None:
+        return hit
+    with _lock_trafico:
+        hit = _cache_trafico.get("t")
+        if hit is not None:
+            return hit
+        corredores = []
+        try:
+            for c in CORREDORES:
+                r = _pedir_google("DRIVE", c["o"], c["d"], None)
+                if not r:
+                    continue
+                con, sin = _segundos(r.get("duration")), _segundos(r.get("staticDuration"))
+                n = nivel_trancon(con, sin)
+                corredores.append({"id": c["id"], "min": round(con / 60), **n})
+        except RoutesNoDisponible as e:
+            log.warning("trafico_no_disponible motivo=%s", e)
+            res = {"disponible": False, "corredores": []}
+            _cache_trafico.set("t", res, ttl_s=120)  # no martillamos a Google si está caído
+            return res
+        if not corredores:
+            return {"disponible": False, "corredores": []}
+        con_prom = sum(c["min"] for c in corredores) / len(corredores) * 60
+        sin_prom = sum(c["min"] - c["extra_min"] for c in corredores) / len(corredores) * 60
+        general = nivel_trancon(con_prom, sin_prom)
+        res = {"disponible": True, "actualizado": datetime.datetime.now(TZ).isoformat(timespec="minutes"),
+               "general": {"nivel": general["nivel"], "ratio": general["ratio"], "extra_min": general["extra_min"]},
+               "corredores": corredores}
+        _cache_trafico.set("t", res)
+        return res
 
 
 # ─────────────────────────── modo demo (sin Routes API) ───────────────────────────

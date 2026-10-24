@@ -213,7 +213,7 @@ def _gustos_block(trip: dict) -> str:
     )
 
 
-def build(trip: dict, docs: list[dict] | None = None, mensaje: str = "", memoria: str = "") -> str:
+def build(trip: dict, docs: list[dict] | None = None, mensaje: str = "", memoria: str = "", rutas: str = "") -> str:
     docs = docs if docs is not None else db.rows("documents", trip["id"])
     docs_block = ""
     if docs:
@@ -346,6 +346,8 @@ ESTILO CONVERSACIONAL:
 - Personaliza SIEMPRE con el perfil del viajero (ver "PERFIL DEL VIAJERO"): cada recomendación debe sentirse pensada para ESTE usuario, no para cualquiera.
 - EXCEPCIÓN: en emergencias, cero preguntas de estilo — instrucción vital primero, triage después.
 - Acciones (rebooking, reservas): describe qué harías y pide confirmación final. Nunca ejecutas directo."""
+    if rutas:
+        prompt += "\n\n" + rutas  # rutas REALES de este turno (Google): el Companion responde con ellas
     if idioma_code != "es":
         # Este prompt es largo y está en español: los modelos baratos tienden a contestar en español
         # aunque la instrucción de idioma esté al principio. El recordatorio va AL FINAL (lo último

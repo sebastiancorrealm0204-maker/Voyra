@@ -18,6 +18,15 @@ def test_nivel_de_trancon_por_cociente():
     assert t.nivel_trancon(500, 0)["nivel"] == "fluido"  # sin dato de referencia no acusamos
 
 
+def test_en_trayectos_cortos_la_proporcion_no_exagera():
+    # 15 → 22 min: proporción 1,47 pero solo +7 min → moderado, no «pesado»
+    assert t.nivel_trancon(22 * 60, 15 * 60)["nivel"] == "moderado"
+    # 20 → 30 min (+10): ahora sí pesado
+    assert t.nivel_trancon(30 * 60, 20 * 60)["nivel"] == "pesado"
+    # 5 → 6,5 min (+2): fluido
+    assert t.nivel_trancon(390, 300)["nivel"] == "fluido"
+
+
 def test_precio_taxi_tiene_minimo_y_rango_redondeado():
     corto = t.precio_taxi(0.5, 3)
     assert corto["min"] >= 7000 and corto["max"] > corto["min"] and corto["moneda"] == "COP"
@@ -188,3 +197,136 @@ def test_endpoint_destino_curado_aeropuerto_y_errores(monkeypatch):
     # otro usuario no puede usar el viaje
     c2, H2 = _cliente()
     assert c2.post(f"/trips/{tid}/transporte", json={"destino": "aeropuerto"}, headers=H2).status_code in (403, 404)
+
+
+# ───────────── chat: detectar «cómo llego a…» ─────────────
+LUGARES = [
+    {"name": "Museo del Oro", "lat": 4.6019, "lng": -74.0719},
+    {"name": "Cerro de Monserrate", "lat": 4.6057, "lng": -74.0560},
+    {"name": "Plaza de Bolívar", "lat": 4.5981, "lng": -74.0760},
+    {"name": "Parque de la 93", "lat": 4.6760, "lng": -74.0480},
+    {"name": "Usaquén (centro histórico)", "lat": 4.6950, "lng": -74.0310},
+]
+
+
+@pytest.mark.parametrize("msg,esperado", [
+    ("¿Cómo llego al Museo del Oro?", ("lugar", "Museo del Oro")),
+    ("how do I get to Monserrate from here", ("lugar", "Cerro de Monserrate")),
+    ("comment aller à la Plaza de Bolívar ?", ("lugar", "Plaza de Bolívar")),
+    ("wie komme ich zum Parque de la 93", ("lugar", "Parque de la 93")),
+    ("¿cuánto demora un taxi al aeropuerto?", ("aeropuerto", None)),
+    ("how long to get to the airport", ("aeropuerto", None)),
+    ("¿Cómo voy a mi hotel desde acá?", ("hotel", None)),
+    ("cómo llego a Usaquén", ("lugar", "Usaquén (centro histórico)")),
+])
+def test_detecta_el_destino_en_varios_idiomas(msg, esperado):
+    d = t.detectar_destino(msg, LUGARES)
+    assert d is not None and d["tipo"] == esperado[0]
+    if esperado[1]:
+        assert d["nombre"] == esperado[1]
+
+
+@pytest.mark.parametrize("msg", [
+    "El Museo del Oro es muy bonito",            # nombra el lugar pero no pide ruta
+    "¿Cómo llego a ser más feliz?",              # pide «cómo llego» sin destino conocido
+    "Recomiéndame un café",
+    "",
+])
+def test_no_detecta_falsos_positivos(msg):
+    assert t.detectar_destino(msg, LUGARES) is None
+
+
+def _ruta_real():
+    return {
+        "fuente": "google", "origen": {"nombre": "Zona T"}, "destino": {"nombre": "Museo del Oro"},
+        "opciones": {"taxi": {"min": 40, "min_sin_trafico": 30, "km": 10.7, "precio": {"min": 25000, "max": 38000}},
+                     "transporte": {"min": 44, "caminata_min": 9, "transbordos": 0, "pasos": [
+                         {"tipo": "transporte", "linea": "L81", "vehiculo": "TransMilenio", "desde": "Pq. León de Greiff", "hasta": "San Victorino"}]}},
+        "trancon": {"nivel": "pesado", "ratio": 1.6, "extra_min": 14}, "hora_pico": True,
+        "recomendacion": {"modo": "transporte", "motivo": "trancon_gana_transporte"},
+    }
+
+
+def test_bloque_del_prompt_trae_solo_datos_reales():
+    b = t.bloque_chat(_ruta_real())
+    assert "RUTAS EN VIVO" in b and "«Zona T»" in b and "«Museo del Oro»" in b
+    assert "40 min con tráfico (normalmente 30)" in b and "25.000–38.000 COP" in b and "ESTIMADO" in b
+    assert "TransMilenio L81 (Pq. León de Greiff → San Victorino)" in b
+    assert "hora pico" in b and "Conviene: transporte público" in b and "No inventes" in b
+
+
+# ───────────── termómetro ─────────────
+def test_termometro_sin_routes_api_no_inventa(monkeypatch):
+    monkeypatch.setattr(t, "API_KEY", "")
+    assert t.trafico() == {"disponible": False, "corredores": []}
+
+
+def test_termometro_mide_los_corredores_y_se_cachea(monkeypatch):
+    monkeypatch.setattr(t, "API_KEY", "x")
+    t._cache_trafico = t.net.TTLCache(ttl_s=1200, maxsize=2)
+    llamadas = []
+
+    def falso(modo, o, d, salida):
+        llamadas.append(modo)
+        return {"duration": "2400s", "staticDuration": "1000s"}  # +23 min, ratio 2,4 → trancón
+
+    monkeypatch.setattr(t, "_pedir_google", falso)
+    r = t.trafico()
+    assert r["disponible"] and len(r["corredores"]) == len(t.CORREDORES) and r["general"]["nivel"] == "trancon"
+    assert {c["id"] for c in r["corredores"]} == {c["id"] for c in t.CORREDORES}
+    n = len(llamadas)
+    t.trafico()
+    assert len(llamadas) == n  # una sola medición compartida por todos
+
+
+def test_termometro_si_google_cae_responde_no_disponible(monkeypatch):
+    monkeypatch.setattr(t, "API_KEY", "x")
+    t._cache_trafico = t.net.TTLCache(ttl_s=1200, maxsize=2)
+
+    def roto(*a, **k):
+        raise t.RoutesNoDisponible("http_403")
+
+    monkeypatch.setattr(t, "_pedir_google", roto)
+    assert t.trafico()["disponible"] is False
+
+
+# ───────────── el chat recibe la ruta real ─────────────
+def test_el_chat_inyecta_la_ruta_real_en_el_prompt(monkeypatch):
+    from app import llm
+    monkeypatch.setattr(t, "API_KEY", "x")
+    monkeypatch.setattr(t, "rutas", lambda o, d, s=0: {**_ruta_real(), "destino": {"nombre": d[2]}})
+    capturado = {}
+
+    def falso_chat(system, history):
+        capturado["system"] = system
+        return "ok"
+
+    monkeypatch.setattr(llm, "chat", falso_chat)
+    c, H = _cliente()
+    tid = c.post("/trips", json={"ciudad": "Bogotá", "hotel": "H"}, headers=H).json()["trip_id"]
+    r = c.post(f"/trips/{tid}/chat", json={"message": "¿Cómo llego al Museo del Oro?"}, headers=H)
+    assert r.status_code == 200
+    assert "RUTAS EN VIVO" in capturado["system"] and "Museo del Oro" in capturado["system"]
+    # sin pedir ruta, el prompt no la lleva
+    c.post(f"/trips/{tid}/chat", json={"message": "recomiéndame un café"}, headers=H)
+    assert "RUTAS EN VIVO" not in capturado["system"]
+
+
+def test_el_chat_sigue_normal_sin_routes_api(monkeypatch):
+    from app import llm
+    monkeypatch.setattr(t, "API_KEY", "")
+    capturado = {}
+    monkeypatch.setattr(llm, "chat", lambda system, history: capturado.setdefault("system", system) and "ok")
+    c, H = _cliente()
+    tid = c.post("/trips", json={"ciudad": "Bogotá", "hotel": "H"}, headers=H).json()["trip_id"]
+    assert c.post(f"/trips/{tid}/chat", json={"message": "¿Cómo llego al Museo del Oro?"}, headers=H).status_code == 200
+    assert "RUTAS EN VIVO" not in capturado["system"]
+
+
+def test_endpoint_del_termometro_pide_sesion_y_responde(monkeypatch):
+    from app.main import app
+    monkeypatch.setattr(t, "API_KEY", "")
+    assert TestClient(app).get("/transporte/trafico").status_code == 401
+    c, H = _cliente()
+    r = c.get("/transporte/trafico", headers=H)
+    assert r.status_code == 200 and r.json()["disponible"] is False

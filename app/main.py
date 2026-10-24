@@ -809,6 +809,53 @@ def nearby_chain(tid: str, q: str, orig_lat: float | None = None,
                 else "Búsqueda en vivo no configurada (falta GOOGLE_MAPS_API_KEY).")}
 
 
+def _origen_del_viaje(trip: dict, lat: float | None = None, lng: float | None = None):
+    """GPS del teléfono > ubicación guardada del viaje > hotel/zona conocida. (None, None) si no hay nada."""
+    if lat is None or lng is None:
+        lat, lng = trip.get("lat_actual"), trip.get("lng_actual")
+    if lat is None or lng is None:
+        coords = geo.resolve_origin(trip)
+        if coords:
+            lat, lng = coords
+    return lat, lng
+
+
+def _bloque_rutas(trip: dict, user: dict, mensaje: str) -> str:
+    """Si el mensaje pide cómo llegar a un sitio conocido, trae la ruta REAL y la devuelve como bloque para el
+    prompt. Cualquier fallo (sin Routes, sin cuota, sin ubicación) devuelve "" y el chat sigue normal."""
+    if not transporte_mod.disponible():
+        return ""
+    try:
+        d = transporte_mod.detectar_destino(mensaje, db.places_for_city(trip.get("ciudad") or "Bogotá"))
+        if not d:
+            return ""
+        if d["tipo"] == "aeropuerto":
+            dest = transporte_mod.AEROPUERTO
+        elif d["tipo"] == "hotel":
+            if trip.get("lat_hotel") is None or trip.get("lng_hotel") is None:
+                return ""
+            dest = (trip["lat_hotel"], trip["lng_hotel"], trip.get("hotel") or "Hotel")
+        else:
+            dest = (d["lat"], d["lng"], d["nombre"])
+        olat, olng = _origen_del_viaje(trip)
+        if olat is None or olng is None:
+            return ""
+        limits.check_and_consume(user["id"], "maps")
+        ruta = transporte_mod.rutas((float(olat), float(olng), trip.get("zona_actual") or ""), dest, 0)
+        return transporte_mod.bloque_chat(ruta) if ruta["fuente"] == "google" else ""
+    except limits.QuotaError:
+        return ""
+    except Exception as e:  # una ruta fallida nunca rompe el chat
+        log.warning("bloque_rutas_error error=%s", type(e).__name__)
+        return ""
+
+
+@app.get("/transporte/trafico")
+def transporte_trafico(user: dict = Depends(current_user)):
+    """Termómetro de tráfico de Bogotá (4 corredores). Medición compartida y cacheada (20 min)."""
+    return transporte_mod.trafico()
+
+
 class TransporteIn(BaseModel):
     destino: str | None = None        # "hotel" | "aeropuerto" | nombre de un lugar curado
     nombre: str | None = None         # nombre a mostrar si se manda lat/lng
@@ -842,13 +889,7 @@ def transporte(tid: str, body: TransporteIn, user: dict = Depends(verified_user)
                                       "mensaje": "No encontré ese destino. Elige uno de la lista."})
         dest = (float(lugar["lat"]), float(lugar["lng"]), lugar["name"])
     # ── origen: GPS del teléfono > ubicación guardada > hotel/zona conocida
-    olat, olng = body.origen_lat, body.origen_lng
-    if olat is None or olng is None:
-        olat, olng = trip.get("lat_actual"), trip.get("lng_actual")
-    if olat is None or olng is None:
-        coords = geo.resolve_origin(trip)
-        if coords:
-            olat, olng = coords
+    olat, olng = _origen_del_viaje(trip, body.origen_lat, body.origen_lng)
     if olat is None or olng is None:
         raise HTTPException(422, {"error": "sin_origen",
                                   "mensaje": "No tengo tu ubicación. Comparte tu GPS o elige tu zona."})
@@ -1023,7 +1064,8 @@ def chat(tid: str, c: ChatIn, user: dict = Depends(verified_user)):
     # busca la cadena en Google. Antes era router → chat → extracción en serie
     # (hasta 3 llamadas LLM una tras otra); ahora el turno dura ~lo que la más
     # lenta de ellas.
-    system = context.build(trip, mensaje=c.message, memoria=memoria.bloque(user["id"], tid))
+    rutas = "" if es_tap else _bloque_rutas(trip, user, c.message)
+    system = context.build(trip, mensaje=c.message, memoria=memoria.bloque(user["id"], tid), rutas=rutas)
     fut_reply = _fanout.submit(llm.chat, system, history)
 
     # ── ROUTER DE INTENCIÓN ──
