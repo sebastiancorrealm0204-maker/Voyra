@@ -22,7 +22,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import (transporte as transporte_mod, ciudades, city_knowledge, context, db, engine, geo, llm, memoria, net, places_live, push, scheduler,
                search, seed_data, verificacion, watchers, auth, limits, email_send, social_enrich,
-               waitlist, traducir)
+               waitlist, traducir, visual)
 
 # Logging estructurado (clave=valor) en un solo formato para toda la app. Railway
 # captura stdout; LOG_LEVEL=DEBUG para depurar.
@@ -804,6 +804,15 @@ def nearby(tid: str, user: dict = Depends(current_user)):
     Usa SOLO la curación local (sin costo de API), así que no consume cuota."""
     trip = own_trip(tid, user)
     out = watchers.nearby_recommendations(tid)
+    try:  # cada recomendación con su tarjeta visual (foto, zona, calificación, dato local)
+        por_nombre = {p["name"]: p for p in db.places_for_city(trip.get("ciudad", ""))}
+        res = out.get("resultados") or []
+        elegidos = [por_nombre[r["lugar"]] for r in res if r.get("lugar") in por_nombre]
+        dist = {r["lugar"]: r.get("distancia_km") for r in res}
+        cards = {c["name"]: c for c in visual.tarjetas(elegidos, trip.get("idioma") or "es", distancias=dist)}
+        out = {**out, "resultados": [{**r, "tarjeta": cards.get(r.get("lugar"))} for r in res]}
+    except Exception:
+        log.warning("tarjetas_nearby_fallo trip=%s", tid, exc_info=True)
     if out.get("nota"):
         out = {**out, "nota": traducir.traducir([out["nota"]], trip.get("idioma") or "es")[0]}
     return out
@@ -1199,9 +1208,18 @@ def chat(tid: str, c: ChatIn, user: dict = Depends(verified_user)):
     propuestas = _resultado_o(fut_planes, [], "planes")
     chain_results = _resultado_o(fut_cadena, None, "cadena")
 
+    # Tarjetas visuales (foto, zona, calificación, dato local) de los lugares CURADOS que la respuesta nombra.
+    lugares_card: list[dict] = []
+    if not es_tap:
+        try:
+            lugares_card = visual.tarjetas(
+                visual.mencionados(reply, db.places_for_city(trip.get("ciudad", ""))), _idi)
+        except Exception:
+            log.warning("tarjetas_lugares_fallo trip=%s", tid, exc_info=True)
+
     return {"reply": reply, "planes_propuestos": propuestas, "chain_results": chain_results,
             "intencion": intencion, "restante_chat": limits.remaining(user["id"], "chat"),
-            "verificacion": verificacion_info, "ruta": ruta_card}
+            "verificacion": verificacion_info, "ruta": ruta_card, "lugares": lugares_card}
 
 
 def _resultado_o(fut, default, nombre: str):
