@@ -57,6 +57,8 @@ TAG_VOCAB: set[str] = {
     # Aire libre y bienestar
     "Naturaleza y aire libre", "Senderismo", "Aventura", "Playas",
     "Bienestar y relax", "Aguas termales",
+    # Propios de Bogotá (los lugares se etiquetan solos: ver _tags_bogota)
+    "Grafiti y arte urbano", "Ciclovía y bici", "Miradores y vistas", "Escapadas desde Bogotá",
     # Estilo de viaje
     "Fotografía", "Planes tranquilos", "Compras", "En familia / con niños",
     "Pet-friendly", "Joyas escondidas", "Lujo y premium", "Económico / mochilero",
@@ -2594,6 +2596,24 @@ def _local_extra() -> dict:
     return {k: v for k, v in data.items() if isinstance(v, dict) and not k.startswith("_")}
 
 
+def _tags_bogota(p: dict) -> list[str]:
+    """Tags propios de Bogotá según lo que el lugar ES (categoría/nombre), sumados a los que ya traiga."""
+    nombre = (p.get("name") or "").lower()
+    cat = p.get("category")
+    extra = []
+    if "grafiti" in nombre or "graffiti" in nombre:
+        extra += ["Grafiti y arte urbano", "Arte y diseño"]
+    if "ciclov" in nombre or "bici" in nombre:
+        extra += ["Ciclovía y bici", "Aventura"]
+    if cat == "mirador" or "monserrate" in nombre or "guadalupe" in nombre:
+        extra.append("Miradores y vistas")
+    if cat == "excursion":
+        extra.append("Escapadas desde Bogotá")
+    if "senderismo" in nombre:
+        extra += ["Senderismo", "Naturaleza y aire libre"]
+    return extra
+
+
 def all_seeds() -> list[dict]:
     """Resuelve lat/lng de cada lugar.
 
@@ -2635,5 +2655,8 @@ def all_seeds() -> list[dict]:
             for k, v in extra.items():
                 if not local.get(k):
                     local[k] = v
-        out.append({**p, "lat": lat, "lng": lng, "local": local})
+        tags = list(p.get("tags") or [])
+        if p["city_display"] == "Bogotá":
+            tags += [t for t in _tags_bogota(p) if t not in tags]
+        out.append({**p, "lat": lat, "lng": lng, "local": local, **({"tags": tags} if tags else {})})
     return out

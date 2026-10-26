@@ -8,6 +8,7 @@ viaje ACTIVO, decide en HORA LOCAL DEL DESTINO si toca disparar:
 - check-in nocturno  (~8pm)         → confirma/pregunta planes de mañana
 - recordatorio de vuelo de regreso  (mañana del día 'fin') → push operativo
 - aviso_hora_de_salir (1h y 15min antes de cada plan con hora) → push operativo
+- recomendación por gustos (mediodía, tarde y noche) → un lugar curado que calza con sus gustos
 
 Dedup: cada evento se registra en db.proactive_log y se dispara UNA vez por día
 local. Así, aunque el tick corra varias veces dentro de la ventana, no repite.
@@ -25,6 +26,10 @@ log = logging.getLogger("voyra.scheduler")
 
 MATUTINO  = (8.0, 10.0)
 NOCTURNO  = (20.0, 22.0)
+# Recomendaciones por gustos (watchers.recomendar_por_gustos): mediodía, tarde y noche.
+RECO_MEDIODIA = (12.0, 13.5)
+RECO_TARDE    = (16.0, 17.5)
+RECO_NOCHE    = (19.0, 20.0)
 TICK_MINUTES = 15
 # Viajes procesados en paralelo por tick. Cada check-in es una llamada LLM de
 # varios segundos; en serie, con muchos viajes activos un tick podía durar más
@@ -184,6 +189,12 @@ def _procesar_trip(trip: dict, disparos: list) -> None:
             if search.MODE == "real":
                 _disparar(tid, "scan", ld,
                           lambda t: disparos.append(("scan", t, watchers.scan_destination(t))))
+
+        if trip.get("gustos"):
+            for slot, ventana in (("mediodia", RECO_MEDIODIA), ("tarde", RECO_TARDE), ("noche", RECO_NOCHE)):
+                if _en_ventana(h, ventana):
+                    _disparar(tid, f"reco_{slot}", ld,
+                              lambda t, s=slot: disparos.append((f"reco_{s}", t, watchers.recomendar_por_gustos(t, s))))
 
         if _en_ventana(h, NOCTURNO):
             _disparar(tid, "nocturno", ld,

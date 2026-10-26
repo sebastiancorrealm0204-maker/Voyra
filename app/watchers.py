@@ -307,6 +307,10 @@ def scan_destination(trip_id: str) -> dict:
         "Joyas escondidas":             f"{lugar} lugares escondidos secretos que pocos conocen locales {rango}",
         "Lujo y premium":               f"{lugar} experiencias de lujo premium fine dining exclusivo {rango}",
         "Económico / mochilero":        f"{lugar} barato económico mochilero gratis qué hacer {rango}",
+        "Grafiti y arte urbano":        f"{lugar} grafiti arte urbano murales tour {rango}",
+        "Ciclovía y bici":              f"{lugar} ciclovía tour en bicicleta rutas {rango}",
+        "Miradores y vistas":           f"{lugar} miradores vistas panorámicas atardecer {rango}",
+        "Escapadas desde Bogotá":       f"{lugar} escapadas de un día excursiones cerca {rango}",
     }
     gustos = trip.get("gustos") or []
     gustos_a_buscar = gustos[:3] if gustos else []  # máx 3 búsquedas de cuota
@@ -413,3 +417,83 @@ def nearby_recommendations(trip_id: str, limit: int = 3) -> dict:
     if not seleccionados:
         out["nota"] = "Ya te mostré todos los lugares cercanos que tengo curados para esta zona en las últimas 24h."
     return out
+
+
+
+# ── Recomendaciones proactivas según los gustos del viajero ──
+# Tres momentos del día. En cada uno se elige UN lugar curado que calce con los gustos declarados (tags ∩ gustos),
+# de la categoría que tiene sentido a esa hora, que no se haya recomendado ya en este viaje ni esté en su itinerario.
+# Sin gustos o sin match no se manda nada: preferimos callar a mandar algo genérico. Cero costo de API.
+_SLOTS_RECO = {
+    "mediodia": {"cats": {"restaurante"}, "emoji": "🍽️"},
+    "tarde": {"cats": {"atraccion", "parque", "mercado", "experiencia", "mirador", "cafe"}, "emoji": "📍"},
+    "noche": {"cats": {"bar", "restaurante"}, "emoji": "🌙"},
+}
+_PLANTILLA_RECO = {
+    "mediodia": {"es": "Para almorzar hoy: {name} ({zona}). {clave} ¿Te cuento cómo llegar?",
+                 "en": "For lunch today: {name} ({zona}). {clave} Want directions?",
+                 "pt": "Para almoçar hoje: {name} ({zona}). {clave} Quer saber como chegar?",
+                 "fr": "Pour déjeuner aujourd'hui : {name} ({zona}). {clave} Je t'explique comment y aller ?",
+                 "de": "Zum Mittagessen heute: {name} ({zona}). {clave} Soll ich dir den Weg zeigen?",
+                 "it": "Per pranzo oggi: {name} ({zona}). {clave} Ti dico come arrivare?"},
+    "tarde": {"es": "Plan para esta tarde: {name} ({zona}). {clave} ¿Lo agrego a tu itinerario?",
+              "en": "Plan for this afternoon: {name} ({zona}). {clave} Should I add it to your itinerary?",
+              "pt": "Plano para esta tarde: {name} ({zona}). {clave} Adiciono ao seu roteiro?",
+              "fr": "Plan pour cet après-midi : {name} ({zona}). {clave} Je l'ajoute à ton itinéraire ?",
+              "de": "Plan für heute Nachmittag: {name} ({zona}). {clave} Soll ich es in deinen Reiseplan aufnehmen?",
+              "it": "Piano per questo pomeriggio: {name} ({zona}). {clave} Lo aggiungo al tuo itinerario?"},
+    "noche": {"es": "Para esta noche: {name} ({zona}). {clave} ¿Te cuento cómo llegar?",
+              "en": "For tonight: {name} ({zona}). {clave} Want directions?",
+              "pt": "Para esta noite: {name} ({zona}). {clave} Quer saber como chegar?",
+              "fr": "Pour ce soir : {name} ({zona}). {clave} Je t'explique comment y aller ?",
+              "de": "Für heute Abend: {name} ({zona}). {clave} Soll ich dir den Weg zeigen?",
+              "it": "Per stasera: {name} ({zona}). {clave} Ti dico come arrivare?"},
+}
+
+
+def elegir_reco_por_gustos(trip: dict, slot: str) -> dict | None:
+    """El lugar curado que mejor calza con los gustos del viaje para este momento del día, o None."""
+    gustos = {g for g in (trip.get("gustos") or []) if g}
+    if not gustos or slot not in _SLOTS_RECO:
+        return None
+    ya = db.recently_recommended(trip["id"], hours=24 * 60)
+    en_plan = " ".join(f"{p.get('titulo', '')} {p.get('lugar') or ''}" for p in db.get_plans(trip["id"])).lower()
+    origin = geo.resolve_origin(trip)
+    candidatos = []
+    for p in db.places_for_city(trip.get("ciudad", "")):
+        if p.get("category") not in _SLOTS_RECO[slot]["cats"] or p["name"] in ya:
+            continue
+        if p["name"].lower() in en_plan:
+            continue
+        match = len(gustos & set(p.get("tags") or []))
+        if not match:
+            continue
+        d = geo.haversine_km(origin[0], origin[1], p["lat"], p["lng"]) if origin else 0.0
+        candidatos.append((-match, d if d is not None else 0.0, -float(p.get("rating") or 0), p))
+    if not candidatos:
+        return None
+    candidatos.sort(key=lambda x: x[:3])
+    return candidatos[0][3]
+
+
+def recomendar_por_gustos(trip_id: str, slot: str) -> dict:
+    """Mensaje proactivo corto con UN lugar acorde a los gustos. Queda en el chat y sale como push."""
+    from . import traducir
+    trip = db.get_trip(trip_id)
+    p = elegir_reco_por_gustos(trip, slot)
+    if not p:
+        return {"enviado": False}
+    idioma = (trip.get("idioma") or "es").lower()
+    local = p.get("local") if isinstance(p.get("local"), dict) else {}
+    clave = (local.get("clave") or "").strip()
+    if clave and idioma != "es":
+        try:
+            clave = traducir.traducir([clave], idioma)[0]
+        except Exception:
+            pass
+    plantilla = _PLANTILLA_RECO[slot].get(idioma, _PLANTILLA_RECO[slot]["es"])
+    texto = " ".join(plantilla.format(name=p["name"], zona=p.get("zona", ""), clave=clave).split())
+    db.insert("messages", {"trip_id": trip_id, "role": "companion", "content": texto})
+    db.mark_recommended(trip_id, p["name"])
+    _push_checkin(trip_id, f"{_SLOTS_RECO[slot]['emoji']} {p['name']}", texto)
+    return {"enviado": True, "lugar": p["name"], "slot": slot}
