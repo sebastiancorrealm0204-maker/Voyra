@@ -170,7 +170,7 @@ def check_in_matutino(trip_id: str) -> dict:
         "pregúntalos en una frase amable. No repitas lo que ya dijiste anoche."
     ), "matutino")
     db.insert("messages", {"trip_id": trip_id, "role": "companion", "content": texto})
-    _push_checkin(trip_id, "Revisa tu día ☀️", texto)
+    _push_checkin(trip_id, "Revisa tu día", texto)
     return {"message": texto}
 
 
@@ -425,9 +425,9 @@ def nearby_recommendations(trip_id: str, limit: int = 3) -> dict:
 # de la categoría que tiene sentido a esa hora, que no se haya recomendado ya en este viaje ni esté en su itinerario.
 # Sin gustos o sin match no se manda nada: preferimos callar a mandar algo genérico. Cero costo de API.
 _SLOTS_RECO = {
-    "mediodia": {"cats": {"restaurante"}, "emoji": "🍽️"},
-    "tarde": {"cats": {"atraccion", "parque", "mercado", "experiencia", "mirador", "cafe"}, "emoji": "📍"},
-    "noche": {"cats": {"bar", "restaurante"}, "emoji": "🌙"},
+    "mediodia": {"cats": {"restaurante"},},
+    "tarde": {"cats": {"atraccion", "parque", "mercado", "experiencia", "mirador", "cafe"}},
+    "noche": {"cats": {"bar", "restaurante"}},
 }
 _PLANTILLA_RECO = {
     "mediodia": {"es": "Para almorzar hoy: {name} ({zona}). {clave} ¿Te cuento cómo llegar?",
@@ -495,5 +495,5 @@ def recomendar_por_gustos(trip_id: str, slot: str) -> dict:
     texto = " ".join(plantilla.format(name=p["name"], zona=p.get("zona", ""), clave=clave).split())
     db.insert("messages", {"trip_id": trip_id, "role": "companion", "content": texto})
     db.mark_recommended(trip_id, p["name"])
-    _push_checkin(trip_id, f"{_SLOTS_RECO[slot]['emoji']} {p['name']}", texto)
+    _push_checkin(trip_id, p["name"], texto)
     return {"enviado": True, "lugar": p["name"], "slot": slot}

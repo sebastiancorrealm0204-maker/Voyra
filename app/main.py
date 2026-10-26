@@ -244,8 +244,12 @@ class TripIn(BaseModel):
 
 
 class EncuestaIn(BaseModel):
-    gusto: list[str] = []
-    mejora: str = ""
+    nota_destino: int | None = None
+    nota_app: int | None = None
+    gusto_destino: list[str] = []
+    gusto_app: list[str] = []
+    mejora_destino: str = ""
+    mejora_app: str = ""
     feature: str = ""
 
 
@@ -402,7 +406,7 @@ def verify_email(token: str):
             status_code=400)
     return HTMLResponse(
         "<div style='font-family:system-ui;text-align:center;padding:48px'>"
-        "<h2>✅ ¡Email confirmado!</h2>"
+        "<h2>¡Email confirmado!</h2>"
         "<p>Ya puedes volver a la app e iniciar sesión.</p></div>")
 
 
@@ -651,11 +655,20 @@ def plans_fotos(tid: str, user: dict = Depends(current_user)):
 
 @app.post("/trips/{tid}/encuesta")
 def trip_encuesta(tid: str, e: EncuestaIn, user: dict = Depends(current_user)):
-    """Encuesta corta de cierre: qué le gustó más, qué mejoraría y qué función le gustaría."""
+    """Encuesta de cierre (obligatoria para ver el resumen): nota y feedback del destino, y de la app."""
     trip = own_trip(tid, user)
-    if not resumen_mod.guardar_encuesta(trip, user["id"], e.gusto, e.mejora, e.feature):
-        raise HTTPException(422, "Cuéntanos al menos una cosa.")
+    if not resumen_mod.guardar_encuesta(
+            trip, user["id"], nota_destino=e.nota_destino, nota_app=e.nota_app, gusto_destino=e.gusto_destino,
+            gusto_app=e.gusto_app, mejora_destino=e.mejora_destino, mejora_app=e.mejora_app, feature=e.feature):
+        raise HTTPException(422, "Calificanos el destino y la app (de 1 a 5).")
     return {"ok": True}
+
+
+@app.get("/trips/{tid}/encuesta")
+def trip_encuesta_estado(tid: str, user: dict = Depends(current_user)):
+    """¿Ya respondió la encuesta de cierre? Es rápido (sin armar el resumen) para decidir qué pantalla mostrar."""
+    own_trip(tid, user)
+    return {"respondida": resumen_mod.encuesta_respondida(tid)}
 
 
 @app.get("/trips/{tid}/resumen")
@@ -1519,7 +1532,7 @@ def _waitlist_admin(x_admin_token: str | None, token: str | None) -> None:
 def encuestas_admin(token: str | None = None, x_admin_token: str | None = Header(default=None)):
     _waitlist_admin(x_admin_token, token)
     with db.conn() as c:
-        rs = [dict(r) for r in c.execute("SELECT * FROM encuestas ORDER BY created_at DESC").fetchall()]
+        rs = [dict(r) for r in c.execute("SELECT * FROM encuesta_cierre ORDER BY created_at DESC").fetchall()]
     return {"count": len(rs), "encuestas": rs}
 
 

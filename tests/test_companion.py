@@ -989,11 +989,13 @@ def test_encuesta_de_cierre():
     from app import resumen
     tid = db.create_trip({"ciudad": "Bogotá", "hotel": "H", "inicio": "2026-01-01", "fin": "2026-01-03"})
     trip = db.get_trip(tid)
-    assert not resumen.guardar_encuesta(trip, None, ["nope"], "  ", "")          # vacía → no se guarda
+    assert not resumen.guardar_encuesta(trip, None, nota_destino=5, nota_app=None)      # las dos notas son obligatorias
+    assert not resumen.guardar_encuesta(trip, None, nota_destino=9, nota_app=4)         # fuera de rango
     assert not resumen.encuesta_respondida(tid)
-    assert resumen.guardar_encuesta(trip, None, ["comida", "comida", "x"], "más rápido", "reservas")
-    assert resumen.guardar_encuesta(trip, None, ["chat"], "", "")                # reemplaza la anterior
+    assert resumen.guardar_encuesta(trip, None, nota_destino=5, nota_app=4, gusto_destino=["comida", "comida", "x"],
+                                    mejora_destino="más seguro", mejora_app="más rápido", feature="reservas")
+    assert resumen.guardar_encuesta(trip, None, nota_destino=3, nota_app=3, gusto_app=["chat"])   # reemplaza la anterior
     assert resumen.encuesta_respondida(tid)
     with db.conn() as c:
-        fila = [dict(r) for r in c.execute("SELECT * FROM encuestas WHERE trip_id=?", (tid,)).fetchall()]
-    assert len(fila) == 1 and fila[0]["gusto"] == "chat"
+        fila = [dict(r) for r in c.execute("SELECT * FROM encuesta_cierre WHERE trip_id=?", (tid,)).fetchall()]
+    assert len(fila) == 1 and fila[0]["gusto_app"] == "chat" and fila[0]["nota_destino"] == 3

@@ -154,7 +154,7 @@ def _galeria(p: dict, n: int) -> list[dict]:
 
 
 def tarjetas(lugares: list[dict], idioma: str = "es", con_foto: bool = True, distancias: dict | None = None,
-             n_fotos: int = 4) -> list[dict]:
+             n_fotos: int = 3) -> list[dict]:
     """Tarjetas listas para pintar. Fotos reales en paralelo; textos del dato local traducidos al idioma del usuario."""
     if not lugares:
         return []
@@ -184,29 +184,39 @@ def tarjetas(lugares: list[dict], idioma: str = "es", con_foto: bool = True, dis
 
 # ── Portada: fotos reales de lugares emblemáticos de las ciudades activas (pantalla de bienvenida e inicio) ──
 _cache_portada = net.TTLCache(ttl_s=6 * 3600, maxsize=4)
-_PORTADA_CATS = ("atraccion", "museo", "parque", "mercado", "experiencia", "restaurante")
+_PORTADA_CATS = ("atraccion", "restaurante", "parque", "mercado", "experiencia", "cafe", "museo")
 
 
-def portada(ciudades: list[str], por_ciudad: int = 3) -> dict:
-    """{'fotos': [{uri, autor, lugar, ciudad}], 'ciudades': {ciudad: {uri, autor, lugar}}}. Solo fotos reales de
-    Google de lugares curados; sin fotos, listas vacías (la app pinta su fondo de siempre). Cacheado 6 h."""
+def portada(ciudades: list[str], por_ciudad: int = 9) -> dict:
+    """{'fotos': [{uri, autor, lugar, ciudad}], 'ciudades': {ciudad: {uri, autor, lugar}}}. Collage de lugares reales
+    y variados (un poco de cada categoría, no solo monumentos). Solo fotos reales de Google; sin fotos, listas vacías
+    (la app pinta su fondo de siempre). Cacheado 6 h."""
     from . import db
-    clave = "|".join(ciudades)
+    clave = "|".join(ciudades) + f"|{por_ciudad}"
     hit = _cache_portada.get(clave, _SIN)
     if hit is not _SIN:
         return hit
     fotos_out, por = [], {}
     try:
         for ciudad in ciudades:
-            lugares = [p for p in db.places_for_city(ciudad) if p.get("category") in _PORTADA_CATS]
-            lugares.sort(key=lambda p: (p.get("category") != "atraccion", -(float(p.get("rating") or 0))))
             vistos: set[str] = set()
-            elegidos = [p for p in lugares if not (p['name'] in vistos or vistos.add(p['name']))][:por_ciudad + 3]
+            por_cat: dict[str, list[dict]] = {}
+            for p in sorted(db.places_for_city(ciudad), key=lambda p: -(float(p.get("rating") or 0))):
+                if p.get("category") in _PORTADA_CATS and p["name"] not in vistos:
+                    vistos.add(p["name"])
+                    por_cat.setdefault(p["category"], []).append(p)
+            # Una a una por categoría (atracciones primero) hasta juntar candidatos de sobra.
+            candidatos: list[dict] = []
+            for i in range(3):
+                for cat in _PORTADA_CATS:
+                    if i < len(por_cat.get(cat, [])):
+                        candidatos.append(por_cat[cat][i])
+            elegidos = candidatos[:por_ciudad + 4]
             futs = [_pool.submit(_galeria, p, 1) for p in elegidos]
             n = 0
             for p, f in zip(elegidos, futs):
                 try:
-                    ph = f.result(timeout=8)
+                    ph = f.result(timeout=10)
                 except Exception:
                     ph = []
                 if not ph or n >= por_ciudad:

@@ -267,13 +267,17 @@ CREATE TABLE IF NOT EXISTS traducciones (
   texto TEXT NOT NULL,
   created_at REAL NOT NULL
 );
-CREATE TABLE IF NOT EXISTS encuestas (
+CREATE TABLE IF NOT EXISTS encuesta_cierre (
   id TEXT PRIMARY KEY,          -- una por viaje: responder otra vez reemplaza la anterior
   trip_id TEXT NOT NULL,
   user_id TEXT,
   ciudad TEXT,
-  gusto TEXT,                   -- claves separadas por coma (comida, lugares, tips, rutas, itinerario, chat)
-  mejora TEXT,
+  nota_destino INTEGER,         -- 1-5: cómo fue el destino
+  gusto_destino TEXT,           -- claves separadas por coma (comida, cultura, noche, naturaleza, gente, cafe)
+  mejora_destino TEXT,
+  nota_app INTEGER,             -- 1-5: cómo fue la app
+  gusto_app TEXT,               -- claves separadas por coma (recomendaciones, lugares, tips, rutas, itinerario, chat)
+  mejora_app TEXT,
   feature TEXT,
   created_at REAL NOT NULL
 );

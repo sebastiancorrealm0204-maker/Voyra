@@ -55,7 +55,7 @@ def fotos_de_planes(planes: list[dict], lugares: list[dict], idioma: str = "es")
     if not por_plan:
         return {}
     unicos = list({l["name"]: l for l in por_plan.values()}.values())
-    cards = {c["name"]: c for c in visual.tarjetas(unicos, idioma, n_fotos=3)}
+    cards = {c["name"]: c for c in visual.tarjetas(unicos, idioma, n_fotos=1)}
     return {pid: cards[l["name"]] for pid, l in por_plan.items() if l["name"] in cards}
 
 
@@ -94,35 +94,44 @@ def resumen(trip: dict, planes: list[dict], lugares: list[dict]) -> dict:
         "terminado": terminado(trip),
         "encuesta_respondida": encuesta_respondida(trip["id"]),
         "visitados": visual.tarjetas(list(visitados.values())[:8], idioma, n_fotos=1),
-        "ganchos": visual.tarjetas(_ganchos(lugares, set(visitados)), idioma, n_fotos=3),
+        "ganchos": visual.tarjetas(_ganchos(lugares, set(visitados)), idioma, n_fotos=2),
     }
 
 
-# ── Encuesta de cierre ──
-GUSTOS = ("comida", "lugares", "tips", "rutas", "itinerario", "chat")
+# ── Encuesta de cierre (obligatoria antes de ver el resumen): el destino y la app ──
+GUSTOS_DESTINO = ("comida", "cultura", "noche", "naturaleza", "gente", "cafe")
+GUSTOS_APP = ("recomendaciones", "lugares", "tips", "rutas", "itinerario", "chat")
 MAX_TEXTO = 500
 
 
-def guardar_encuesta(trip: dict, user_id: str | None, gusto: list[str], mejora: str, feature: str) -> bool:
-    """Guarda (o reemplaza) la encuesta del viaje. False si llegó vacía. Las claves de `gusto` se filtran a las
-    conocidas y los textos se recortan: es entrada de usuario."""
+def _nota(n) -> int | None:
+    return n if isinstance(n, int) and 1 <= n <= 5 else None
+
+
+def guardar_encuesta(trip: dict, user_id: str | None, *, nota_destino, nota_app, gusto_destino=(), gusto_app=(),
+                     mejora_destino="", mejora_app="", feature="") -> bool:
+    """Guarda (o reemplaza) la encuesta del viaje. False si faltan las dos notas (son obligatorias). Las claves se
+    filtran a las conocidas y los textos se recortan: es entrada de usuario."""
     from . import db
-    gusto = [g for g in dict.fromkeys(gusto) if g in GUSTOS]
-    mejora, feature = (mejora or "").strip()[:MAX_TEXTO], (feature or "").strip()[:MAX_TEXTO]
-    if not (gusto or mejora or feature):
+    nd, na = _nota(nota_destino), _nota(nota_app)
+    if nd is None or na is None:
         return False
+    gd = ",".join(g for g in dict.fromkeys(gusto_destino) if g in GUSTOS_DESTINO)
+    ga = ",".join(g for g in dict.fromkeys(gusto_app) if g in GUSTOS_APP)
+    corto = lambda t: (t or "").strip()[:MAX_TEXTO]  # noqa: E731
     with db.conn() as c:
-        c.execute("DELETE FROM encuestas WHERE trip_id=?", (trip["id"],))
-    db.insert("encuestas", {"trip_id": trip["id"], "user_id": user_id, "ciudad": trip.get("ciudad", ""),
-                            "gusto": ",".join(gusto), "mejora": mejora, "feature": feature})
+        c.execute("DELETE FROM encuesta_cierre WHERE trip_id=?", (trip["id"],))
+    db.insert("encuesta_cierre", {
+        "trip_id": trip["id"], "user_id": user_id, "ciudad": trip.get("ciudad", ""),
+        "nota_destino": nd, "gusto_destino": gd, "mejora_destino": corto(mejora_destino),
+        "nota_app": na, "gusto_app": ga, "mejora_app": corto(mejora_app), "feature": corto(feature)})
     return True
 
 
 def encuesta_respondida(trip_id: str) -> bool:
     from . import db
     with db.conn() as c:
-        return c.execute("SELECT 1 FROM encuestas WHERE trip_id=?", (trip_id,)).fetchone() is not None
-
+        return c.execute("SELECT 1 FROM encuesta_cierre WHERE trip_id=?", (trip_id,)).fetchone() is not None
 
 
 # ── Resumen detallado del viaje terminado (usa TODO: itinerario, documentos y la conversación) ──
