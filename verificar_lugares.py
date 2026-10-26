@@ -12,7 +12,7 @@ consulta su ficha en Google y detecta:
   · SIN_HORARIO         — Google no publica horario (no podemos decir "abre hoy").
 
 NO modifica nada: genera un reporte para que una persona decida (regla de confianza de
-Voyra: nada cambia en la curación sin revisión humana).
+Companion: nada cambia en la curación sin revisión humana).
 
     pip install httpx                           # ya está en requirements.txt
     # La key va en un archivo .env (junto a este script) con la línea:  GOOGLE_MAPS_API_KEY=tu_key

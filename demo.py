@@ -20,7 +20,7 @@ db.init_db()
 engine.QUIET_START, engine.QUIET_END = 24.0, 0.0
 
 P = lambda s: print(s, flush=True)
-P(f"\n=== VOYRA COMPANION · demo end-to-end · LLM: {llm.MODE} ===\n")
+P(f"\n=== COMPANION · demo end-to-end · LLM: {llm.MODE} ===\n")
 
 # 1. Crear viaje (input mínimo del usuario)
 tid = db.create_trip({

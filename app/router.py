@@ -131,7 +131,7 @@ def clasificar(mensaje: str, trip: dict | None = None) -> dict:
     prompt = f'Mensaje del usuario:\n"{mensaje}"\n\n{_ROUTER_SCHEMA}'
     try:
         raw = llm._call(llm.EXTRACT_PROVIDER,
-                        "Eres el router de intención de Voyra. Respondes solo JSON.",
+                        "Eres el router de intención de Companion. Respondes solo JSON.",
                         [{"role": "user", "content": prompt}], max_tokens=150)
         out = json.loads(raw.replace("```json", "").replace("```", "").strip())
         intent = out.get("intencion")

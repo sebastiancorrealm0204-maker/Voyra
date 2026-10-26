@@ -353,7 +353,7 @@ def detectar_destino(mensaje: str, lugares: list[dict]) -> dict | None:
 
 
 # ── destino «libre»: el usuario nombra un sitio que NO está en nuestra curación. No se calcula ruta (el valor de
-#    Voyra es recomendar lugares curados): solo se detecta para que el Companion lo diga y ofrezca alternativas. ──
+#    Companion es recomendar lugares curados): solo se detecta para que el Companion lo diga y ofrezca alternativas. ──
 _DESTINO_LIBRE = re.compile(
     r"(?:\b(?:ir|llegar|llego|voy|vamos|iré|quiero ir|quiero llegar)\s+(?:a la|a los|a las|al|a|hasta|hacia|para)\s+"
     r"|\b(?:go to|get to|going to|get me to|take me to|travel to|to the|directions to|route to)\s+"

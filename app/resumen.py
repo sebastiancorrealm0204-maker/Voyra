@@ -163,7 +163,7 @@ def encuesta_respondida(trip_id: str) -> bool:
 
 # ── Resumen detallado del viaje terminado (usa TODO: itinerario, documentos y la conversación) ──
 _SISTEMA_NARRATIVA = (
-    "Eres el Companion de Voyra y escribes el RESUMEN FINAL de un viaje que ya terminó, para el viajero. "
+    "Eres Companion y escribes el RESUMEN FINAL de un viaje que ya terminó, para el viajero. "
     "Escribe en {idioma}, en segunda persona, con tono cálido y concreto. Usa SOLO lo que aparece en los datos "
     "(itinerario, documentos y conversación): no inventes lugares, platos, horarios, precios ni anécdotas. "
     "Si de un día no hay datos, no lo rellenes. Responde SOLO con JSON válido con esta forma:\n"

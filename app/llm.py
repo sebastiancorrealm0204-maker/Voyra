@@ -516,7 +516,7 @@ def extract_document(text_content: str, filename: str, trip: dict | None = None)
         f"{_trip_ctx_block(trip)}"
         "Extrae TODA la info útil y los planes agendables. " + _EXTRACT_SCHEMA
     )
-    raw = _call(EXTRACT_PROVIDER, "Eres el parser de documentos de viaje de Voyra.",
+    raw = _call(EXTRACT_PROVIDER, "Eres el parser de documentos de viaje de Companion.",
                 [{"role": "user", "content": prompt}], max_tokens=1000)
     return _safe_extract(raw, filename)
 
@@ -536,7 +536,7 @@ def extract_document_image(image_data_url: str, filename: str, trip: dict | None
         f"{_trip_ctx_block(trip)}"
         "Extrae TODA la info útil y los planes agendables. " + _EXTRACT_SCHEMA
     )
-    raw = _call_vision(vp, "Eres el parser de documentos de viaje de Voyra.",
+    raw = _call_vision(vp, "Eres el parser de documentos de viaje de Companion.",
                        prompt, image_data_url, max_tokens=1000)
     return _safe_extract(raw, filename)
 
@@ -585,7 +585,7 @@ def extract_plans_from_chat(message: str, trip: dict | None = None) -> list[dict
         '"detalle": "<datos útiles o vacío>", "lugar": "<nombre del sitio o null, NUNCA la ciudad>"} ] }'
     )
     try:
-        out = _parse_json(_call(EXTRACT_PROVIDER, "Eres el detector de planes de viaje de Voyra.",
+        out = _parse_json(_call(EXTRACT_PROVIDER, "Eres el detector de planes de viaje de Companion.",
                                 [{"role": "user", "content": prompt}], max_tokens=450))
         planes = out.get("planes", [])
         planes = planes if isinstance(planes, list) else []

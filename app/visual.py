@@ -1,7 +1,7 @@
 """Tarjetas visuales de lugares curados: foto, categoría, zona, calificación y el dato local en una línea.
 
 Cuando el Companion recomienda o menciona un lugar de NUESTRA curación, la app lo muestra como tarjeta con foto
-(las personas entienden mejor lo que ven). Solo lugares curados: ese es el valor de Voyra.
+(las personas entienden mejor lo que ven). Solo lugares curados: ese es el valor de Companion.
 
 Las fotos vienen de Google Places (Place Details → foto → URL pública): son fotos REALES del lugar, nunca
 generadas ni de stock. Se cachean 6 h por lugar, así que el costo no crece con los usuarios; si Google falla o

@@ -1,4 +1,4 @@
-/* Voyra Companion — service worker
+/* Companion — service worker
  * Estrategia:
  *  - Shell (navegación a "/")  → network-first, cae a caché si no hay red.
  *  - Librerías de CDN (GET)    → stale-while-revalidate (abre rápido, refresca en background).
@@ -94,7 +94,7 @@ self.addEventListener("fetch", (event) => {
 // Recibe la notificación enviada por el backend y la muestra. El payload es
 // JSON: { title, body, data }.
 self.addEventListener("push", (event) => {
-  let payload = { title: "Voyra", body: "", data: {} };
+  let payload = { title: "Companion", body: "", data: {} };
   try { if (event.data) payload = { ...payload, ...event.data.json() }; }
   catch (e) { if (event.data) payload.body = event.data.text(); }
 
@@ -106,7 +106,7 @@ self.addEventListener("push", (event) => {
     tag: (payload.data && payload.data.kind) || "voyra",
     renotify: true,
   };
-  event.waitUntil(self.registration.showNotification(payload.title || "Voyra", options));
+  event.waitUntil(self.registration.showNotification(payload.title || "Companion", options));
 });
 
 // Al tocar la notificación: enfoca la app si ya está abierta, o la abre.

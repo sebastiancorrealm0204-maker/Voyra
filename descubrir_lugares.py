@@ -13,7 +13,7 @@ lenguaje: Google aporta la verdad estructurada y Tavily la corroboración editor
     3. CLASIFICAR: «recomendado» (≥ 2 dominios, sin señal de cierre), «dudoso» (1 dominio o sin
        evidencia) y «descartado por cierre».
     4. REPORTE para revisión humana: reportes/candidatos_bogota_<fecha>.{json,md}. NADA entra a la
-       curación sin pasar por aprobar_candidatos.py (regla de confianza de Voyra).
+       curación sin pasar por aprobar_candidatos.py (regla de confianza de Companion).
 
     # Las keys van en .env junto a este script: GOOGLE_MAPS_API_KEY y TAVILY_API_KEY
     python descubrir_lugares.py --dry-run                 # muestra el plan y el costo, no llama a nada

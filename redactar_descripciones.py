@@ -2,7 +2,7 @@
 
 La `descripcion` es lo que el Companion lee para recomendar un lugar, así que tiene que ser concreta y verdadera.
 Para cada candidato el modelo recibe SOLO lo que sabemos (nombre, categoría, zona, dirección, rating, reseñas, y los
-extractos y títulos de las fuentes que lo mencionan) y escribe 1-2 frases en el estilo de la curación de Voyra. No
+extractos y títulos de las fuentes que lo mencionan) y escribe 1-2 frases en el estilo de la curación de Companion. No
 inventa: si los datos son escasos, escribe algo corto y neutro y lo marca como `poca_informacion` para que lo revises.
 
     python redactar_descripciones.py --archivo reportes/candidatos_cultura_bogota_2026-10-26.json --dry-run
@@ -32,7 +32,7 @@ TAVILY_KEY = os.environ.get("TAVILY_API_KEY", "")
 SIN_TEXTO = ("tiktok.com", "instagram.com", "facebook.com", "youtube.com", "x.com", "twitter.com", "pinterest.com")
 
 SISTEMA = (
-    "Redactas las fichas de lugares de Voyra, una guía local de Bogotá. Para cada lugar que te doy escribe una "
+    "Redactas las fichas de lugares de Companion, una guía local de Bogotá. Para cada lugar que te doy escribe una "
     "`descripcion` en español neutro y natural, de 1 a 2 frases (máximo ~240 caracteres), con este estilo:\n"
     "- «Una de las colecciones de orfebrería prehispánica más importantes del mundo. Imprescindible; entrada económica y "
     "gratis los domingos. Dedícale 1.5–2 horas.»\n"

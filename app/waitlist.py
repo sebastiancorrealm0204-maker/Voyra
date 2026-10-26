@@ -193,7 +193,7 @@ def panel_html(rows: list[dict]) -> str:
     return (
         "<!doctype html><html lang='es'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
-        "<title>Waitlist Voyra</title><style>"
+        "<title>Waitlist Companion</title><style>"
         "body{font-family:system-ui,sans-serif;margin:16px;color:#0f172a;background:#fff}"
         "table{border-collapse:collapse;width:100%;font-size:14px}"
         "th,td{border-bottom:1px solid #e2e8f0;padding:6px 8px;text-align:left}"

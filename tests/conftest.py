@@ -14,3 +14,7 @@ def _verificacion_activa(monkeypatch):
     # usuarios empezaban a recibir 429. En los tests no aplica.
     from app import auth
     monkeypatch.setattr(auth, "_SIGNUP_MAX_PER_IP", 10**6)
+    # Sin llamadas reales a Google Places en las pruebas (fotos de las tarjetas, búsqueda de hoteles): con la key del .env cargada
+    # por los scripts de curación, cada chat con tarjetas hacía peticiones de red y la corrida pasaba de 1 a 12 minutos.
+    from app import places_live
+    monkeypatch.setattr(places_live, "API_KEY", "")

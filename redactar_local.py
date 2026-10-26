@@ -27,7 +27,7 @@ CAMPOS = ("clave", "pedir", "ver", "momento", "ojo", "dato")
 MIN_CITA = 18   # una cita de menos caracteres no prueba nada
 
 SISTEMA = (
-    "Redactas la ficha de un lugar de Voyra, una guía local de Bogotá, SOLO con la evidencia que te doy (resumen de Google y "
+    "Redactas la ficha de un lugar de Companion, una guía local de Bogotá, SOLO con la evidencia que te doy (resumen de Google y "
     "fragmentos de guías o redes). El Companion usa la ficha para hablar como un local. Devuelve SOLO JSON:\n"
     '{"descripcion": "1-2 frases (~240 caracteres): qué es el lugar y por qué ir", "descripcion_cita": "frase TEXTUAL de la evidencia", '
     '"local": {"clave": {"texto": "...", "cita": "..."}, "pedir": {...}, "ver": {...}, "momento": {...}, "ojo": {...}, "dato": {...}}}\n'

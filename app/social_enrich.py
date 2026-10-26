@@ -2,7 +2,7 @@
 
 QUÉ HACE Y POR QUÉ (lee esto antes de tocarlo)
 ─────────────────────────────────────────────────────────────────────────────
-El diferencial de Voyra es saber lo que un local sabe — y mucho de ese saber vive
+El diferencial de Companion es saber lo que un local sabe — y mucho de ese saber vive
 en TikTok e IG como "joyas perdidas". Pero hay dos verdades que definen el diseño:
 
   1) Lo VIRAL no es la joya. Para cuando algo tiene 8 TikToks, tiene fila de 2h.
@@ -27,7 +27,7 @@ señal de ruido— ya queda resuelta aquí.
 from . import db, llm
 
 _SYSTEM = (
-    "Eres el extractor de 'joyas locales' de Voyra. Recibes el texto de una pieza de "
+    "Eres el extractor de 'joyas locales' de Companion. Recibes el texto de una pieza de "
     "redes sociales (TikTok/Instagram) sobre un lugar concreto de viaje, y tu trabajo es "
     "destilar UN (1) dato local específico, accionable y verificable que un viajero "
     "agradecería — el tipo de cosa que solo sabe alguien que estuvo ahí.\n\n"
@@ -42,7 +42,7 @@ _SYSTEM = (
     "• Datos que no son de ESE lugar, o que son tan generales que ya están en cualquier guía.\n\n"
     "REGLAS DE SALIDA:\n"
     "• Escribe el dato en español neutro, en UNA frase corta, en tono de amigo local "
-    "(igual que los `dato` curados de Voyra). Sin emojis, sin hashtags, sin '¡increíble!'.\n"
+    "(igual que los `dato` curados de Companion). Sin emojis, sin hashtags, sin '¡increíble!'.\n"
     "• Solo puedes afirmar lo que el texto sostiene. Si dudas, dato=null.\n"
     "• 'tipo': 'durable' si el dato es atemporal (qué pedir, un truco permanente); "
     "'fresco' si es de coyuntura (algo que abrió esta semana, un evento, una tendencia "

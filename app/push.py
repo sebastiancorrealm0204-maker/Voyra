@@ -1,6 +1,6 @@
 """Web Push (VAPID) — notificaciones reales al celular.
 
-Para PWAs instaladas (el caso de Voyra en iPhone iOS 16.4+ / Android). No usa
+Para PWAs instaladas (el caso de Companion en iPhone iOS 16.4+ / Android). No usa
 FCM ni APNs directo: usa el estándar Web Push. El navegador del usuario crea una
 "suscripción" (un endpoint + claves) cuando da permiso; la guardamos y le
 mandamos notificaciones a ese endpoint. En iPhone, Safari la entrega vía APNs

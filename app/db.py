@@ -105,7 +105,7 @@ class _PgCursor:
     """Envuelve un cursor de psycopg para que el resto del código siga usando
     placeholders estilo SQLite ('?'). Traduce '?' -> '%s' en cada execute.
 
-    Ojo: solo toca los placeholders posicionales. El código de Voyra no usa '?'
+    Ojo: solo toca los placeholders posicionales. El código de Companion no usa '?'
     dentro de literales de cadena en su SQL, así que la traducción es segura.
     """
 

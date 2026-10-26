@@ -71,7 +71,7 @@ async def lifespan(_app: FastAPI):
         log.info("app_stop")
 
 
-app = FastAPI(title="Voyra Companion", version="0.2.0", lifespan=lifespan)
+app = FastAPI(title="Companion", version="0.2.0", lifespan=lifespan)
 
 # CORS: permite que el frontend (corriendo en el navegador, ej. un Artifact de
 # Claude) llame a este backend en localhost. En producción, reemplaza "*" por
@@ -873,7 +873,7 @@ def push_unsubscribe(tid: str, body: PushSubIn, user: dict = Depends(current_use
 def push_test(tid: str, user: dict = Depends(current_user)):
     """Manda una notificación de prueba a los dispositivos suscritos del viaje."""
     own_trip(tid, user)
-    return push.send_to_trip(tid, "Voyra 🛟", "¡Las notificaciones funcionan! Te avisaré de lo que importe.",
+    return push.send_to_trip(tid, "Companion", "¡Las notificaciones funcionan! Te avisaré de lo que importe.",
                              data={"kind": "test"})
 
 
@@ -968,7 +968,7 @@ def _bloque_rutas(trip: dict, user: dict, mensaje: str) -> tuple[str, dict | Non
         if not d:
             libre = transporte_mod.destino_libre(mensaje)
             if libre:
-                # Solo damos ruta a lugares de nuestra curación (más hotel y aeropuerto): ese es el valor de Voyra.
+                # Solo damos ruta a lugares de nuestra curación (más hotel y aeropuerto): ese es el valor de Companion.
                 return ("RUTAS: el usuario pregunta cómo llegar a «%s», que NO está en nuestra curación. No calcules ni "
                         "inventes la ruta ni tiempos. Dile con naturalidad que ahí no te metes, y ofrécele 1-2 lugares "
                         "CURADOS parecidos o cercanos a su zona (de los que tienes en LUGARES) con los que sí puedes ayudarle "
@@ -1366,8 +1366,12 @@ def chat(tid: str, c: ChatIn, user: dict = Depends(verified_user)):
     lugares_card: list[dict] = []
     if not es_tap:
         try:
-            lugares_card = visual.tarjetas(
-                visual.mencionados(reply, db.places_for_city(trip.get("ciudad", ""))), _idi)
+            citados = visual.mencionados(reply, db.places_for_city(trip.get("ciudad", "")), maximo=6)
+            if context.pide_comida(c.message):
+                # Un pedido de comida solo muestra tarjetas de sitios para comer o beber: «Parque de la 93» o «Zona T» nombrados como
+                # zona del restaurante no deben ocupar una tarjeta (y dejar fuera al tercer restaurante).
+                citados = [p for p in citados if p.get("category") in context.CATEGORIAS_COMIDA]
+            lugares_card = visual.tarjetas(citados[:3], _idi)
         except Exception:
             log.warning("tarjetas_lugares_fallo trip=%s", tid, exc_info=True)
 

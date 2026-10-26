@@ -1,4 +1,4 @@
-# Voyra Companion — backend del agente del durante
+# Companion — backend del agente del durante
 
 > **Posicionamiento:** el Companion es un local con carácter y memoria, alimentado por una
 > red local curada y verificado con IA encima. **Avisa, pero sin

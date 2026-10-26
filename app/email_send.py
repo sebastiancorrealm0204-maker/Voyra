@@ -13,7 +13,7 @@ puedas probar el flujo sin enviar correos reales todavía.
 
 Variables de entorno:
   RESEND_API_KEY        — key de Resend
-  EMAIL_FROM            — remitente, ej. "Voyra <hola@tudominio.com>"
+  EMAIL_FROM            — remitente, ej. "Companion <hola@tudominio.com>"
   APP_BASE_URL          — URL pública del backend, ej. https://web-production-1b2f6.up.railway.app
   SMTP_HOST/PORT/USER/PASSWORD — alternativa SMTP
 """
@@ -25,7 +25,7 @@ from . import net
 log = logging.getLogger("voyra.email")
 
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
-EMAIL_FROM = os.environ.get("EMAIL_FROM", "Voyra <onboarding@resend.dev>").strip()
+EMAIL_FROM = os.environ.get("EMAIL_FROM", "Companion <onboarding@resend.dev>").strip()
 APP_BASE_URL = os.environ.get("APP_BASE_URL", "").strip().rstrip("/")
 
 SMTP_HOST = os.environ.get("SMTP_HOST", "").strip()
@@ -91,7 +91,7 @@ def send_verification(email: str, token: str) -> dict:
                 headers={"Authorization": f"Bearer {RESEND_API_KEY}",
                          "Content-Type": "application/json"},
                 json={"from": EMAIL_FROM, "to": [email],
-                      "subject": "Confirma tu email — Voyra",
+                      "subject": "Confirma tu email — Companion",
                       "html": _html(link)},
                 timeout=10,
             )
@@ -108,7 +108,7 @@ def send_verification(email: str, token: str) -> dict:
         import smtplib
         from email.mime.text import MIMEText
         msg = MIMEText(_html(link), "html", "utf-8")
-        msg["Subject"] = "Confirma tu email — Voyra"
+        msg["Subject"] = "Confirma tu email — Companion"
         msg["From"] = EMAIL_FROM
         msg["To"] = email
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as s:

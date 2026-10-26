@@ -14,7 +14,7 @@ Complementa a descubrir_lugares.py: aquel trae lo bien valorado por zona (lo pop
        texto habla de cierre.
     5. REPORTE para revisión humana: reportes/joyas_bogota_<fecha>.{json,md}, en el mismo formato que
        descubrir_lugares.py, así que se aprueba igual: `python aprobar_candidatos.py --archivo <json> --aprobar "X"`.
-       NADA entra a la curación sin pasar por ahí (regla de confianza de Voyra). La `descripcion` viene
+       NADA entra a la curación sin pasar por ahí (regla de confianza de Companion). La `descripcion` viene
        pre-escrita con lo que dicen las fuentes: léela y corrígela antes de aprobar.
 
     # .env (junto a este script): GOOGLE_MAPS_API_KEY, TAVILY_API_KEY y una key de LLM (p. ej. DEEPSEEK_API_KEY)
@@ -75,7 +75,7 @@ CADENAS = {"starbucks", "juan valdez", "crepes waffles", "mcdonalds", "burger ki
            "frisby", "el corral", "andres carne de res", "tostao", "oma", "wok", "home burgers"}
 
 SISTEMA = (
-    "Eres el extractor de 'joyas escondidas' de Voyra, una guía local de Bogotá. Recibes textos numerados (títulos y "
+    "Eres el extractor de 'joyas escondidas' de Companion, una guía local de Bogotá. Recibes textos numerados (títulos y "
     "descripciones de TikToks, reels, hilos de Reddit y blogs). Devuelve SOLO JSON con esta forma:\n"
     '{"lugares": [{"nombre": "nombre exacto del lugar", "tipo": "restaurante|cafe|bar|atraccion|parque|mercado|'
     'experiencia", "barrio": "barrio o zona si el texto lo dice, o vacío", "detalle": "una frase de máximo 160 '

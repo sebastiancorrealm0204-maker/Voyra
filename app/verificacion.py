@@ -17,7 +17,7 @@ from . import food_guard, llm
 log = logging.getLogger("voyra.verificacion")
 
 _SYSTEM_CORRECTOR = (
-    "Eres el verificador de Voyra. Corriges respuestas del Companion (un local con criterio que "
+    "Eres el verificador de Companion. Corriges respuestas del Companion (un local con criterio que "
     "acompaña a viajeros) para que solo afirmen lo que dice la ficha curada de cada lugar. "
     "Reglas: conserva el tono, el idioma, la longitud y todo lo que ya era correcto; elimina o "
     "corrige SOLO lo señalado; si quitas un plato, puedes sugerir algo que SÍ esté en la ficha; "
