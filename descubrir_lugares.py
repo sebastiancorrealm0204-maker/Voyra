@@ -77,6 +77,10 @@ TIPOS = {
 RATING_MIN = 4.4
 RESENAS_MIN = 150
 DOMINIOS_MIN = 2          # menciones en dominios distintos para ser «recomendado»
+# Evidencia fuerte de Google: un lugar con esto, sin señal de cierre, también es «recomendado» aunque casi no tenga
+# menciones (la mayoría de los restaurantes buenos aparecen en una sola guía, no en dos).
+RATING_FUERTE = 4.5
+RESENAS_FUERTE = 300
 SENAL_CIERRE = re.compile(r"cerr[óo]|cierre definitivo|cerrado definitivamente|permanently closed|"
                           r"closed permanently|ya no existe|clausur", re.I)
 
@@ -175,11 +179,14 @@ def familia(dom: str) -> str:
     return partes[-2] if len(partes) >= 2 else dom
 
 
+_PALABRAS_COMUNES = {"bar", "the", "los", "las", "del", "con", "por", "casa", "cafe", "restaurante"}
+
+
 def es_propio_o_red(dom: str, nombre: str) -> bool:
     if any(dom == d or dom.endswith("." + d) for d in NO_INDEPENDIENTES | LISTADOS):
         return True
     cuerpo = _norm(dom.rsplit(".", 1)[0]).replace(" ", "")
-    return any(len(w) >= 4 and w in cuerpo for w in _norm(nombre).split())
+    return any(len(w) >= 3 and w not in _PALABRAS_COMUNES and w in cuerpo for w in _norm(nombre).split())
 
 
 def dominio(url: str) -> str:
@@ -212,10 +219,23 @@ def corroborar(nombre: str, resultados: list[dict]) -> dict:
             "fuentes": fuentes[:4], "extractos": extractos[:3], "otras": sorted(otras)}
 
 
-def clasificar(corro: dict, dominios_min: int = DOMINIOS_MIN) -> str:
+def clasificar(corro: dict, dominios_min: int = DOMINIOS_MIN, g: dict | None = None) -> str:
+    """recomendado: 2+ fuentes independientes, o (con `g`) rating y reseñas fuertes en Google. Cualquier señal de cierre
+    lo descarta."""
     if corro["cierre"]:
         return "descartado_cierre"
-    return "recomendado" if corro["menciones"] >= dominios_min else "dudoso"
+    if corro["menciones"] >= dominios_min:
+        return "recomendado"
+    if g and (g.get("rating") or 0) >= RATING_FUERTE and (g.get("resenas") or 0) >= RESENAS_FUERTE:
+        return "recomendado"
+    return "dudoso"
+
+
+def motivo(corro: dict, estado: str) -> str:
+    """Por qué quedó como recomendado: «fuentes» (2+ independientes) o «google» (solo evidencia de Google)."""
+    if estado != "recomendado":
+        return ""
+    return "fuentes" if corro["menciones"] >= DOMINIOS_MIN else "google"
 
 
 def a_entrada(g: dict, cat: str, zona: str, corro: dict, estado: str) -> dict:
@@ -250,6 +270,8 @@ def resumen_md(entradas: list[dict]) -> str:
             ev = e["_evidencia"]
             L.append(f"### {e['name']} — {e['zona']} · {e['category']}")
             L.append(f"- ★{e.get('rating')} ({ev['resenas']} reseñas) · {e['dir']}")
+            if ev.get("motivo") == "google":
+                L.append("- Recomendado por evidencia de Google (rating y reseñas fuertes), sin 2 fuentes independientes: revisa antes de aprobar.")
             if ev["dominios"]:
                 L.append(f"- Recomendado/mencionado en {ev['menciones']} sitio(s) independiente(s): {', '.join(ev['dominios'])}")
             for f in ev["fuentes"][:2]:
@@ -422,9 +444,10 @@ def main() -> None:
                 corro = {"dominios": [], "menciones": 0, "cierre": False, "fuentes": [], "extractos": []}
             if (k + 1) % 10 == 0:
                 _guardar_cache()
-            estado = clasificar(corro)
+            estado = clasificar(corro, g=g)
             print(f"   {estado[:11]:<11} {g['nombre'][:38]:<38} ★{g['rating']} ({g['resenas']}) {corro['menciones']} sitios")
             entradas.append(a_entrada(g, c["cat"], c["zona"], corro, estado))
+            entradas[-1]["_evidencia"]["motivo"] = motivo(corro, estado)
 
     _guardar_cache()
     os.makedirs("reportes", exist_ok=True)

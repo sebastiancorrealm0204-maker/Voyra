@@ -141,3 +141,19 @@ def test_un_texto_sin_bogota_no_corrobora():
            {"title": "London Calling Bogotá", "url": "https://guia.com/y", "content": "Bogotá. London Calling, pub en Bogotá con música"}]
     c = d.corroborar("London Calling", res)
     assert c["dominios"] == ["guia.com"]
+
+
+def test_google_fuerte_basta_para_recomendar_pero_no_si_hay_cierre():
+    sin_fuentes = {"menciones": 0, "cierre": False}
+    assert d.clasificar(sin_fuentes) == "dudoso"                                           # comportamiento de siempre
+    assert d.clasificar(sin_fuentes, g={"rating": 4.6, "resenas": 800}) == "recomendado"
+    assert d.clasificar(sin_fuentes, g={"rating": 4.4, "resenas": 800}) == "dudoso"
+    assert d.clasificar(sin_fuentes, g={"rating": 4.8, "resenas": 100}) == "dudoso"
+    assert d.clasificar({"menciones": 0, "cierre": True}, g={"rating": 4.9, "resenas": 5000}) == "descartado_cierre"
+    assert d.motivo({"menciones": 2}, "recomendado") == "fuentes" and d.motivo(sin_fuentes, "recomendado") == "google"
+
+
+def test_el_sitio_propio_de_un_local_de_nombre_corto_no_cuenta_como_fuente():
+    assert d.es_propio_o_red("restauranteuro.com", "URO")
+    assert d.es_propio_o_red("serattagroup.com", "Seratta")
+    assert not d.es_propio_o_red("tripadvisor.es", "URO")

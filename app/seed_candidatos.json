@@ -899,5 +899,215 @@
    "momento": "Abre todos los días desde las 8 a. m.",
    "practico": "Precio medio. horario según Google: lun–sáb 8:00–20:00; dom 8:00–21:00."
   }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Pasaje Rivas",
+  "category": "mercado",
+  "zona": "La Candelaria",
+  "dir": "Cra. 10 #No. 10 - 54, Bogotá",
+  "maps_query": "Pasaje Rivas Bogotá",
+  "lat": 4.599431,
+  "lng": -74.078211,
+  "place_id": "ChIJA-VrywmZP44RzSEMcYrkvlo",
+  "rating": 4.5,
+  "price_level": null,
+  "descripcion": "Inaugurado en 1893, es el primer centro comercial de la historia de Bogotá y hoy patrimonio inmaterial de la ciudad. Allí se consiguen piezas originales, réplicas y objetos típicos de Colombia.",
+  "confianza": "media_alta",
+  "tags": [
+   "Mercados y artesanías",
+   "Historia y cultura",
+   "Compras"
+  ],
+  "_fuentes": [
+   "lacandelaria.gobiernobogota.gov.co",
+   "tripadvisor.es",
+   "visitbogota.co"
+  ],
+  "local": {
+   "clave": "El primer centro comercial de Bogotá, de 1893: puestos de artesanías, réplicas y regalos a buen precio, con zona de cafés.",
+   "ver": "Los puestos de artesanías y objetos típicos, y la zona gastronómica para un café o un refrigerio.",
+   "dato": "Queda en La Candelaria: cerca están el Palacio de Nariño, la catedral, iglesias coloniales y museos.",
+   "practico": "horario según Google: lun–sáb 9:00–18:00; dom 10:00–15:00."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Humedal Santa María del Lago",
+  "category": "parque",
+  "zona": "Engativá",
+  "dir": "Parque Santa María Del Lago, Cra. 76 #75B 02, Zona 3, Bogotá",
+  "maps_query": "Humedal Santa María del Lago Bogotá",
+  "lat": 4.694991,
+  "lng": -74.09415,
+  "place_id": "ChIJBy-lHDqbP44R_8aZ7LHJ9Y4",
+  "rating": 4.6,
+  "price_level": null,
+  "descripcion": "Reserva Distrital de Humedal en Engativá, de categoría Ramsar: un espacio de naturaleza con aves y jardines dentro de la ciudad.",
+  "confianza": "media",
+  "tags": [
+   "Naturaleza y aire libre",
+   "Planes tranquilos",
+   "En familia / con niños"
+  ],
+  "_fuentes": [
+   "es.wikipedia.org"
+  ],
+  "local": {
+   "clave": "Un humedal de categoría Ramsar dentro de la ciudad, en Engativá: aves acuáticas y migratorias, cañaverales y jardines.",
+   "ver": "Las aves acuáticas y migratorias, los cañaverales y los jardines con flores.",
+   "dato": "Hay parqueadero de bicicletas y pistas para correr; según una guía local, la entrada es gratuita.",
+   "practico": "horario según Google: lun–sáb 6:00–17:00; dom 6:00–14:00."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Parapente Paraíso",
+  "category": "excursion",
+  "zona": "Sopó",
+  "dir": "Vía Pionono #km 4, Sopo, Guasca, Cundinamarca",
+  "maps_query": "Parapente Paraíso Bogotá",
+  "lat": 4.908658,
+  "lng": -73.913013,
+  "place_id": "ChIJ6cO4GTZ0QI4R9UtnYyvQyAM",
+  "rating": 4.7,
+  "price_level": null,
+  "descripcion": "Escuela de parapente en Sopó, a unos 40 minutos de Bogotá, con vuelos en parapente con pilotos certificados y fotos y videos de la experiencia. El refugio tiene café y restaurante con vista al embalse de Tominé y al valle de Guasca.",
+  "confianza": "media",
+  "tags": [
+   "Aventura",
+   "Escapadas desde Bogotá",
+   "Miradores y vistas"
+  ],
+  "_fuentes": [
+   "sopo.info"
+  ],
+  "local": {
+   "clave": "Escuela de parapente en Sopó, a unos 40 minutos de Bogotá, con vuelos con pilotos certificados desde 1998.",
+   "ver": "El refugio con café y restaurante, con vista al embalse de Tominé y al valle de Guasca.",
+   "ojo": "Verifica que el piloto y la escuela tengan certificaciones y seguros, y ve con ropa cómoda y calzado cerrado.",
+   "dato": "Conviene reservar antes de ir: manejan reservas por teléfono y redes.",
+   "practico": "horario según Google: lun–vie 10:30–16:30; sáb–dom 9:00–17:30."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Santuario Nuestra Señora del Carmen",
+  "category": "atraccion",
+  "zona": "La Candelaria",
+  "dir": "C. del Carmen #8-36, Bogotá",
+  "maps_query": "Santuario Nuestra Señora del Carmen Bogotá",
+  "lat": 4.594539,
+  "lng": -74.074872,
+  "place_id": "ChIJO51CTqiZP44RNohVsnwj19M",
+  "rating": 4.8,
+  "price_level": null,
+  "descripcion": "Iglesia en La Candelaria, reconocible por su fachada a rayas rojas y blancas que se levanta sobre el barrio. Una parada breve mientras recorres el centro histórico.",
+  "confianza": "media",
+  "tags": [
+   "Arquitectura",
+   "Historia y cultura",
+   "Fotografía"
+  ],
+  "_fuentes": [
+   "atlasobscura.com"
+  ],
+  "local": {
+   "clave": "Santuario de estilo gótico florentino de principios del siglo XX, famoso por su fachada a rayas rojas y blancas, que sigue por dentro.",
+   "ver": "La fachada a rayas rojas y blancas y el mismo patrón en el interior.",
+   "ojo": "El horario de Google es por franjas cortas: confírmalo antes de ir.",
+   "dato": "Queda en la Carrera 5 #8-36, entre los museos del centro histórico.",
+   "practico": "horario según Google: lun 12:00–12:50; mar–vie 7:30–11:30; sáb 12:00–12:50; dom 8:00–8:50, 10:00–10:50, 12:00–12:50."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Distrito Grafiti",
+  "category": "atraccion",
+  "zona": "Puente Aranda",
+  "dir": "Cra. 53f #5c-1 5c-99 a, Bogotá",
+  "maps_query": "Distrito Grafiti Bogotá",
+  "lat": 4.626335,
+  "lng": -74.112158,
+  "place_id": "ChIJJUWgEliZP44Rn2AaXR3rEBg",
+  "rating": 4.4,
+  "price_level": null,
+  "descripcion": "Galería de arte urbano al aire libre en Puente Aranda: donde antes había paredes de bodegas y almacenes hoy hay murales de animales y rostros humanos que cuentan historias. El Gobierno de Bogotá la presenta como la más grande de su tipo en América Latina.",
+  "confianza": "media_alta",
+  "tags": [
+   "Grafiti y arte urbano",
+   "Arte y diseño"
+  ],
+  "_fuentes": [
+   "bogota.gov.co",
+   "es.wikipedia.org",
+   "maps.apple.com",
+   "visitbogota.co"
+  ],
+  "local": {
+   "clave": "Zona de almacenes cubiertos de murales en Puente Aranda, una iniciativa distrital de arte urbano responsable.",
+   "ver": "Los almacenes decorados con murales de colores de distintos artistas.",
+   "dato": "Nació en la zona industrial, en la Avenida Américas con carrera 53A, en la localidad de Puente Aranda.",
+   "practico": "horario según Google: lun–dom abierto 24 horas."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Sendero a Monserrate",
+  "category": "parque",
+  "zona": "La Macarena",
+  "dir": "Vía Monserrate, Bogotá",
+  "maps_query": "Sendero a Monserrate Bogotá",
+  "lat": 4.6038,
+  "lng": -74.061448,
+  "place_id": "ChIJGVvEU6SZP44RPYTTV3dY6vQ",
+  "rating": 4.7,
+  "price_level": null,
+  "descripcion": "Sendero que sube al santuario de Monserrate, en los cerros orientales de Bogotá, a unos 3.150 metros de altitud. Es un lugar tradicional de peregrinación religiosa: en la cima hay un santuario que data de 1640.",
+  "confianza": "media",
+  "tags": [
+   "Senderismo",
+   "Naturaleza y aire libre",
+   "Historia y cultura",
+   "Miradores y vistas"
+  ],
+  "_fuentes": [],
+  "local": {
+   "clave": "El sendero peatonal que sube al santuario de Monserrate, en los cerros orientales de Bogotá.",
+   "dato": "Arriba hay un santuario que data de 1640 y alberga la estatua del Señor Caído de Monserrate; es un sitio tradicional de peregrinación.",
+   "ojo": "Según Google, los martes está cerrado.",
+   "practico": "horario según Google: lun 5:00–13:00; mar cerrado; mié–dom 5:00–13:00."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Fragmentos, Espacio de Arte y Memoria",
+  "category": "atraccion",
+  "zona": "La Candelaria",
+  "dir": "Cra. 7 #6b-30, Bogotá",
+  "maps_query": "Fragmentos, Espacio de Arte y Memoria Bogotá",
+  "lat": 4.592716,
+  "lng": -74.078438,
+  "place_id": "ChIJM9uQo2WZP44R8_M-klLsCuY",
+  "rating": 4.8,
+  "price_level": null,
+  "descripcion": "Espacio de arte y memoria en La Candelaria, instalado en una casa colonial. Sus salas exhiben obras y exposiciones temporales en torno al conflicto armado colombiano.",
+  "confianza": "media",
+  "tags": [
+   "Arte y diseño",
+   "Historia y cultura",
+   "Museos y galerías"
+  ],
+  "_fuentes": [
+   "es.wikipedia.org"
+  ],
+  "local": {
+   "clave": "Contramonumento de la artista Doris Salcedo sobre el conflicto armado: un espacio de reflexión, no de historia épica.",
+   "ver": "Las exposiciones abiertas al público: mira cuáles hay antes de ir.",
+   "momento": "Abre de martes a domingo de 9:00 a 17:00.",
+   "ojo": "Los lunes está cerrado.",
+   "dato": "Todos sus programas y actividades son de entrada libre y gratuitos.",
+   "practico": "horario según Google: lun cerrado; mar–dom 9:00–17:00."
+  }
  }
 ]
