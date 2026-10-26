@@ -1109,5 +1109,233 @@
    "dato": "Todos sus programas y actividades son de entrada libre y gratuitos.",
    "practico": "horario según Google: lun cerrado; mar–dom 9:00–17:00."
   }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Calle de los Anticuarios",
+  "category": "atraccion",
+  "zona": "Rosales",
+  "dir": "Cl. 79b #7 61, Bogotá",
+  "maps_query": "Calle de los Anticuarios Bogotá",
+  "lat": 4.661756,
+  "lng": -74.051023,
+  "place_id": "ChIJ22QkMgCbP44RoonDWIFKfoI",
+  "rating": 4.8,
+  "price_level": null,
+  "descripcion": "Calle del barrio Rosales con tiendas de antigüedades y boutiques como Artesanías de Colombia y St Dom, dedicadas a lo colombiano. Los anticuarios ofrecen pinturas, objetos y libros de colección.",
+  "confianza": "media",
+  "tags": [
+   "Joyas escondidas",
+   "Arte y diseño",
+   "Compras",
+   "Historia y cultura"
+  ],
+  "_fuentes": [
+   "bogota.gov.co",
+   "foodandtravel.com"
+  ],
+  "local": {
+   "clave": "Una calle de Rosales (Calle 79B) con tiendas de antigüedades: pinturas, objetos y libros de colección.",
+   "ver": "Las tiendas de antigüedades y las boutiques de artesanía colombiana, como Artesanías de Colombia.",
+   "dato": "La Alcaldía de Bogotá la lista entre los lugares escondidos turísticos de la localidad de Chapinero.",
+   "practico": "sin horario propio en Google: cada tienda maneja el suyo."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "AALTO | Bistró & Piano Bar",
+  "category": "restaurante",
+  "zona": "Zona T",
+  "dir": "Cl. 82 #11-75, piso 5, Chapinero, Bogotá, Cundinamarca, Chapinero, Bogotá",
+  "maps_query": "AALTO | Bistró & Piano Bar Bogotá",
+  "lat": 4.665954,
+  "lng": -74.053815,
+  "place_id": "ChIJaTEI3A-bP44R1WsXpvon3Xs",
+  "rating": 4.7,
+  "price_level": "PRICE_LEVEL_EXPENSIVE",
+  "descripcion": "Bistró y piano bar en el último piso del Centro Comercial El Retiro, en la Zona T. Es conocido por su torta de chocolate.",
+  "confianza": "media",
+  "tags": [
+   "Joyas escondidas",
+   "Cocina de autor",
+   "Dulces y repostería",
+   "Música en vivo"
+  ],
+  "_fuentes": [
+   "instagram.com"
+  ],
+  "local": {
+   "clave": "Bistró y piano bar en el último piso del Centro Comercial El Retiro, conocido por su torta de chocolate.",
+   "pedir": "La torta de chocolate.",
+   "dato": "Queda en el piso 5 del centro comercial, en la Calle 82 #11-75.",
+   "practico": "Caro. horario según Google: lun–dom 12:00–24:00."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Marcha Restaurante Café",
+  "category": "restaurante",
+  "zona": "La Candelaria",
+  "dir": "Cl. 11 #4 -93, La Candelaria, Bogotá, Cundinamarca",
+  "maps_query": "Marcha Restaurante Café Bogotá",
+  "lat": 4.596943,
+  "lng": -74.07342,
+  "place_id": "ChIJp8UDm6iZP44R6XJ_ef5GbGI",
+  "rating": 4.6,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Restaurante mediterráneo y café dentro del Museo Botero, en La Candelaria. Un plan para comer o tomar un café en medio del museo.",
+  "confianza": "media",
+  "tags": [
+   "Joyas escondidas",
+   "Arte y diseño",
+   "Historia y cultura"
+  ],
+  "_fuentes": [
+   "tiktok.com"
+  ],
+  "local": {
+   "clave": "Restaurante mediterráneo y café dentro del Museo Botero, en La Candelaria.",
+   "momento": "Abre de lunes a sábado de 9:00 a 17:30 y los domingos de 10:00 a 16:30.",
+   "ojo": "Cierra los martes.",
+   "dato": "Está dentro del Museo Botero.",
+   "practico": "Precio medio. horario según Google: lun 9:00–17:30; mar cerrado; mié–sáb 9:00–17:30; dom 10:00–16:30."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "lohas café",
+  "category": "cafe",
+  "zona": "Zona G",
+  "dir": "Cra. 7a #69- 99, Bogotá",
+  "maps_query": "lohas café Bogotá",
+  "lat": 4.653142,
+  "lng": -74.05741,
+  "place_id": "ChIJR6WMQyOfP44RghL8sQ6MGEQ",
+  "rating": 4.7,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Café de especialidad en la Zona G, reconocido en la selección de cafés de especialidad y de competición de Colombia. Opción para quienes buscan cafés de origen y microlotes.",
+  "confianza": "media",
+  "tags": [
+   "Joyas escondidas",
+   "Café de especialidad"
+  ],
+  "_fuentes": [
+   "reddit.com"
+  ],
+  "local": {
+   "clave": "Café de especialidad con cafés de alta calidad y de competencia, y baristas campeones nacionales.",
+   "pedir": "Pide recomendaciones al barista: te orientan sobre orígenes, métodos de extracción y tazas de temporada.",
+   "dato": "Es la división de Lohas Beans en Colombia, que impulsa el conocimiento de los cafés de especialidad en el país.",
+   "practico": "Precio medio. horario según Google: lun–sáb 8:30–19:00; dom 9:00–19:00."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Oculto Coffee",
+  "category": "cafe",
+  "zona": "Zona G",
+  "dir": "Cl 72 #9-83, Bogotá",
+  "maps_query": "Oculto Coffee Bogotá",
+  "lat": 4.656102,
+  "lng": -74.057791,
+  "place_id": "ChIJb8nI3tqbP44R7z2zOqxFzA4",
+  "rating": 4.7,
+  "price_level": "PRICE_LEVEL_INEXPENSIVE",
+  "descripcion": "Café de especialidad en la Zona G con diseño contemporáneo y ambiente de calma. Trabaja café de origen y propone conocer lo que hay antes, durante y después de cada taza.",
+  "confianza": "media",
+  "tags": [
+   "Joyas escondidas",
+   "Café de especialidad",
+   "Planes tranquilos"
+  ],
+  "_fuentes": [
+   "unaantologiadeaventuras.com"
+  ],
+  "local": {
+   "clave": "Café de especialidad en la Zona G con diseño contemporáneo y ambiente de calma, que trabaja café de origen.",
+   "practico": "Económico. horario según Google: lun–vie 7:30–19:00; sáb–dom 11:00–17:00."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Autóctona Café",
+  "category": "cafe",
+  "zona": "Quinta Camacho",
+  "dir": "Cra. 11 #69-16, Bogotá",
+  "maps_query": "Autóctona Café Bogotá",
+  "lat": 4.65415,
+  "lng": -74.060558,
+  "place_id": "ChIJ-WHAdACbP44RhJs4H-Pk3Aw",
+  "rating": 4.8,
+  "price_level": "PRICE_LEVEL_INEXPENSIVE",
+  "descripcion": "Café de especialidad 100% colombiano en Quinta Camacho, con pastelería artesanal y ambiente acogedor.",
+  "confianza": "media",
+  "tags": [
+   "Joyas escondidas",
+   "Café de especialidad",
+   "Planes tranquilos"
+  ],
+  "_fuentes": [
+   "distritoch.com"
+  ],
+  "local": {
+   "clave": "Café de especialidad 100% colombiano en Quinta Camacho, con pastelería artesanal.",
+   "dato": "Queda en la Carrera 11 #69-16.",
+   "practico": "Económico. horario según Google: lun–sáb 8:00–20:00; dom 8:00–19:30."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Open Chapinero Café",
+  "category": "cafe",
+  "zona": "Chapinero",
+  "dir": "Cl. 65 #4A - 03, Chapinero, Bogotá, Cundinamarca",
+  "maps_query": "Open Chapinero Café Bogotá",
+  "lat": 4.647836,
+  "lng": -74.05725,
+  "place_id": "ChIJfTtDURqbP44RL4HZJ1qRZfw",
+  "rating": 4.6,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Cafetería de especialidad en Chapinero Alto, en la calle 65 con carrera 4A. Recomendada por locales como una de sus favoritas para café en la ciudad.",
+  "confianza": "media",
+  "tags": [
+   "Joyas escondidas",
+   "Café de especialidad"
+  ],
+  "_fuentes": [
+   "reddit.com"
+  ],
+  "local": {
+   "clave": "Cafetería de especialidad en Chapinero Alto, en la Calle 65 con carrera 4A.",
+   "dato": "Un hilo de locales en Reddit la cita entre sus cafés favoritos de la ciudad.",
+   "practico": "Precio medio. horario según Google: lun–dom 10:00–18:30."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Balzac Cafe Anticuaria - Libreria Bar",
+  "category": "cafe",
+  "zona": "La Candelaria",
+  "dir": "Cl. 17 #72 a 7-98, Bogotá",
+  "maps_query": "Balzac Cafe Anticuaria - Libreria Bar Bogotá",
+  "lat": 4.603996,
+  "lng": -74.072652,
+  "place_id": "ChIJMbAGDaGZP44RR0_jBH9-x_o",
+  "rating": 4.7,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Café, librería y anticuario en La Candelaria, mencionado como uno de los lugares secretos de Bogotá. Un rincón para descubrir entre libros y objetos antiguos.",
+  "confianza": "media",
+  "tags": [
+   "Joyas escondidas",
+   "Planes tranquilos"
+  ],
+  "_fuentes": [
+   "instagram.com"
+  ],
+  "local": {
+   "clave": "Café, librería y anticuario escondido en La Candelaria: libros, objetos antiguos y un ambiente tranquilo.",
+   "ojo": "Los domingos está cerrado, y de lunes a sábado abre desde el mediodía o la tarde.",
+   "practico": "Precio medio. horario según Google: lun–vie 12:00–20:00; sáb 14:00–20:00; dom cerrado."
+  }
  }
 ]
