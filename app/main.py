@@ -1112,6 +1112,34 @@ def diagnostico():
     }
 
 
+@app.get("/_diag_fotos")
+def diag_fotos():
+    """Por qué (no) salen las fotos: key presente, cobertura de place_id y la respuesta cruda de Google."""
+    places = db.places_for_city("Bogotá")
+    vis = [p for p in places if p.get("category") in visual.CATEGORIAS_VISUALES]
+    muestra = next((p for p in vis if p.get("place_id")), None)
+    out = {"api_key": bool(places_live.API_KEY), "visuales": len(vis),
+           "con_place_id": sum(1 for p in vis if p.get("place_id")), "muestra": muestra and muestra["name"]}
+    if muestra and places_live.API_KEY:
+        try:
+            r = net.request("GET", f"https://places.googleapis.com/v1/places/{muestra['place_id']}", retries=0, timeout=6,
+                            headers={"X-Goog-Api-Key": places_live.API_KEY, "X-Goog-FieldMask": "photos.name"})
+            body = r.json()
+            out["details_status"] = r.status_code
+            out["fotos_en_google"] = len(body.get("photos") or [])
+            if r.status_code != 200:
+                out["details_error"] = (body.get("error") or {}).get("message", "")[:300]
+            elif body.get("photos"):
+                m = net.request("GET", f"https://places.googleapis.com/v1/{body['photos'][0]['name']}/media", retries=0,
+                                timeout=6, headers={"X-Goog-Api-Key": places_live.API_KEY},
+                                params={"maxWidthPx": 640, "skipHttpRedirect": "true"})
+                out["media_status"] = m.status_code
+                out["media_uri"] = (m.json().get("photoUri") or "")[:80] if m.status_code == 200 else                     (m.json().get("error") or {}).get("message", "")[:300]
+        except Exception as e:
+            out["excepcion"] = type(e).__name__
+    return out
+
+
 @app.get("/_diag_prompt")
 def diag_prompt(q: str = "cuéntame de La Tavola"):
     """Devuelve la LÍNEA EXACTA del prompt para el lugar mencionado en q.
