@@ -69,3 +69,11 @@ def test_limpiar_quita_texto_del_modelo_sobre_la_evidencia_y_repeticiones_parcia
              "pedir": "Pide lo que quieras; la evidencia no menciona platos específicos.",        # el modelo hablando de sí mismo
              "ver": "Los sabores de la cocina colombiana en el plato."}                            # repite la clave
     assert r.limpiar(local) == {"clave": local["clave"]}
+
+
+def test_limpiar_quita_frases_vagas_que_no_dicen_nada():
+    local = {"clave": "Bar de rock en Chapinero con música en vivo.",
+             "dato": "Según su perfil, ahí siempre pasa algo bueno.",
+             "ver": "Todo se ve y sabe muy bien, así que elegir es parte del plan.",
+             "pedir": "La jazy IPA y la macha burger."}
+    assert r.limpiar(local) == {"clave": local["clave"], "pedir": local["pedir"]}

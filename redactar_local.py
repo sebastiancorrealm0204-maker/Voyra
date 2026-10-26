@@ -22,7 +22,6 @@ import unicodedata
 
 from verificar_lugares import cargar_env
 
-cargar_env()
 RUTA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app", "seed_candidatos.json")
 CAMPOS = ("clave", "pedir", "ver", "momento", "ojo", "dato")
 MIN_CITA = 18   # una cita de menos caracteres no prueba nada
@@ -72,6 +71,8 @@ _PRECIO_HORA = re.compile(r"\$|\d{1,2}[:.]\d{2}|\d{2,3}\.\d{3}|cop|usd|pe
 _ADVERTENCIA = re.compile(r"cuidado|ojo|evita|fila|cola|reserv|lleno|llena|ruido|espera|demora|tarda|solo efectivo|"
                           r"no aceptan|cobran|cobro|propina|parquead|caro|no tanto|no es para|no apto|cierra|agotad", re.I)
 _META = re.compile(r"evidencia|no menciona|no se menciona|no especifica|no hay (?:datos|informaci)|sin informaci", re.I)   # el modelo hablando de sí mismo
+_VAGO = re.compile(r"seg[uú]n su perfil|siempre pasa|todo se ve|sabe muy bien|as[ií] que elegir|delicios|incre[ií]ble|espectacular|"
+                   r"hace la diferencia|buena energ[ií]a|ambiente (?:chévere|chevere|agradable)|sin prisa", re.I)   # frases sin información
 _TRIVIAL = re.compile(r"instagram|facebook|tiktok|cuenta de|rappi|domicilio|sitio web|p[aá]gina|publican", re.I)
 
 
@@ -90,6 +91,8 @@ def limpiar(local: dict) -> dict:
         if k == "ojo" and not _ADVERTENCIA.search(v):
             continue
         if k in ("ver", "dato") and _TRIVIAL.search(v):
+            continue
+        if k != "clave" and _VAGO.search(v):
             continue
         tv = _tokens(v)
         if k != "clave" and any(tv and len(tv & _tokens(o)) / min(len(tv), max(1, len(_tokens(o)))) >= 0.5 for o in out.values()):
@@ -164,6 +167,7 @@ def main() -> None:
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--no-quitar", action="store_true", help="No quita de la capa los lugares sin evidencia suficiente")
     a = ap.parse_args()
+    cargar_env()   # en main(): cargar .env al importar contaminaba el entorno de los tests
 
     evid = {e["name"]: e for e in json.load(open(a.evidencia, encoding="utf-8"))}
     capa = json.load(open(RUTA, encoding="utf-8"))
