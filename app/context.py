@@ -5,8 +5,9 @@ agente sabe del viaje en < 4K tokens. Incluye datos del setup, ubicación actual
 documentos extraídos y planes contados por el usuario.
 """
 import os
+import re
 
-from . import airport, city_knowledge, db, geo, plans, reloj, timeutil
+from . import airport, city_knowledge, db, geo, horarios, plans, reloj, timeutil
 
 # Cuántos mensajes previos del chat se mandan al LLM. Antes se mandaban hasta 200
 # (y eran los 200 MÁS VIEJOS): en viajes largos eso eran decenas de miles de
@@ -115,13 +116,51 @@ def _lugares_block(trip: dict, mensaje: str = "") -> str:
             if all(w in msg_low for w in palabras):
                 anclados.append(p)
 
-    # Top: los anclados primero (sin duplicar), luego los más cercanos.
+    # Hora a la que el usuario quiere el plan («a las 9 pm», «mañana a las 8») o, si no dice, ahora. Cada lugar llega marcado
+    # como ABIERTO (hasta cuándo) o CERRADO a esa hora, y los cerrados no ocupan el top: a las 21:30 el Companion debe ver los
+    # restaurantes que SÍ están abiertos, no los 30 más cercanos que ya cerraron.
+    ahora = timeutil.now_local(trip)
+    ref, _ = horarios.referencia(trip, mensaje, ahora)
+
+    def cerrado(p: dict) -> bool:
+        return horarios.esta_cerrado(p.get("place_id"), ref)
+
+    # Lugares que encajan con lo que PIDE («algo colombiano», «sushi», «vegano»), aunque no estén entre los más cercanos: así a
+    # las 23:00 aparecen los pocos colombianos abiertos y no solo los 26 más próximos. Se cruza la raíz de cada palabra del
+    # mensaje con el nombre, la descripción, los gustos y la ficha local de cada lugar.
+    _VACIAS = {"quiero", "quieres", "cenar", "comer", "almorzar", "desayunar", "algo", "para", "donde", "dónde", "hacer",
+               "recomiendame", "recomiéndame", "cerca", "noche", "tarde", "mañana", "manana", "ahora", "esta", "estoy", "tengo",
+               "puedo", "buen", "bueno", "buena", "bonito", "rico", "hora", "horas", "agrega", "agregar", "itinerario"}
+    _SERVICIOS = {"transporte", "clinica", "farmacia", "supermercado"}   # un «colombiano» no debe traer cajeros ni clínicas
+    raices = {w[:6] for w in re.findall(r"[a-záéíóúñü]{5,}", msg_low) if w not in _VACIAS}
+    relevantes: list[tuple[int, float, dict]] = []
+    if raices:
+        for p in places:
+            if p in anclados or cerrado(p) or p.get("category") in _SERVICIOS:
+                continue
+            texto = " ".join([p["name"], p.get("descripcion", ""), " ".join(p.get("tags") or []), str(p.get("local") or "")]).lower()
+            puntos = sum(1 for r in raices if r in texto)
+            if puntos:
+                d = geo.haversine_km(origin[0], origin[1], p["lat"], p["lng"]) if origin else 0.0
+                relevantes.append((-puntos, d, p))
+        relevantes.sort(key=lambda x: x[:2])
+
+    # Top: los anclados primero (sin duplicar), luego los más relevantes abiertos, luego los más cercanos abiertos; al final,
+    # unos pocos cerrados (marcados) para poder proponer «mejor mañana al mediodía».
     top = list(anclados)
-    for p in places:
+    for _, _, p in relevantes[:8]:
         if p not in top:
             top.append(p)
+    for p in places:
+        if p not in top and not cerrado(p):
+            top.append(p)
+        if len(top) >= 26:
+            break
+    for p in places:
         if len(top) >= 30:
             break
+        if p not in top and cerrado(p):
+            top.append(p)
 
     lineas = []
     for p in top:
@@ -129,7 +168,7 @@ def _lugares_block(trip: dict, mensaje: str = "") -> str:
         if origin:
             km = geo.haversine_km(origin[0], origin[1], p["lat"], p["lng"])
             dist = f" (~{km:.1f} km)"
-        linea = f"- {p['name']} [{p['category']}]{dist} · {p['zona']} · {p['descripcion']}"
+        linea = f"- {p['name']} [{p['category']}]{horarios.etiqueta(p.get('place_id'), ref)}{dist} · {p['zona']} · {p['descripcion']}"
         if p.get("tags"):
             linea += f" · GUSTOS: {', '.join(p['tags'])}"
         linea += _local_suffix(p.get("local"))
@@ -151,7 +190,7 @@ def _lugares_block(trip: dict, mensaje: str = "") -> str:
     # Companion sabe que existe y es válido recomendarlo.
     resto = [p for p in places if p not in top]
     if resto:
-        nombres = ", ".join(f"{p['name']} ({p['zona']})" for p in resto)
+        nombres = ", ".join(f"{p['name']} ({p['zona']}){' [cerrado a esa hora]' if cerrado(p) else ''}" for p in resto)
         bloque += (
             "\nOTROS LUGARES CURADOS DE VOYRA (también válidos para recomendar; "
             "están más lejos del usuario pero son parte de la curación oficial — "
@@ -298,7 +337,7 @@ QUIÉN ERES — TU CARÁCTER:
 
 CONTEXTO DEL VIAJE (Trip Context Store):
 - Destino: {trip['ciudad']}
-- Hotel donde se aloja (esto es solo dónde DUERME, no dónde está ahora): {trip['hotel']}
+- Hotel donde se aloja (esto es solo dónde DUERME, no dónde está ahora): {trip['hotel']}{(' — ' + trip['dir_hotel']) if trip.get('dir_hotel') else ''}
 - Fechas: del {trip['inicio']} al {trip['fin']}
 - Vuelo de ida: {trip.get('vuelo_ida', 'no registrado')}
 - Vuelo de regreso: {trip.get('vuelo_regreso', 'no registrado')}
@@ -337,6 +376,8 @@ SENTIDO DEL TIEMPO — PRIORIDAD ALTA (es lo que más debe distinguir al Compani
 • Antes de decir "sal a las X" o "llegas a las Y", haz la cuenta COMPLETA: hora actual o de llegada + trámites (del aterrizaje a la acera toma 60-90 min en vuelo internacional y 30-45 en nacional) + trayecto con el tráfico de ESA hora + alistarse (30 min si pasa antes por el hotel) + 10 min de margen. Si el bloque RELOJ Y LOGÍSTICA trae números calculados, úsalos tal cual y no los contradigas.
 • Muestra la cuenta en una línea para que se vea realista: "aterrizas 18:00 → afuera ~19:15 → hotel ~20:15 → listo 20:45 → en la mesa ~21:15".
 • Hora pico en Bogotá (días hábiles 5:30-8:30 y 16:30-19:30): los trayectos tardan 40-60% más; del aeropuerto al norte o al centro suele ser 60-90 min a esa hora. Un restaurante cuya cocina cierra a las 21:30 no sirve a quien recién sale del hotel a las 21:00.
+• Cada lugar de la lista trae una marca [ABIERTO hasta HH:MM] o [CERRADO a esa hora] calculada para la hora que pregunta el usuario. NUNCA recomiendes un lugar [CERRADO a esa hora] para ese momento; y si [ABIERTO hasta HH:MM] cierra poco después de cuando llegaría (menos de 45 min), dilo o descártalo. Un lugar sin marca es de horario desconocido: dilo ("confirma el horario").
+• Si a esa hora hay MENOS DE TRES opciones realmente abiertas de lo que pide (por ejemplo, comida colombiana pasadas las 21:00): da las que sí hay, di con honestidad que a esa hora la oferta es corta, y ofrece alternativas reales (otra cocina cercana que sí esté abierta, algo cerca de su hotel, domicilio). Si de verdad es muy difícil, recomiéndale con criterio hacerlo OTRO momento: el almuerzo o la tarde del día siguiente (a esa hora todo está abierto), nombrando 2-3 lugares de la lista con su horario.
 • Nunca propongas una hora que ya pasó ni algo que esté cerrado cuando llegaría (los museos suelen cerrar los lunes y a las 17:00-18:00; las cocinas cierran 21:30-22:30; domingos y festivos horario reducido; la Ciclovía es solo domingos 7:00-14:00). Si no estás seguro de un horario, dilo y pídele que lo confirme.
 • Si lo que pide no cabe en el tiempo que tiene, díselo de frente y ofrece la alternativa realista (algo cerca del hotel, domicilio, dejarlo para mañana). Mejor "no llegas, hagamos esto" que prometer lo imposible.
 • En horas concretas usa siempre formato 24 h (20:45) y di también la hora estimada de LLEGADA, no solo la de salida.

@@ -157,3 +157,12 @@ def test_el_sitio_propio_de_un_local_de_nombre_corto_no_cuenta_como_fuente():
     assert d.es_propio_o_red("restauranteuro.com", "URO")
     assert d.es_propio_o_red("serattagroup.com", "Seratta")
     assert not d.es_propio_o_red("tripadvisor.es", "URO")
+
+
+def test_cierra_despues_cuenta_madrugada_y_24_horas():
+    tarde = ["lunes: 12:00–23:00", "martes: 12:00–23:00", "miércoles: 12:00–23:30", "jueves: 12:00–22:00"]
+    assert d.cierra_despues(tarde, "22:30")                                    # 3 días ≥ 22:30
+    assert not d.cierra_despues(["lunes: 12:00–21:00"] * 7, "22:30")
+    assert d.cierra_despues(["viernes: 18:00–2:00", "sábado: 18:00–3:00", "jueves: 18:00–1:00"], "22:30")   # madrugada = tarde
+    assert d.cierra_despues(["lunes: Abierto 24 horas"] * 3, "23:00")
+    assert not d.cierra_despues([], "22:30")

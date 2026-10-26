@@ -234,6 +234,55 @@ def _maps_link(dest_lat, dest_lng, place_id, orig_lat, orig_lng) -> str:
     return "https://www.google.com/maps/dir/?" + urllib.parse.urlencode(params)
 
 
+_cache_busqueda_hotel = net.TTLCache(ttl_s=6 * 3600, maxsize=256)
+_CENTROS = {"bogota": (4.65, -74.07), "guadalajara": (20.6597, -103.3496)}
+
+
+def buscar_hoteles(nombre: str, ciudad: str, pais: str = "", n: int = 4) -> list[dict]:
+    """Hasta `n` hoteles que coinciden con lo que escribió el usuario, para que ELIJA cuál es. Hay nombres que existen en
+    varias zonas o ciudades (hay dos Dann Carlton en Bogotá): tomar el primer resultado, como hace `geocodificar_hotel`, es
+    adivinar. Devuelve [{place_id, nombre, direccion, lat, lng, rating, resenas, foto_name}]; [] si no hay key o resultados."""
+    if not API_KEY or not (nombre or "").strip():
+        return []
+    ck = f"{nombre.strip().lower()}|{ciudad.strip().lower()}|{n}"
+    hit = _cache_busqueda_hotel.get(ck, _SIN_CACHE)
+    if hit is not _SIN_CACHE:
+        return [dict(x) for x in hit]
+    cuerpo = {"textQuery": f"{nombre}, {ciudad}" + (f", {pais}" if pais and pais.lower() not in ciudad.lower() else ""),
+              "languageCode": "es", "maxResultCount": max(1, min(n, 6)), "includedType": "lodging"}
+    centro = _CENTROS.get(norm_ciudad(ciudad))
+    if centro:   # sesgo (no restricción) hacia la ciudad: los hoteles de ahí salen primero
+        cuerpo["locationBias"] = {"circle": {"center": {"latitude": centro[0], "longitude": centro[1]}, "radius": 30000.0}}
+    try:
+        r = net.request("POST", SEARCH_URL, retries=1, timeout=_TIMEOUT,
+                        headers={"Content-Type": "application/json", "X-Goog-Api-Key": API_KEY,
+                                 "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,"
+                                                     "places.rating,places.userRatingCount,places.photos.name"},
+                        json=cuerpo)
+        if r.status_code != 200:
+            log.warning("buscar_hoteles_error status=%s", r.status_code)
+            return []
+        out = []
+        for p in r.json().get("places", []):
+            loc = p.get("location") or {}
+            if loc.get("latitude") is None:
+                continue
+            out.append({"place_id": p.get("id", ""), "nombre": (p.get("displayName") or {}).get("text", ""),
+                        "direccion": p.get("formattedAddress", ""), "lat": round(loc["latitude"], 7), "lng": round(loc["longitude"], 7),
+                        "rating": p.get("rating"), "resenas": p.get("userRatingCount"),
+                        "foto_name": ((p.get("photos") or [{}])[0]).get("name")})
+        _cache_busqueda_hotel.set(ck, [dict(x) for x in out])
+        return out
+    except Exception as e:
+        log.warning("buscar_hoteles_exception error=%s", type(e).__name__)
+        return []
+
+
+def norm_ciudad(c: str) -> str:
+    import unicodedata
+    return unicodedata.normalize("NFKD", (c or "").strip().lower()).encode("ascii", "ignore").decode()
+
+
 def geocodificar_hotel(nombre_hotel: str, ciudad: str, pais: str = "") -> dict | None:
     """Geocodifica el nombre del hotel contra Google Places API una sola vez
     al crear/actualizar el trip. Devuelve {lat, lng, place_id, dir} o None.

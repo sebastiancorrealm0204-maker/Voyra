@@ -71,6 +71,9 @@ TIPOS = {
     "cultura": ("atraccion", ["museos y galerías de arte"]),
     "parques": ("parque", ["parques y jardines"]),
     "mercados": ("mercado", ["mercados y plazas de mercado"]),
+    # Para cenar tarde (más comida típica abierta de noche): se usan con --cierra-despues 22:30
+    "colombiano": ("restaurante", ["restaurantes de comida típica colombiana", "restaurantes de cocina criolla y parrilla"]),
+    "nocturno": ("restaurante", ["restaurantes abiertos hasta tarde para cenar"]),
 }
 
 # Umbrales (ajustables por línea de comandos)
@@ -125,6 +128,26 @@ TIPOS_RUIDO = {"supermarket", "grocery_store", "convenience_store", "school", "p
                "university", "gym", "fitness_center", "lodging", "hotel", "car_dealer", "car_repair", "store",
                "clothing_store", "electronics_store", "pharmacy", "hospital", "doctor", "dentist", "bank",
                "real_estate_agency", "insurance_agency", "lawyer", "meal_takeaway_only"}
+
+
+def cierra_despues(horarios: list[str], limite: str = "22:30", dias_min: int = 3) -> bool:
+    """¿Cierra a las `limite` o más tarde (la madrugada cuenta como tarde) al menos `dias_min` días de la semana?
+    `horarios` = weekdayDescriptions de Google («viernes: 12:00–23:00»). Abierto 24 h cuenta."""
+    lh, lm = (int(x) for x in limite.split(":"))
+    tarde = 0
+    for ln in horarios or []:
+        d = ln.split(":", 1)[1] if ":" in ln else ln
+        if re.search(r"24 horas|abierto 24", d, re.I):
+            tarde += 1
+            continue
+        cierres = re.findall(r"[–-]\s*(\d{1,2})(?::(\d{2}))?", d)
+        if not cierres:
+            continue
+        h, m = int(cierres[-1][0]), int(cierres[-1][1] or 0)
+        h = h + 24 if h < 6 else h           # 1:00 = una de la madrugada: después de medianoche
+        if (h, m) >= (lh, lm):
+            tarde += 1
+    return tarde >= dias_min
 
 
 def es_ruido(g: dict, zonas: list[str]) -> bool:
@@ -379,6 +402,8 @@ def main() -> None:
     ap.add_argument("--max-google", type=int, default=120, help="Tope de consultas a Google")
     ap.add_argument("--max-tavily", type=int, default=40, help="Tope de búsquedas a Tavily")
     ap.add_argument("--dry-run", action="store_true", help="Solo muestra el plan y el costo")
+    ap.add_argument("--cierra-despues", default="", metavar="HH:MM", help="Solo lugares que cierran a esta hora o más tarde (≥3 días)")
+    ap.add_argument("--prefijo", default="candidatos_bogota", help="Nombre base del reporte en reportes/ (no pisa el de siempre)")
     args = ap.parse_args()
 
     zonas = [z.strip() for z in args.zonas.split(",") if z.strip()] or list(ZONAS)
@@ -418,6 +443,8 @@ def main() -> None:
                     continue
                 if geo.haversine_km(ZONAS[z][0], ZONAS[z][1], g["lat"], g["lng"]) * 1000 > RADIO_MAX_M:
                     continue
+                if args.cierra_despues and not cierra_despues(g.get("horarios") or [], args.cierra_despues):
+                    continue
                 if es_ruido(g, list(ZONAS)) or es_duplicado(g["nombre"], g["place_id"], curados):
                     continue
                 candidatos[g["place_id"]] = {"g": g, "zona": z,
@@ -451,7 +478,7 @@ def main() -> None:
 
     _guardar_cache()
     os.makedirs("reportes", exist_ok=True)
-    base = f"reportes/candidatos_bogota_{datetime.date.today().isoformat()}"
+    base = f"reportes/{args.prefijo}_{datetime.date.today().isoformat()}"
     with open(base + ".json", "w", encoding="utf-8") as f:
         json.dump(entradas, f, ensure_ascii=False, indent=1)
     with open(base + ".md", "w", encoding="utf-8") as f:

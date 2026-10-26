@@ -4228,5 +4228,712 @@
    "dato": "Se presenta como Café Cultural en redes.",
    "practico": "Precio medio. horario según Google: lun–vie 8:00–23:00; sáb 10:00–23:00; dom 10:00–20:00."
   }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "PETRONIO Cocina de autor",
+  "category": "restaurante",
+  "zona": "Rosales",
+  "dir": "El Polo, Cra. 22 #84-99, Barrios Unidos, Bogotá, Cundinamarca",
+  "maps_query": "PETRONIO Cocina de autor Bogotá",
+  "lat": 4.673039,
+  "lng": -74.061437,
+  "place_id": "ChIJWyM7DG-bP44Rl7bK8GMa9u8",
+  "rating": 4.4,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Restaurante de cocina de autor inspirado en el Pacífico colombiano, con platos tradicionales y un toque creativo en un ambiente relajado.",
+  "confianza": "media",
+  "tags": [],
+  "_fuentes": [
+   "tripadvisor.es"
+  ],
+  "local": {
+   "clave": "Cocina de autor que une tradición del Pacífico colombiano y alta cocina.",
+   "pedir": "Pide el plato 'cerdo que se duerme'.",
+   "ver": "Sabores del Pacífico con ingredientes colombianos en platos que cuentan una historia.",
+   "dato": "Está en Carrera 22 #84–99, Piso 1.",
+   "practico": "Precio medio. horario según Google: lun–mié 12:00–22:00; jue–sáb 12:00–24:00; dom 12:00–18:00."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Qun Bogotá | Best Restaurant in Bogotá",
+  "category": "restaurante",
+  "zona": "Chicó",
+  "dir": "Cra. 11 #90-49, Chapinero, Bogotá, Cundinamarca",
+  "maps_query": "Qun Bogotá | Best Restaurant in Bogotá Bogotá",
+  "lat": 4.672658,
+  "lng": -74.048791,
+  "place_id": "ChIJqyIV10WbP44ROAe-f6cH4Ws",
+  "rating": 4.7,
+  "price_level": null,
+  "descripcion": "Restaurante peruano en el barrio Chicó de Bogotá, con reserva disponible en Resy. Una opción para comer cocina peruana en la zona.",
+  "confianza": "media",
+  "tags": [],
+  "_fuentes": [],
+  "local": {
+   "clave": "Restaurante peruano en el Chicó de Bogotá.",
+   "practico": "horario según Google: lun–mié 12:00–23:00; jue–sáb 12:00–24:00; dom 12:00–18:00."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Primi",
+  "category": "restaurante",
+  "zona": "Zona T",
+  "dir": "Kr 13 #85-85, Bogotá",
+  "maps_query": "Primi Bogotá",
+  "lat": 4.670238,
+  "lng": -74.053262,
+  "place_id": "ChIJuf2JS4uaP44RAD6V3NrdE6U",
+  "rating": 4.6,
+  "price_level": "PRICE_LEVEL_EXPENSIVE",
+  "descripcion": "Restaurante cálido de clásicos italianos mejorados, como pizza, pasta y postres. Un favorito para pizza de masa delgada y crujiente en la Zona T.",
+  "confianza": "media",
+  "tags": [],
+  "_fuentes": [
+   "tripadvisor.es"
+  ],
+  "local": {
+   "clave": "Italiano de clásicos mejorados, famoso por su pizza de masa delgada y crujiente.",
+   "pedir": "La pizza de 3 quesos es la que más destacan.",
+   "momento": "Puedes entrar sin reserva, incluso si está lloviendo.",
+   "dato": "Queda al otro lado de la calle del Sofitel, así que es fácil llegar caminando.",
+   "practico": "Caro. horario según Google: lun–mié 12:00–22:00; jue–sáb 12:00–23:00; dom 12:00–21:00."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Campo Dei Fiori",
+  "category": "restaurante",
+  "zona": "Usaquén",
+  "dir": "Ak 7 #120-20, Usaquén, Bogotá, Cundinamarca",
+  "maps_query": "Campo Dei Fiori Bogotá",
+  "lat": 4.69689,
+  "lng": -74.030931,
+  "place_id": "ChIJzyIDMwCbP44RH6RMgxr_Bw8",
+  "rating": 4.4,
+  "price_level": "PRICE_LEVEL_EXPENSIVE",
+  "descripcion": "Restaurante italiano en Usaquén inspirado en la plaza de Roma, con gastronomía, arte, moda y shows en vivo en un mismo espacio. Un pedacito de Italia en el corazón de Bogotá.",
+  "confianza": "media",
+  "tags": [],
+  "_fuentes": [
+   "tripadvisor.es"
+  ],
+  "local": {
+   "clave": "Restaurante italiano temático que recrea la piazza de Roma con pizza, brindis y shows en vivo.",
+   "pedir": "Negroni de autor o Aperol Spritz para el brindis, y pizza al centro.",
+   "ver": "La gastronomía, la música y cada rincón del lugar como un paseo sensorial.",
+   "dato": "El ambiente recuerda a las trattorias italianas auténticas.",
+   "practico": "Caro. horario según Google: lun–sáb 12:00–23:30; dom 12:00–19:00."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Tienda de café",
+  "category": "restaurante",
+  "zona": "Usaquén",
+  "dir": "Cl. 119 #6-16, Usaquén, Bogotá, Cundinamarca",
+  "maps_query": "Tienda de café Bogotá",
+  "lat": 4.695463,
+  "lng": -74.030605,
+  "place_id": "ChIJiQ1r06iaP44RCQZMLSUzMMg",
+  "rating": 4.5,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Restaurante en Usaquén donde el carbón y la experiencia dan alma a los platos. Lleva desde 1993 cocinando historias en el barrio.",
+  "confianza": "media",
+  "tags": [],
+  "_fuentes": [
+   "tripadvisor.com"
+  ],
+  "local": {
+   "clave": "Restaurante de Usaquén con cocina al carbón, abierto desde 1993.",
+   "dato": "Usaquén debe su nombre a la princesa Usacá, hija del Zaque.",
+   "practico": "Precio medio. horario según Google: lun–mar 11:30–22:00; mié 11:30–22:30; jue 11:30–23:00; vie 11:30–24:00; sáb 10:00–24:00; dom 9:00–22:00."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Tokyo Rooftop | Sushi y Cocteles en la Zona G",
+  "category": "restaurante",
+  "zona": "Zona G",
+  "dir": "Cra. 5 #65-14, Bogotá",
+  "maps_query": "Tokyo Rooftop | Sushi y Cocteles en la Zona G Bogotá",
+  "lat": 4.648589,
+  "lng": -74.057852,
+  "place_id": "ChIJPYht75CbP44RxqOxPqE8x_c",
+  "rating": 4.5,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Restaurante de cocina japonesa contemporánea en terraza sobre la Zona G, inspirado en la estética de Tokio, con sushi de autor y vistas panorámicas.",
+  "confianza": "media",
+  "tags": [],
+  "_fuentes": [],
+  "local": {
+   "clave": "Cocina japonesa contemporánea en una terraza sobre la Zona G.",
+   "pedir": "Sushi de autor y sashimi.",
+   "ver": "Las vistas panorámicas desde la terraza.",
+   "dato": "Está inspirado en la estética de Tokio.",
+   "practico": "Precio medio. horario según Google: lun–mié 12:00–22:00; jue–sáb 12:00–23:00; dom 0:00–18:00."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Isola Trattoria Bar",
+  "category": "restaurante",
+  "zona": "Zona T",
+  "dir": "Cra. 12a #83 - 30, Bogotá",
+  "maps_query": "Isola Trattoria Bar Bogotá",
+  "lat": 4.667615,
+  "lng": -74.053812,
+  "place_id": "ChIJz_tRNPWaP44RHSQyzJ_j_v8",
+  "rating": 4.4,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Trattoria bar en la Zona T que trae el encanto del Mediterráneo y la costa italiana a Bogotá. Ideal para pastas hechas a mano, mariscos y un spritz en su barra luminosa.",
+  "confianza": "media",
+  "tags": [],
+  "_fuentes": [
+   "bogota.gaycities.com"
+  ],
+  "local": {
+   "clave": "Cocina de la costa italiana con pastas hechas a mano y mariscos, en un espacio luminoso con barra.",
+   "ver": "La barra es buena para spritz, copas de vino y aperitivos.",
+   "momento": "Pasa por la barra antes o después de cenar.",
+   "dato": "Está en el sector de El Retiro, dentro de la Zona T.",
+   "practico": "Precio medio. horario según Google: lun 12:00–22:00; mar 12:00–23:00; mié 12:00–24:00; jue 12:00–1:00; vie–sáb 12:00–3:00; dom 12:00–22:00."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "El Bardo - Bar & Mediterranean Grill | Zona G",
+  "category": "restaurante",
+  "zona": "Zona G",
+  "dir": "Cl. 69a #5-59, Bogotá",
+  "maps_query": "El Bardo - Bar & Mediterranean Grill | Zona G Bogotá",
+  "lat": 4.651554,
+  "lng": -74.055853,
+  "place_id": "ChIJpbK5SiCbP44RHbatZUyssMw",
+  "rating": 4.5,
+  "price_level": "PRICE_LEVEL_EXPENSIVE",
+  "descripcion": "Bar y parrilla mediterránea en la Zona G que mezcla cocina árabe y de Medio Oriente con cócteles y vinos.",
+  "confianza": "media",
+  "tags": [],
+  "_fuentes": [],
+  "local": {
+   "clave": "Bar y parrilla mediterránea con cocina árabe en la Zona G.",
+   "pedir": "Pide del menú de mezze y acompáñalo con un cóctel del bardo o una copa de sangría.",
+   "dato": "También se llama El Bardo - Arabic Grill.",
+   "practico": "Caro. horario según Google: lun–mar 11:40–22:00; mié–sáb 11:40–23:00; dom 11:40–20:00."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Todo Es Color Di Rosa",
+  "category": "restaurante",
+  "zona": "Zona G",
+  "dir": "Cl. 81 #13-05, Chapinero, Bogotá, Cundinamarca",
+  "maps_query": "Todo Es Color Di Rosa Bogotá",
+  "lat": 4.666122,
+  "lng": -74.055826,
+  "place_id": "ChIJ6wzlBDSbP44R80yUfn3jTW8",
+  "rating": 4.4,
+  "price_level": "PRICE_LEVEL_EXPENSIVE",
+  "descripcion": "Restaurante de cocina italiana en rosa en la Zona T, con pasta fresca, pizza de masa madre y coctelería de autor. Es un lugar pensado para la foto, con shows como la pasta a la rueda.",
+  "confianza": "media",
+  "tags": [],
+  "_fuentes": [],
+  "local": {
+   "clave": "Cocina italiana en rosa, con pasta fresca y la mesa más fotografiada de Bogotá.",
+   "ver": "La pasta a la rueda, terminada dentro de una rueda de Grana Padano frente a tu mesa.",
+   "momento": "Puedes reservar por el asistente con cupos en vivo y confirmación inmediata.",
+   "dato": "El espacio tiene sofás de terciopelo rosa y un árbol de flores en el techo.",
+   "practico": "Caro. horario según Google: lun–sáb 12:00–23:00; dom 12:00–18:00."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Attic & Keller",
+  "category": "restaurante",
+  "zona": "Zona G",
+  "dir": "Kr 13 #75-51, Bogotá",
+  "maps_query": "Attic & Keller Bogotá",
+  "lat": 4.661571,
+  "lng": -74.058492,
+  "place_id": "ChIJbeqwITabP44Rpt74BLtyw90",
+  "rating": 4.4,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Attic & Keller es un gastrobar mediterráneo en la Zona G con varios ambientes y un patio entre árboles y ladrillo. Es un sitio para ir con amigos, con música, vino y cerveza.",
+  "confianza": "media",
+  "tags": [],
+  "_fuentes": [
+   "mesa247.co",
+   "tripadvisor.es"
+  ],
+  "local": {
+   "clave": "Gastrobar mediterráneo cuatro en uno, entre árboles y paredes de ladrillo.",
+   "pedir": "Pide salchichas y pizza como entrada.",
+   "ver": "El lugar tiene un interior cálido y platos artesanales.",
+   "dato": "El socio fundador lo describe como el ático, el sótano y todo lo que está en la mitad.",
+   "practico": "Precio medio. horario según Google: lun 12:00–18:00; mar 12:00–22:00; mié 12:00–24:00; jue 12:00–1:30; vie–sáb 12:00–2:00; dom 11:30–22:00."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Omnia",
+  "category": "restaurante",
+  "zona": "Chapinero",
+  "dir": "Cl. 81 #13-05 Piso 4, Bogotá",
+  "maps_query": "Omnia Bogotá",
+  "lat": 4.666151,
+  "lng": -74.055654,
+  "place_id": "ChIJNwgjbkqbP44R53VD3qtkgUM",
+  "rating": 4.4,
+  "price_level": null,
+  "descripcion": "Restaurante de cocina japonesa y china en Chapinero, con sushi signature, show mientras cenas y un Buda de la felicidad para pedir un deseo.",
+  "confianza": "media",
+  "tags": [],
+  "_fuentes": [
+   "serattagroup.com",
+   "tripadvisor.com"
+  ],
+  "local": {
+   "clave": "Cocina japonesa y china con sushi signature y un Buda de los deseos.",
+   "pedir": "Prueba el maki popcorn, los nigiris y los dumplings de pato.",
+   "ver": "Puedes pedir un deseo al Buda de la felicidad y ver un show mientras cenas.",
+   "dato": "Combina recetas de China y Japón con sabores colombianos.",
+   "practico": "horario según Google: lun–mié 14:00–23:00; jue–sáb 12:00–23:00; dom 12:00–18:00."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Lounge de Andrei",
+  "category": "restaurante",
+  "zona": "Usaquén",
+  "dir": "Cra. 6 #116-78, Bogotá",
+  "maps_query": "Lounge de Andrei Bogotá",
+  "lat": 4.693813,
+  "lng": -74.031143,
+  "place_id": "ChIJr8JJl6eaP44R7Ffi1NPbQS0",
+  "rating": 4.6,
+  "price_level": null,
+  "descripcion": "Un lounge rústico y bohemio en Usaquén, con salas cómodas para ir con amigos a tardear o tomar vino.",
+  "confianza": "media",
+  "tags": [],
+  "_fuentes": [
+   "tripadvisor.es"
+  ],
+  "local": {
+   "clave": "Un lounge rústico, privado y bohemio para planes relajados en Usaquén.",
+   "pedir": "Pide una tablita de quesos, de jamones o las dos para acompañar.",
+   "ver": "Las salas cómodas del lounge, que hacen sentirse en casa.",
+   "momento": "Buena opción para tardear con amigos o tomar vinos en la noche.",
+   "dato": "El recibimiento desde la entrada a la Casa de Andréi es cálido y cordial.",
+   "practico": "horario según Google: lun–mié 10:30–22:30; jue–sáb 10:30–23:00; dom 10:30–18:00."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Huitzilin Restaurante",
+  "category": "restaurante",
+  "zona": "La Candelaria",
+  "dir": "Cl. 12b Bis #1A-06, La Candelaria, Bogotá",
+  "maps_query": "Huitzilin Restaurante Bogotá",
+  "lat": 4.597339,
+  "lng": -74.069463,
+  "place_id": "ChIJ-abTRSqZP44RerQ5KdkKETc",
+  "rating": 4.5,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Restaurante mexicano en La Candelaria con cocina que recuerda a México y atención muy amable. Buen plan para celebrar con sabor mexicano.",
+  "confianza": "media",
+  "tags": [],
+  "_fuentes": [
+   "dadep.gov.co",
+   "tripadvisor.com"
+  ],
+  "local": {
+   "clave": "Restaurante mexicano en La Candelaria con sazón de México y buen servicio.",
+   "ver": "Comida mexicana y buena música.",
+   "practico": "Precio medio. horario según Google: lun–dom 14:00–23:00."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "El Estanque bar",
+  "category": "restaurante",
+  "zona": "Teusaquillo",
+  "dir": "110111, Teusaquillo, Bogotá",
+  "maps_query": "El Estanque bar Bogotá",
+  "lat": 4.631087,
+  "lng": -74.07481,
+  "place_id": "ChIJkyCmaEqbP44R_OxWI1cQLRg",
+  "rating": 4.5,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Bar and grill en Teusaquillo donde se come comida pakistaní con opciones veganas y se prueban tés y bebidas variadas. El servicio amable es parte del plan.",
+  "confianza": "media",
+  "tags": [],
+  "_fuentes": [
+   "wanderlog.com"
+  ],
+  "local": {
+   "clave": "Bar and grill de comida pakistaní con opciones veganas y buena variedad de tés y bebidas.",
+   "dato": "El personal amable, como Mauricio, es parte de la experiencia.",
+   "practico": "Precio medio. horario según Google: lun 9:00–17:00; mar–jue 11:00–24:00; vie–dom 11:00–2:00."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "FRIJOLES EL GORDO",
+  "category": "restaurante",
+  "zona": "Chicó",
+  "dir": "Bogotá",
+  "maps_query": "FRIJOLES EL GORDO Bogotá",
+  "lat": 4.679734,
+  "lng": -74.049101,
+  "place_id": "ChIJNYFB_g-bP44R5-yNzpD8L0o",
+  "rating": 4.4,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Un restaurante de frijoles en el Chicó, con la promesa de frijoles certificados por un paisa. Un sitio para ir por la comida de casa.",
+  "confianza": "media",
+  "tags": [],
+  "_fuentes": [],
+  "local": {
+   "clave": "Frijoles certificados por un paisa en el Chicó.",
+   "pedir": "Los frijoles, que son la especialidad de la casa.",
+   "practico": "Precio medio. horario según Google: lun–vie 11:30–3:00; sáb–dom cerrado."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "7•16 Steak House",
+  "category": "restaurante",
+  "zona": "Usaquén",
+  "dir": "Cl. 119b #6-28, Bogotá",
+  "maps_query": "7•16 Steak House Bogotá",
+  "lat": 4.696287,
+  "lng": -74.030222,
+  "place_id": "ChIJv5UWA6iaP44RghHG0ExB_uc",
+  "rating": 4.5,
+  "price_level": "PRICE_LEVEL_EXPENSIVE",
+  "descripcion": "Steak house y parrilla en Usaquén con ambientes cuidados y carta variada de carnes. Las croquetas de jamón y las costillas bbq tiernas son lo que más se repite en las reseñas.",
+  "confianza": "media",
+  "tags": [],
+  "_fuentes": [],
+  "local": {
+   "clave": "Parrilla de carnes en Usaquén con ambientes bien logrados y carta variada.",
+   "pedir": "Las croquetas de jamón y las costillas bbq, que salen tiernas.",
+   "practico": "Caro. horario según Google: lun–jue 12:00–22:00; vie–sáb 12:00–23:00; dom 9:00–18:00."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "El Día Que Me Quieras",
+  "category": "restaurante",
+  "zona": "Chapinero",
+  "dir": "Cl. 69a #4-26, Bogotá",
+  "maps_query": "El Día Que Me Quieras Bogotá",
+  "lat": 4.651149,
+  "lng": -74.054624,
+  "place_id": "ChIJXymf9kGaP44Rlh10IkpYdoU",
+  "rating": 4.4,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Restaurante en Chapinero con varias sedes en Bogotá, entre ellas la Zona G y la Calle 93. Un sitio para comer bien en la zona.",
+  "confianza": "media",
+  "tags": [],
+  "_fuentes": [],
+  "local": {
+   "clave": "Restaurante bogotano con sedes en la Zona G, la Calle 93 y la Calle 140.",
+   "practico": "Precio medio. horario según Google: lun–jue 12:00–22:00; vie–sáb 12:00–23:00; dom 12:00–17:00."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "La Patagonia",
+  "category": "restaurante",
+  "zona": "Usaquén",
+  "dir": "Cl. 119b #5-19, Bogotá",
+  "maps_query": "La Patagonia Bogotá",
+  "lat": 4.695721,
+  "lng": -74.029483,
+  "place_id": "ChIJ4_aqigeQP44RDsN68PzULsE",
+  "rating": 4.6,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Una parrilla argentina en Usaquén, conocida por sus buenos cortes de carne y su comida auténtica. Ambiente acogedor para disfrutar de una comida informal.",
+  "confianza": "media",
+  "tags": [],
+  "_fuentes": [
+   "tripadvisor.es"
+  ],
+  "local": {
+   "clave": "Parrilla argentina con buenos cortes y ambiente acogedor.",
+   "pedir": "Los cortes de carne, especialmente el steak.",
+   "practico": "Precio medio. horario según Google: lun 12:00–21:00; mar–mié 12:00–15:00, 17:00–21:00; jue–dom 12:00–22:00."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "La Bonga Del Sinú Calle 116",
+  "category": "restaurante",
+  "zona": "Usaquén",
+  "dir": "Ac 116 #16-89, Bogotá",
+  "maps_query": "La Bonga Del Sinú Calle 116 Bogotá",
+  "lat": 4.697093,
+  "lng": -74.046071,
+  "place_id": "ChIJ9Qew6rCaP44R-Rd33KAJMHs",
+  "rating": 4.2,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Restaurante de cocina colombiana en Usaquén, conocido por sus carnes y su variedad de aperitivos. Un sitio para probar sabores auténticos del país.",
+  "confianza": "media",
+  "tags": [],
+  "_fuentes": [],
+  "local": {
+   "clave": "Cocina colombiana auténtica con carnes bien preparadas.",
+   "pedir": "Pide los platos de carne de res.",
+   "ver": "Hay variedad de carnes y aperitivos.",
+   "practico": "Precio medio. horario según Google: lun–mié 12:00–22:00; jue–sáb 12:00–23:00; dom 9:00–20:00."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Pasión Peruana",
+  "category": "restaurante",
+  "zona": "La Macarena",
+  "dir": "Cra. 4 #29-14, Bogotá",
+  "maps_query": "Pasión Peruana Bogotá",
+  "lat": 4.614904,
+  "lng": -74.066039,
+  "place_id": "ChIJkRRdkJqZP44RDWOvrZM9WNY",
+  "rating": 4.3,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Restaurante peruano en La Macarena donde preparan ceviche y platos como causa limeña y lomo acuchado. Un sitio para comer cocina peruana en Bogotá.",
+  "confianza": "media",
+  "tags": [],
+  "_fuentes": [
+   "tripadvisor.es"
+  ],
+  "local": {
+   "clave": "Cocina peruana en La Macarena, con ceviche y causa limeña entre lo pedido.",
+   "ver": "El ceviche está bien preparado y con sus detalles.",
+   "ojo": "Para reservar hay que llamar al teléfono que aparece en su Instagram.",
+   "practico": "Precio medio. horario según Google: lun–mié 12:00–15:00, 18:00–22:00; jue–sáb 12:00–22:00; dom 12:00–17:00."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "HAB Café",
+  "category": "restaurante",
+  "zona": "Chapinero Alto",
+  "dir": "Cra. 5 # 58 - 07, Chapinero, Bogotá, Cundinamarca",
+  "maps_query": "HAB Café Bogotá",
+  "lat": 4.643032,
+  "lng": -74.060902,
+  "place_id": "ChIJJaKwXO6ZP44R8EWdQZDjBH4",
+  "rating": 4.5,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Restaurante del HAB Hotel en Chapinero Alto con cocina colombiana de autor y enfoque de la granja a la mesa. Buen sitio para brunch o comida en un espacio acogedor y moderno.",
+  "confianza": "media",
+  "tags": [],
+  "_fuentes": [],
+  "local": {
+   "clave": "Bistró de cocina colombiana de autor, con enfoque de la granja a la mesa, dentro del HAB Hotel.",
+   "pedir": "Para brunch: pancakes, tostadas francesas, croissant relleno y bowls con miel.",
+   "ver": "También hay pesca del día, ensaladas, postres y vinos en el menú.",
+   "dato": "Queda dentro del HAB Hotel, en Chapinero Alto.",
+   "practico": "Precio medio. horario según Google: lun–jue 7:00–22:00; vie–sáb 7:00–23:00; dom 7:00–20:00."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Lima Restaurante Bar",
+  "category": "restaurante",
+  "zona": "La Macarena",
+  "dir": "Cra. 4a #27-36, Bogotá",
+  "maps_query": "Lima Restaurante Bar Bogotá",
+  "lat": 4.614279,
+  "lng": -74.06613,
+  "place_id": "ChIJ48sMC6SZP44RPbZXaEPD1bs",
+  "rating": 4.3,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Restaurante de gastronomía peruana en La Macarena, con menú amplio y comida fresca bien preparada. Un sitio tranquilo para comer sazón peruano en Bogotá.",
+  "confianza": "media",
+  "tags": [],
+  "_fuentes": [
+   "tripadvisor.co"
+  ],
+  "local": {
+   "clave": "Restaurante bar de gastronomía peruana en La Macarena.",
+   "pedir": "El suspiro limeño, que lo sirven en copa.",
+   "ver": "Probar algo de mar con Inca Kola.",
+   "dato": "El local es pequeño.",
+   "practico": "Precio medio. horario según Google: lun–sáb 12:00–23:00; dom 12:00–22:00."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Cocina Peruana La Molina",
+  "category": "restaurante",
+  "zona": "La Macarena",
+  "dir": "Cl. 26c #4-43, barrio, Bogotá, Cundinamarca",
+  "maps_query": "Cocina Peruana La Molina Bogotá",
+  "lat": 4.61268,
+  "lng": -74.066536,
+  "place_id": "ChIJYT6F5-yZP44Rz8ioITiS95Q",
+  "rating": 4.6,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Peruano auténtico y acogedor en el corazón de Bogotá, con sabores tradicionales y buena atención. Un paso por su cocina si buscas arroz chaufa o lomo saltado.",
+  "confianza": "media",
+  "tags": [],
+  "_fuentes": [],
+  "local": {
+   "clave": "Peruano de barrio con cocina auténtica y trato cercano.",
+   "pedir": "Pide el arroz chaufa o el lomo saltado.",
+   "ver": "Ambiente acogedor y servicio atento.",
+   "dato": "Buena opción peruana a precio económico sin perder calidad.",
+   "practico": "Precio medio. horario según Google: lun–sáb 12:00–22:00; dom 12:00–17:00."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "80 Sillas",
+  "category": "restaurante",
+  "zona": "Usaquén",
+  "dir": "Cl. 118 #6a-05, Usaquén, Bogotá",
+  "maps_query": "80 Sillas Bogotá",
+  "lat": 4.694885,
+  "lng": -74.031619,
+  "place_id": "ChIJc6gjaRSbP44RN-macOvu1-c",
+  "rating": 4.4,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Restaurante de pescados y mariscos en Usaquén con un capítulo importante de ceviches. Trabajan con pescado fresco directamente del Pacífico.",
+  "confianza": "media",
+  "tags": [],
+  "_fuentes": [
+   "tripadvisor.es"
+  ],
+  "local": {
+   "clave": "Restaurante de pescados y mariscos con ceviches que son la especialidad de la casa.",
+   "pedir": "La cazuelita de camarones gratinados y los ceviches, que vienen en tamaño vaso o taza.",
+   "ver": "Prueba el cilantro y jalapeño con pescado, camarón, chicharrón de pulpo y tigre de jalapeño.",
+   "dato": "Trabajan solo con pescado fresco traído directamente del Pacífico.",
+   "practico": "Precio medio. horario según Google: lun 12:00–18:00; mar 12:00–21:00; mié–sáb 12:00–22:00; dom 12:00–17:00."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Ciudad Parrilla",
+  "category": "restaurante",
+  "zona": "Teusaquillo",
+  "dir": "Cra. 24 #41-60, Bogotá",
+  "maps_query": "Ciudad Parrilla Bogotá",
+  "lat": 4.631995,
+  "lng": -74.074788,
+  "place_id": "ChIJUa1kuiiaP44RoQd1a8aJcYg",
+  "rating": 4.4,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Un restaurante de parrilla en Teusaquillo que empezó en una calle de la zona y hoy tiene su propio local. La clientela ya conoce la calidad de su comida.",
+  "confianza": "media",
+  "tags": [],
+  "_fuentes": [],
+  "local": {
+   "clave": "Parrilla de barrio que nació en la calle y hoy tiene local propio en Teusaquillo.",
+   "pedir": "El churrasco con su guarnición y las hamburguesas.",
+   "ver": "Queda cerca del Parkway, ideal para pasear por la zona.",
+   "dato": "Comenzó como un puesto en una calle de la zona antes de tener su propio local.",
+   "practico": "Precio medio. horario según Google: lun–jue 11:00–22:00; vie–sáb 11:00–23:00; dom 11:00–18:00."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "iLatina",
+  "category": "restaurante",
+  "zona": "Quinta Camacho",
+  "dir": "Cl. 70 #10a-39, Chapinero, Bogotá, Cundinamarca",
+  "maps_query": "iLatina Bogotá",
+  "lat": 4.65459,
+  "lng": -74.060023,
+  "place_id": "ChIJ0SxkfgCbP44RbwvkiMGNvyY",
+  "rating": 4.5,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "iLatina es una casa latinoamericana contemporánea en Bogotá donde restaurante, bar, escuela y terraza funcionan juntos. Aquí la gastronomía se vive como cultura y comunidad.",
+  "confianza": "media",
+  "tags": [],
+  "_fuentes": [
+   "co.linkedin.com",
+   "tripadvisor.es"
+  ],
+  "local": {
+   "clave": "Casa latinoamericana contemporánea con restaurante, bar, escuela y terraza.",
+   "pedir": "Su carta evoluciona constantemente y celebra la diversidad de América Latina.",
+   "ver": "La propuesta combina ingredientes de origen con técnicas contemporáneas y chefs invitados.",
+   "practico": "Precio medio. horario según Google: lun cerrado; mar–jue 12:00–22:00; vie–sáb 12:00–23:00; dom 12:00–18:00."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Zarpado Restaurante",
+  "category": "restaurante",
+  "zona": "Chapinero",
+  "dir": "Cl. 70a #11-10, Chapinero, Bogotá, Cundinamarca",
+  "maps_query": "Zarpado Restaurante Bogotá",
+  "lat": 4.655856,
+  "lng": -74.059949,
+  "place_id": "ChIJ8ZHsiC-bP44RGif6chlTbps",
+  "rating": 4.7,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Restaurante de cocina popular argentina en Quinta Camacho, Chapinero. Ideal si buscas milas y milangas en un plan de pareja o con compañeros de trabajo.",
+  "confianza": "media",
+  "tags": [],
+  "_fuentes": [],
+  "local": {
+   "clave": "Cocina popular argentina en el barrio Quinta Camacho.",
+   "ver": "Está en Quinta Camacho, sobre la Calle 70A.",
+   "momento": "Funciona para ir en pareja, con socios o con compañeros de trabajo.",
+   "practico": "Precio medio. horario según Google: lun–mié 12:00–21:00; jue 12:00–22:00; vie–sáb 12:00–23:00; dom cerrado."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Innato Cocina Bogotá",
+  "category": "restaurante",
+  "zona": "Zona G",
+  "dir": "Cl. 71 #5-34 Loc 2, Bogotá",
+  "maps_query": "Innato Cocina Bogotá Bogotá",
+  "lat": 4.65353,
+  "lng": -74.054484,
+  "place_id": "ChIJ89Wk7TWbP44RIP-bbFodyX4",
+  "rating": 4.5,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Restaurante de cocina colombiana en la Zona G, en Calle 71 #5-34. Un punto para comer local en el barrio gastronómico de Bogotá.",
+  "confianza": "media",
+  "tags": [],
+  "_fuentes": [],
+  "local": {
+   "clave": "Cocina colombiana en la Zona G, en Calle 71 #5-34.",
+   "practico": "Precio medio. horario según Google: lun–mié 12:00–22:00; jue 12:00–23:00; vie–sáb 12:00–22:00; dom cerrado."
+  }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Fusión Latina",
+  "category": "restaurante",
+  "zona": "Zona T",
+  "dir": "Calle 84bis # 13-54 Referencia Hotel Morrison 84, Chapinero, Bogotá",
+  "maps_query": "Fusión Latina Bogotá",
+  "lat": 4.668998,
+  "lng": -74.054407,
+  "place_id": "ChIJ2W5T-WSbP44RGXbwydHcUgw",
+  "rating": 4.3,
+  "price_level": null,
+  "descripcion": "Restaurante de fusión latinoamericana en la Zona T, con música en vivo y ambiente acogedor. La mezcla de sabores latinos es la razón para ir.",
+  "confianza": "media",
+  "tags": [],
+  "_fuentes": [
+   "directoriolatinoamerica.com",
+   "wanderlog.com"
+  ],
+  "local": {
+   "clave": "Fusión de sabores latinoamericanos en un ambiente acogedor.",
+   "pedir": "Empieza con la Torta para compartir; sigue con chilaquiles o milanesa.",
+   "ver": "Música en vivo y buenas bebidas y postres.",
+   "practico": "horario según Google: lun–vie 12:00–22:00; sáb 11:00–22:00; dom 11:00–17:00."
+  }
  }
 ]

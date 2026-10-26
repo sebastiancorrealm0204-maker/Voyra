@@ -231,6 +231,14 @@ def _consume_or_429(user: dict, resource: str):
 
 
 # ── Schemas ──
+class HotelConfirmadoIn(BaseModel):
+    place_id: str = Field("", max_length=200)
+    nombre: str = Field("", max_length=200)
+    direccion: str = Field("", max_length=300)
+    lat: float
+    lng: float
+
+
 class TripIn(BaseModel):
     ciudad: str = ""
     hotel: str = ""
@@ -241,6 +249,8 @@ class TripIn(BaseModel):
     pais: str = "Colombia"
     gustos: list[str] = Field(default_factory=list)
     idioma: str = "es"            # idioma del usuario (es | en | pt | fr | de | it) — en qué le habla el Companion
+    # Hotel que el usuario CONFIRMÓ entre los candidatos (ver /hotels/search): evita adivinar cuál de varios homónimos es.
+    hotel_confirmado: HotelConfirmadoIn | None = None
 
 
 class EncuestaIn(BaseModel):
@@ -257,6 +267,7 @@ class TripPatchIn(BaseModel):
     """Para completar/corregir datos del viaje (ej. lo que faltó tras subir reservas)."""
     ciudad: str | None = None
     hotel: str | None = None
+    hotel_confirmado: HotelConfirmadoIn | None = None
     inicio: str | None = None
     fin: str | None = None
     vuelo_ida: str | None = None
@@ -511,6 +522,30 @@ def _geocodificar_hotel_bg(tid: str, nombre_hotel: str, ciudad: str, pais: str =
     threading.Thread(target=_run, daemon=True).start()
 
 
+def _campos_hotel(h: HotelConfirmadoIn) -> dict:
+    """Lo que se guarda en el viaje cuando el usuario confirmó su hotel (igual que lo que dejaba el geocoding automático)."""
+    return {"hotel": h.nombre or None, "lat_hotel": h.lat, "lng_hotel": h.lng, "place_id_hotel": h.place_id,
+            "dir_hotel": h.direccion, "google_name_hotel": h.nombre}
+
+
+@app.get("/hotels/search")
+def hoteles_buscar(q: str, ciudad: str = "Bogotá", user: dict = Depends(current_user)):
+    """Candidatos de hotel con foto REAL y dirección para que el usuario confirme cuál es (en onboarding)."""
+    q = (q or "").strip()[:120]
+    if len(q) < 3:
+        return {"hoteles": []}
+    cand = places_live.buscar_hoteles(q, ciudad, n=4)
+    fotos = [visual._pool.submit(visual.fotos, h["place_id"], 1, 480) for h in cand]
+    out = []
+    for h, f in zip(cand, fotos):
+        try:
+            ph = f.result(timeout=8)
+        except Exception:
+            ph = []
+        out.append({**{k: v for k, v in h.items() if k != "foto_name"}, "foto": ph[0] if ph else None})
+    return {"hoteles": out}
+
+
 @app.post("/trips")
 def create_trip(t: TripIn, user: dict = Depends(verified_user)):
     if not limits.can_create_trip(user["id"]):
@@ -521,7 +556,9 @@ def create_trip(t: TripIn, user: dict = Depends(verified_user)):
             "mensaje": f"Tu plan permite {tope} viajes activos. "
                        "Borra uno para crear otro."})
     _exigir_ciudad_activa(t.ciudad)
-    tid = db.create_trip(t.model_dump(), user_id=user["id"])
+    tid = db.create_trip(t.model_dump(exclude={"hotel_confirmado"}), user_id=user["id"])
+    if t.hotel_confirmado:
+        db.update_trip(tid, {k: v for k, v in _campos_hotel(t.hotel_confirmado).items() if v is not None})
     _idi = (t.idioma or "es").lower()
     _saludos = {
         "es": (f"¡Listo! Soy tu amigo local en {t.ciudad}. Pregúntame dónde comer, qué hacer o cómo "
@@ -556,7 +593,7 @@ def create_trip(t: TripIn, user: dict = Depends(verified_user)):
     # Geocodificar el hotel en background para no demorar la respuesta del
     # onboarding. Cuando termine, guarda lat_hotel/lng_hotel/place_id_hotel en
     # el trip — el Companion los usa para detectar si el usuario está en su hotel.
-    if t.hotel.strip() and t.ciudad.strip():
+    if t.hotel.strip() and t.ciudad.strip() and not t.hotel_confirmado:
         _geocodificar_hotel_bg(tid, t.hotel, t.ciudad, t.pais)
 
     return {"trip_id": tid, "greeting": saludo, "trip": db.get_trip(tid)}
@@ -579,14 +616,16 @@ def list_my_trips(user: dict = Depends(current_user)):
 @app.patch("/trips/{tid}")
 def patch_trip(tid: str, p: TripPatchIn, user: dict = Depends(current_user)):
     own_trip(tid, user)
-    patch = {k: v for k, v in p.model_dump().items() if v is not None}
+    patch = {k: v for k, v in p.model_dump(exclude={"hotel_confirmado"}).items() if v is not None}
+    if p.hotel_confirmado:
+        patch.update({k: v for k, v in _campos_hotel(p.hotel_confirmado).items() if v is not None})
     if p.ciudad is not None:
         _exigir_ciudad_activa(p.ciudad)
     if patch:
         db.update_trip(tid, patch)
     # Si se actualizó el hotel o la ciudad, re-geocodificar el hotel en background.
     trip = db.get_trip(tid)
-    if (p.hotel is not None or p.ciudad is not None) and trip.get("hotel") and trip.get("ciudad"):
+    if (p.hotel is not None or p.ciudad is not None) and not p.hotel_confirmado and trip.get("hotel") and trip.get("ciudad"):
         _geocodificar_hotel_bg(tid, trip["hotel"], trip["ciudad"], trip.get("pais", ""))
     return trip
 
