@@ -999,3 +999,34 @@ def test_encuesta_de_cierre():
     with db.conn() as c:
         fila = [dict(r) for r in c.execute("SELECT * FROM encuesta_cierre WHERE trip_id=?", (tid,)).fetchall()]
     assert len(fila) == 1 and fila[0]["gusto_app"] == "chat" and fila[0]["nota_destino"] == 3
+
+
+def test_encuesta_se_copia_a_supabase(monkeypatch):
+    """Con SUPABASE_URL/KEY la encuesta se copia a Supabase (upsert por trip_id) además de guardarse local."""
+    from app import resumen
+    visto = {}
+
+    class _R:
+        status_code = 201
+        text = ""
+
+    def falso(method, url, **kw):
+        visto.update(method=method, url=url, **kw)
+        return _R()
+
+    class _Hilo:
+        def __init__(self, target, args, daemon=True):
+            self.t, self.a = target, args
+
+        def start(self):
+            self.t(*self.a)
+
+    monkeypatch.setattr(resumen, "SUPABASE_URL", "https://x.supabase.co")
+    monkeypatch.setattr(resumen, "SUPABASE_KEY", "k")
+    monkeypatch.setattr(resumen.net, "request", falso)
+    monkeypatch.setattr(resumen.threading, "Thread", _Hilo)
+    tid = db.create_trip({"ciudad": "Bogotá", "hotel": "H", "inicio": "2026-01-01", "fin": "2026-01-03"})
+    assert resumen.guardar_encuesta(db.get_trip(tid), "u1", nota_destino=5, nota_app=4, gusto_app=["chat"])
+    assert visto["url"] == "https://x.supabase.co/rest/v1/encuesta_cierre"
+    assert visto["params"] == {"on_conflict": "trip_id"} and visto["headers"]["apikey"] == "k"
+    assert visto["json"]["trip_id"] == tid and visto["json"]["nota_app"] == 4 and resumen.encuesta_respondida(tid)

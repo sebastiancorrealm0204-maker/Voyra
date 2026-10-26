@@ -8,9 +8,11 @@
   ciudad a los que no fue, para dejarle la puerta abierta a volver. Nada se inventa: todo sale de la curación.
 """
 import logging
-from datetime import date, datetime
+import os
+import threading
+from datetime import date, datetime, timezone
 
-from . import timeutil, visual
+from . import net, timeutil, visual
 
 log = logging.getLogger("voyra.resumen")
 
@@ -125,7 +127,32 @@ def guardar_encuesta(trip: dict, user_id: str | None, *, nota_destino, nota_app,
         "trip_id": trip["id"], "user_id": user_id, "ciudad": trip.get("ciudad", ""),
         "nota_destino": nd, "gusto_destino": gd, "mejora_destino": corto(mejora_destino),
         "nota_app": na, "gusto_app": ga, "mejora_app": corto(mejora_app), "feature": corto(feature)})
+    if SUPABASE_URL and SUPABASE_KEY:
+        fila = {"trip_id": trip["id"], "user_id": user_id, "ciudad": trip.get("ciudad", ""),
+                "nota_destino": nd, "gusto_destino": gd, "mejora_destino": corto(mejora_destino),
+                "nota_app": na, "gusto_app": ga, "mejora_app": corto(mejora_app), "feature": corto(feature),
+                "created_at": datetime.now(timezone.utc).isoformat()}
+        threading.Thread(target=_enviar_a_supabase, args=(fila,), daemon=True).start()
     return True
+
+
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
+SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
+
+
+def _enviar_a_supabase(fila: dict) -> None:
+    """Copia la encuesta a la tabla `encuesta_cierre` de Supabase (upsert por trip_id). Nunca lanza: la copia local
+    en nuestra base ya quedó guardada y es la que manda."""
+    try:
+        r = net.request(
+            "POST", f"{SUPABASE_URL}/rest/v1/encuesta_cierre", params={"on_conflict": "trip_id"}, retries=1, timeout=8,
+            headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}", "Content-Type": "application/json",
+                     "Prefer": "resolution=merge-duplicates,return=minimal"},
+            json=fila)
+        if r.status_code >= 300:
+            log.warning("supabase_encuesta_fallo status=%s body=%s", r.status_code, r.text[:200])
+    except Exception as e:
+        log.warning("supabase_encuesta_error error=%s", type(e).__name__)
 
 
 def encuesta_respondida(trip_id: str) -> bool:
