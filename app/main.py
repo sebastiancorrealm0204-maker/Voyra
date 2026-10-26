@@ -22,7 +22,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import (transporte as transporte_mod, ciudades, city_knowledge, context, db, engine, geo, llm, memoria, net, places_live, push, scheduler,
                search, seed_data, verificacion, watchers, auth, limits, email_send, social_enrich,
-               waitlist, traducir, visual, resumen as resumen_mod)
+               waitlist, traducir, visual, resumen as resumen_mod, itinerario_chat)
 
 # Logging estructurado (clave=valor) en un solo formato para toda la app. Railway
 # captura stdout; LOG_LEVEL=DEBUG para depurar.
@@ -1244,6 +1244,21 @@ def chat(tid: str, c: ChatIn, user: dict = Depends(verified_user)):
         # prompt largo en español y un historial en español, el modelo suele contestar en español.
         history[-1] = {**history[-1],
                        "content": history[-1]["content"] + f"\n\n[Reply in {city_knowledge.lang_name(_idi)}.]"}
+
+    # «Agrégalo a mi itinerario»: se agrega SIEMPRE, sin pasar por el modelo ni por una confirmación aparte.
+    if not es_tap:
+        try:
+            ultimo = next((m["content"] for m in reversed(history[:-1]) if m["role"] != "user"), "")
+            agregado = itinerario_chat.agregar_desde_chat(trip, c.message, ultimo)
+        except Exception:
+            log.warning("agregar_itinerario_fallo trip=%s", tid, exc_info=True)
+            agregado = None
+        if agregado:
+            db.insert("messages", {"trip_id": tid, "role": "companion", "content": agregado["reply"]})
+            return {"reply": agregado["reply"], "planes_propuestos": [], "chain_results": None,
+                    "intencion": "agregar_itinerario", "restante_chat": limits.remaining(user["id"], "chat"),
+                    "verificacion": None, "ruta": None, "planes_agregados": agregado["agregados"],
+                    "lugares": visual.tarjetas(agregado["lugares"], _idi, n_fotos=1)}
 
     # ── PARALELISMO ──
     # La respuesta del chat NO depende de la intención: arranca YA en otro
