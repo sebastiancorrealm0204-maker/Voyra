@@ -22,7 +22,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import (transporte as transporte_mod, ciudades, city_knowledge, context, db, engine, geo, llm, memoria, net, places_live, push, scheduler,
                search, seed_data, verificacion, watchers, auth, limits, email_send, social_enrich,
-               waitlist, traducir, visual, resumen as resumen_mod, itinerario_chat)
+               waitlist, traducir, visual, resumen as resumen_mod, itinerario_chat, horarios, timeutil)
 
 # Logging estructurado (clave=valor) en un solo formato para toda la app. Railway
 # captura stdout; LOG_LEVEL=DEBUG para depurar.
@@ -1336,6 +1336,21 @@ def chat(tid: str, c: ChatIn, user: dict = Depends(verified_user)):
     except Exception as e:
         log.warning("chat_fallback trip=%s error=%s", tid, type(e).__name__)
         reply = _TXT_CHAT["conexion"].get(_idi, _TXT_CHAT["conexion"]["es"])
+    # Red de seguridad de horarios: si la respuesta ofrece un lugar CERRADO a la hora del plan (el modelo a veces lo hace aunque la lista
+    # se lo marque), se le pide UNA vez que la reescriba sin ofrecerlo para ese momento.
+    if not es_tap and reply and intencion != "emergencia":
+        try:
+            ref, _ = horarios.referencia(trip, c.message, timeutil.now_local(trip))
+            cerrados = horarios.cerrados_mencionados(reply, db.places_for_city(trip.get("ciudad", "")), ref)
+            if cerrados:
+                detalle = "; ".join(f"{p['name']} ({horarios.desc_dia(p.get('place_id'), ref) or 'cerrado'})" for p in cerrados)
+                correccion = (f"\n\nCORRECCIÓN OBLIGATORIA: tu borrador ofreció lugares que están CERRADOS el {ref.strftime('%d/%m')} a las {ref.strftime('%H:%M')}: {detalle}. "
+                              "Respóndele de nuevo al usuario SIN ofrecer esos lugares para ese momento: usa solo lugares de OPCIONES QUE CUMPLEN EL PEDIDO "
+                              "(abiertos a esa hora y del tipo que pidió). Si hay pocos, dilo y propón otro momento. Solo puedes nombrarlos como alternativa "
+                              "para OTRO día u hora, con su horario real.")
+                reply = llm.chat(system + correccion, history)
+        except Exception:
+            log.warning("red_horarios_fallo trip=%s", tid, exc_info=True)
     # Verificación que corrige: si la respuesta atribuye a un lugar curado algo
     # que su ficha no respalda (caso real: "Crepes & Waffles" + "bandeja paisa"),
     # se reescribe o recorta ANTES de guardarla y mostrarla. Se guarda la versión

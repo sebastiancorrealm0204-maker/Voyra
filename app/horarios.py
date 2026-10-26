@@ -99,3 +99,48 @@ def referencia(trip: dict, mensaje: str, ahora: datetime) -> tuple[datetime, boo
     hh, mm = (int(x) for x in (hora or f"{ahora.hour}:{ahora.minute}").split(":")[:2])
     dia = datetime.strptime(fecha, "%Y-%m-%d").date() if fecha else ahora.date()
     return datetime.combine(dia, datetime.min.time()).replace(hour=hh, minute=mm, tzinfo=ahora.tzinfo), True
+
+
+_DIAS_ES = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+
+
+def desc_dia(place_id: str | None, cuando: datetime) -> str:
+    """El horario de `cuando` (su día de la semana) en 24 h y en español: «jueves: 12:00–16:00» / «jueves: cerrado». '' si no se
+    conoce el horario del lugar."""
+    h = datos().get(place_id or "")
+    if not h or not h.get("periods"):
+        return ""
+    gdia = (cuando.weekday() + 1) % 7                     # Google: 0 = domingo
+    tramos = []
+    for p in h["periods"]:
+        o, c = p["open"], p.get("close")
+        if o.get("day") != gdia:
+            continue
+        if not c:
+            return f"{_DIAS_ES[cuando.weekday()]}: abierto 24 h"
+        tramos.append(f"{o.get('hour', 0):02d}:{o.get('minute', 0):02d}–{c.get('hour', 0):02d}:{c.get('minute', 0):02d}")
+    return f"{_DIAS_ES[cuando.weekday()]}: {', '.join(tramos) if tramos else 'cerrado'}"
+
+
+# Frases que muestran que un lugar cerrado se menciona como alternativa para OTRO momento (no como opción para ahora).
+_OTRO_MOMENTO = re.compile(r"ma[ñn]ana|almuerzo|mediod[ií]a|otro d[ií]a|otro momento|pasado ma[ñn]ana|en la tarde|desayuno|abre |abre a|"
+                           r"cierra a las|cierran|no abre|no sirve|a esa hora (?:est[aá]|ya|no)|cerrad", re.I)
+
+
+def cerrados_mencionados(respuesta: str, lugares: list[dict], cuando: datetime) -> list[dict]:
+    """Lugares curados nombrados en `respuesta` que están CERRADOS a la hora `cuando` y que no se presentan como alternativa para
+    otro momento (sin una frase como «mañana al mediodía» o «cierra a las…» cerca del nombre). Es la red de seguridad: el
+    modelo a veces ofrece un lugar cerrado aunque la lista se lo marque."""
+    from . import visual
+    t = respuesta or ""
+    out = []
+    for p in visual.mencionados(t, lugares, maximo=6):
+        if not esta_cerrado(p.get("place_id"), cuando):
+            continue
+        base = visual._nombre_base(p.get("name", ""))
+        plano = visual._sin_tildes(t.lower())
+        i = plano.find(base.split()[0]) if base else -1
+        ventana = t[max(0, i - 40): i + 260] if i >= 0 else t
+        if not _OTRO_MOMENTO.search(ventana):
+            out.append(p)
+    return out

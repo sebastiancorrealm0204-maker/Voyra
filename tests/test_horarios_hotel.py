@@ -46,15 +46,16 @@ def test_hora_de_referencia_del_mensaje():
     assert horarios.referencia({}, "qué hay de postre", ahora) == (ahora, False)
 
 
-def test_el_bloque_de_lugares_marca_y_aparta_los_cerrados(monkeypatch):
+def test_los_cerrados_salen_de_las_opciones_y_quedan_marcados_en_el_indice(monkeypatch):
     lugares = [p for p in db.places_for_city("Bogotá") if p.get("place_id") and p.get("category") == "restaurante"][:40]
     cerrados = {p["place_id"] for p in lugares[:30]}                       # solo abren los lunes de 9 a 10
     monkeypatch.setattr(horarios, "datos", lambda: {pid: _h((1, 9, 1, 10)) for pid in cerrados})
     tid = db.create_trip({"ciudad": "Bogotá", "hotel": "H", "inicio": "2026-10-26", "fin": "2026-10-30", "zona_actual": "Zona T"})
-    bloque = context._lugares_block(db.get_trip(tid), "quiero cenar mañana a las 9 pm")
-    assert "[CERRADO a esa hora: NO lo ofrezcas para ese momento; abre 09:00]" in bloque
-    primeros = [ln for ln in bloque.split("\n") if ln.startswith("- ")][:20]
-    assert primeros and not any("[CERRADO" in ln for ln in primeros)        # los abiertos van primero; los cerrados, al final
+    bloque = context._lugares_block(db.get_trip(tid), "dime qué hay para ver mañana a las 9 pm")
+    lista = bloque.split("LUGARES CURADOS DE VOYRA")[1].split("OTROS LUGARES CURADOS")[0]
+    nombres_cerrados = [p["name"] for p in lugares[:30]]
+    assert not any(f"- {n} [" in lista for n in nombres_cerrados)             # ningún cerrado entre las opciones
+    assert "[cerrado a esa hora]" in bloque                                     # sí quedan marcados en el índice de «otros lugares»
 
 
 def test_hotel_confirmado_se_guarda_sin_adivinar(monkeypatch):
@@ -83,3 +84,69 @@ def test_hotel_confirmado_se_guarda_sin_adivinar(monkeypatch):
     assert trip["hotel"] == "Casa Dann Carlton Hotel & Spa" and trip["lat_hotel"] == 4.67 and trip["dir_hotel"] == "Cl 93b #19-44"
     assert trip["place_id_hotel"] == "P2" and "hotel_confirmado" not in trip
     assert "Cl 93b #19-44" in context.build(trip, mensaje="hola")             # el Companion ve la dirección confirmada
+
+
+def _lugar(n, pid, cat="restaurante", desc="", tags=None):
+    return {"name": n, "place_id": pid, "category": cat, "zona": "Zona T", "descripcion": desc, "tags": tags or [], "local": None,
+            "lat": 4.668, "lng": -74.053}
+
+
+def test_el_pedido_filtra_por_codigo_lo_cerrado_y_lo_que_no_encaja(monkeypatch):
+    """«Cenar algo colombiano a las 9 pm»: solo entran como opción los colombianos ABIERTOS; el que cierra a las 16:00 va aparte,
+    como alternativa para otro momento; y un italiano abierto no se cuela como si fuera colombiano."""
+    lugares = [
+        _lugar("Criolla Tarde", "A", desc="Cocina colombiana tradicional: bandeja paisa y ajiaco."),       # cierra 16:00
+        _lugar("Fríjoles Noche", "B", desc="Fríjoles paisas, comida colombiana de casa."),                   # abierto hasta 02:00
+        _lugar("Trattoria Roma", "C", desc="Pasta italiana artesanal."),                                     # abierto, pero italiano
+    ]
+    abre = lambda hasta: _h(*[(d, 12, d, hasta) for d in range(7)])
+    monkeypatch.setattr(horarios, "datos", lambda: {"A": abre(16),
+                                                    "B": _h(*[(d, 12, (d + 1) % 7, 2) for d in range(7)]), "C": abre(23)})
+    monkeypatch.setattr(db, "places_for_city", lambda c: lugares)
+    trip = {"ciudad": "Bogotá", "zona_actual": "Zona T", "planes": []}
+    b = context._lugares_block(trip, "Quiero cenar algo colombiano a las 9 pm")
+    cumplen, _, resto = b.partition("ENCAJAN CON EL PEDIDO PERO ESTÁN CERRADOS")
+    assert "Fríjoles Noche" in cumplen.split("LUGARES CURADOS")[0] and "Trattoria Roma" not in cumplen.split("LUGARES CURADOS")[0]
+    assert "Criolla Tarde" in resto.split("LUGARES CURADOS")[0] and "12:00–16:00" in resto
+    lista = b.split("LUGARES CURADOS DE VOYRA")[1]
+    assert "- Criolla Tarde" not in lista          # un lugar cerrado a esa hora no se ofrece como opción
+    sin = context._lugares_block(trip, "Quiero cenar sushi a las 9 pm")
+    assert "NINGÚN lugar curado que encaje" in sin
+
+
+def test_detecta_cerrados_ofrecidos_para_ahora_pero_no_como_alternativa(monkeypatch):
+    lugares = [_lugar("Criolla Tarde", "A", desc="colombiana"), _lugar("Fríjoles Noche", "B", desc="colombiana")]
+    monkeypatch.setattr(horarios, "datos", lambda: {"A": _h(*[(d, 12, d, 16) for d in range(7)]),
+                                                    "B": _h(*[(d, 12, d, 23) for d in range(7)])})
+    ref = datetime(2026, 10, 28, 21, 0, tzinfo=TZ)
+    malo = "Te propongo Criolla Tarde para cenar: bandeja paisa y ajiaco, muy cerca de ti."
+    bueno = "Para cenar a las 21:00 ve a Fríjoles Noche. Criolla Tarde déjala para mañana al mediodía, a esa hora sí abre."
+    assert [p["name"] for p in horarios.cerrados_mencionados(malo, lugares, ref)] == ["Criolla Tarde"]
+    assert horarios.cerrados_mencionados(bueno, lugares, ref) == []
+
+
+def test_si_el_modelo_ofrece_un_cerrado_se_reescribe_la_respuesta(monkeypatch):
+    from app import llm
+    from app.main import app
+    lugares = [p for p in db.places_for_city("Bogotá") if p.get("place_id") and p.get("category") == "restaurante"][:2]
+    cerrado, abierto = lugares
+    monkeypatch.setattr(horarios, "datos", lambda: {cerrado["place_id"]: _h(*[(d, 12, d, 16) for d in range(7)]),
+                                                    abierto["place_id"]: _h(*[(d, 12, d, 23) for d in range(7)])})
+    llamadas = []
+
+    def falso(system, history):
+        llamadas.append("CORRECCIÓN OBLIGATORIA" in system)
+        return (f"Ve a {abierto['name']}, abre hasta las 23:00." if llamadas[-1]
+                else f"Te recomiendo {cerrado['name']} para cenar esta noche.")
+
+    monkeypatch.setattr(llm, "chat", falso)
+    import uuid
+    client = TestClient(app)
+    email = f"horas{uuid.uuid4().hex[:8]}@example.com"
+    link = client.post("/auth/signup", json={"email": email, "password": "supersecret"}).json()["dev_verification_link"]
+    client.get("/auth/verify", params={"token": link.split("token=")[1]})
+    H = {"Authorization": f"Bearer {client.post('/auth/login', json={'email': email, 'password': 'supersecret'}).json()['token']}"}
+    tid = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H", "inicio": "2099-07-12", "fin": "2099-07-18"}, headers=H).json()["trip_id"]
+    r = client.post(f"/trips/{tid}/chat", json={"message": "Quiero cenar algo rico a las 9 pm"}, headers=H).json()
+    assert llamadas == [False, True]                                   # primer borrador malo, segundo con la corrección
+    assert abierto["name"] in r["reply"] and cerrado["name"] not in r["reply"]

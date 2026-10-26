@@ -73,6 +73,9 @@ def _local_suffix(local: dict | None) -> str:
     return " · LOCAL → " + " | ".join(partes)
 
 
+_DIAS_ES = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+
+
 def _lugares_block(trip: dict, mensaje: str = "") -> str:
     """Inyecta los lugares curados de la ciudad en el system prompt.
 
@@ -125,42 +128,79 @@ def _lugares_block(trip: dict, mensaje: str = "") -> str:
     def cerrado(p: dict) -> bool:
         return horarios.esta_cerrado(p.get("place_id"), ref)
 
-    # Lugares que encajan con lo que PIDE («algo colombiano», «sushi», «vegano»), aunque no estén entre los más cercanos: así a
-    # las 23:00 aparecen los pocos colombianos abiertos y no solo los 26 más próximos. Se cruza la raíz de cada palabra del
-    # mensaje con el nombre, la descripción, los gustos y la ficha local de cada lugar.
+    # Lo que PIDE, sin adivinar: «cenar» (comida), «algo colombiano» (raíz «colomb»), «sushi»… Se cruzan esas raíces con el nombre,
+    # la descripción, los gustos y la ficha local de cada lugar. Un pedido de comida solo admite restaurantes, bares y cafés.
     _VACIAS = {"quiero", "quieres", "cenar", "comer", "almorzar", "desayunar", "algo", "para", "donde", "dónde", "hacer",
                "recomiendame", "recomiéndame", "cerca", "noche", "tarde", "mañana", "manana", "ahora", "esta", "estoy", "tengo",
-               "puedo", "buen", "bueno", "buena", "bonito", "rico", "hora", "horas", "agrega", "agregar", "itinerario"}
+               "puedo", "buen", "bueno", "buena", "bonito", "rico", "hora", "horas", "agrega", "agregar", "itinerario", "lugar",
+               "sitio", "opciones", "opcion", "opción", "alguna", "alguno", "restaurante", "restaurantes"}
     _SERVICIOS = {"transporte", "clinica", "farmacia", "supermercado"}   # un «colombiano» no debe traer cajeros ni clínicas
+    es_comida = bool(re.search(r"\bcen(?:ar|a|amos)\b|\bcom(?:er|ida|emos)\b|almuerz|almorz|desayun|brunch|restaurante|hambre|antojo|"
+                               r"tragos?\b|cóctel|coctel|\bcafé\b|\bcafe\b", msg_low))
+    cats_pedidas = {"restaurante", "bar", "cafe", "mercado"} if es_comida else None
     raices = {w[:6] for w in re.findall(r"[a-záéíóúñü]{5,}", msg_low) if w not in _VACIAS}
-    relevantes: list[tuple[int, float, dict]] = []
-    if raices:
-        for p in places:
-            if p in anclados or cerrado(p) or p.get("category") in _SERVICIOS:
-                continue
-            texto = " ".join([p["name"], p.get("descripcion", ""), " ".join(p.get("tags") or []), str(p.get("local") or "")]).lower()
-            puntos = sum(1 for r in raices if r in texto)
-            if puntos:
-                d = geo.haversine_km(origin[0], origin[1], p["lat"], p["lng"]) if origin else 0.0
-                relevantes.append((-puntos, d, p))
-        relevantes.sort(key=lambda x: x[:2])
 
-    # Top: los anclados primero (sin duplicar), luego los más relevantes abiertos, luego los más cercanos abiertos; al final,
-    # unos pocos cerrados (marcados) para poder proponer «mejor mañana al mediodía».
+    # Una palabra del pedido abre varias raíces: «colombiano» también es paisa, criolla, ajiaco, fríjoles…; «sushi» es japonés…
+    _SINONIMOS = {
+        "colomb": ("colomb", "criol", "paisa", "típic", "tipic", "ajiaco", "bandeja", "fríjol", "frijol", "arepa", "santafere",
+                   "mondong", "tamal", "lechona", "sancocho", "caribe", "pacífico", "pacifico", "llanera", "antioque"),
+        "perua": ("perua", "cebich", "nikkei"), "italia": ("italia", "pizza", "pasta", "trattor", "risotto"),
+        "japone": ("japon", "sushi", "nikkei", "ramen"), "sushi": ("sushi", "japon", "nikkei"), "vegano": ("vegan", "vegetar"),
+        "vegeta": ("vegan", "vegetar"), "mexica": ("mexic", "taco", "mezcal", "tlayuda"), "asiati": ("asiát", "asiat", "thai", "chin", "coreano", "japon", "sushi"),
+        "marisc": ("marisc", "cebich", "pescad", "mar "), "parril": ("parrill", "asado", "steak", "carne"), "carnes": ("parrill", "asado", "steak", "carne"),
+        "argent": ("argent", "parrill", "empanad"), "frances": ("franc", "bistr"), "arabe": ("árabe", "arabe", "libanes", "libanés", "mediterr"),
+    }
+    expandidas = {r: _SINONIMOS.get(r, (r,)) for r in raices}
+
+    def encaja(p: dict) -> int:
+        """Puntos con lo pedido (0 = no encaja). FUERTE (2) = aparece en el nombre, la descripción o los gustos; DÉBIL (1) = solo en
+        la ficha local. Con palabras de cocina hace falta al menos una coincidencia fuerte. Sin raíces, todo lo de la categoría
+        pedida encaja con 1 punto."""
+        if p.get("category") in _SERVICIOS or (cats_pedidas and p.get("category") not in cats_pedidas):
+            return 0
+        if not raices:
+            return 1 if cats_pedidas else 0
+        fuerte = " ".join([p["name"], p.get("descripcion", ""), " ".join(p.get("tags") or [])]).lower()
+        debil = str(p.get("local") or "").lower()
+        puntos = fuertes = 0
+        for sins in expandidas.values():
+            if any(x in fuerte for x in sins):
+                puntos += 2
+                fuertes += 1
+            elif any(x in debil for x in sins):
+                puntos += 1
+        return puntos if fuertes else 0
+
+    def con_distancia(p: dict) -> float:
+        return geo.haversine_km(origin[0], origin[1], p["lat"], p["lng"]) if origin else 0.0
+
+    pedido = bool(es_comida or raices)
+    cumplen: list[dict] = []        # encajan con el pedido Y están abiertos a esa hora (horario conocido)
+    otro_momento: list[dict] = []   # encajan pero están cerrados a esa hora: solo para proponer otro día u hora
+    if pedido:
+        for p in places:
+            pts = encaja(p)
+            if not pts:
+                continue
+            e = horarios.estado(p.get("place_id"), ref)
+            if e and e["abierto"]:
+                cumplen.append((-pts, con_distancia(p), p))
+            elif e:
+                otro_momento.append((-pts, con_distancia(p), p))
+        cumplen = [p for _, _, p in sorted(cumplen, key=lambda x: x[:2])][:8]
+        otro_momento = [p for _, _, p in sorted(otro_momento, key=lambda x: x[:2])][:5]
+
+    # Top: anclados, luego los que cumplen el pedido, luego los más cercanos ABIERTOS (o de horario desconocido). Los lugares
+    # que SABEMOS cerrados a esa hora no entran a la lista de opciones: van solo en su bloque «otro momento».
     top = list(anclados)
-    for _, _, p in relevantes[:8]:
+    for p in cumplen:
         if p not in top:
             top.append(p)
     for p in places:
         if p not in top and not cerrado(p):
             top.append(p)
-        if len(top) >= 26:
-            break
-    for p in places:
         if len(top) >= 30:
             break
-        if p not in top and cerrado(p):
-            top.append(p)
 
     lineas = []
     for p in top:
@@ -174,7 +214,28 @@ def _lugares_block(trip: dict, mensaje: str = "") -> str:
         linea += _local_suffix(p.get("local"))
         lineas.append(linea)
 
-    bloque = (
+    cuando_txt = f"{_DIAS_ES[ref.weekday()]} {ref.strftime('%H:%M')}"
+    encabezado = ""
+    if pedido:
+        if cumplen:
+            filas = []
+            for p in cumplen:
+                e = horarios.estado(p.get("place_id"), ref) or {}
+                hasta = "abierto 24 h" if e.get("24h") else f"abierto hasta {e.get('cierra')}"
+                filas.append(f"- {p['name']} [{p['category']}] — {hasta} · {p['zona']} (~{con_distancia(p):.1f} km)")
+            encabezado += (
+                f"\nOPCIONES QUE CUMPLEN EL PEDIDO DEL USUARIO (filtradas por CÓDIGO: encajan con lo que pidió Y están abiertas el {cuando_txt}). "
+                "Para ESE momento SOLO puedes ofrecer lugares de esta lista. Cada opción debe cumplir TODO lo que pidió (tipo de comida, hora, "
+                "zona); si hay menos de 3, di cuántas hay y NO rellenes con otro tipo de comida sin avisarlo:\n" + "\n".join(filas) + "\n")
+        else:
+            encabezado += (f"\nOPCIONES QUE CUMPLEN EL PEDIDO DEL USUARIO: NINGÚN lugar curado que encaje con lo que pidió está abierto el {cuando_txt}. "
+                           "Díselo de frente y propón una alternativa real (otro tipo de lugar que SÍ esté abierto, o hacerlo otro día u hora).\n")
+        if otro_momento:
+            filas = [f"- {p['name']} [{p['category']}] — {horarios.desc_dia(p.get('place_id'), ref) or 'cerrado a esa hora'} · {p['zona']}"
+                     for p in otro_momento]
+            encabezado += ("\nENCAJAN CON EL PEDIDO PERO ESTÁN CERRADOS A ESA HORA (solo para proponer OTRO día u hora, con su horario real; "
+                           "NUNCA como opción para ese momento):\n" + "\n".join(filas) + "\n")
+    bloque = encabezado + (
         "\nLUGARES CURADOS DE VOYRA PARA " + city.upper() + " "
         "(FUENTE ÚNICA Y EXCLUSIVA para recomendar restaurantes, cafés, bares, "
         "atracciones, parques, tiendas, excursiones, supermercados, farmacias, "
