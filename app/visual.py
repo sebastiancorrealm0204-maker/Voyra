@@ -179,3 +179,44 @@ def tarjetas(lugares: list[dict], idioma: str = "es", con_foto: bool = True, dis
             for c in out:
                 c["clave"], c["pedir"] = mapa.get(c["clave"], c["clave"]), mapa.get(c["pedir"], c["pedir"])
     return out
+
+
+
+# ── Portada: fotos reales de lugares emblemáticos de las ciudades activas (pantalla de bienvenida e inicio) ──
+_cache_portada = net.TTLCache(ttl_s=6 * 3600, maxsize=4)
+_PORTADA_CATS = ("atraccion", "museo", "parque", "mercado", "experiencia", "restaurante")
+
+
+def portada(ciudades: list[str], por_ciudad: int = 3) -> dict:
+    """{'fotos': [{uri, autor, lugar, ciudad}], 'ciudades': {ciudad: {uri, autor, lugar}}}. Solo fotos reales de
+    Google de lugares curados; sin fotos, listas vacías (la app pinta su fondo de siempre). Cacheado 6 h."""
+    from . import db
+    clave = "|".join(ciudades)
+    hit = _cache_portada.get(clave, _SIN)
+    if hit is not _SIN:
+        return hit
+    fotos_out, por = [], {}
+    try:
+        for ciudad in ciudades:
+            lugares = [p for p in db.places_for_city(ciudad) if p.get("category") in _PORTADA_CATS]
+            lugares.sort(key=lambda p: (p.get("category") != "atraccion", -(float(p.get("rating") or 0))))
+            vistos: set[str] = set()
+            elegidos = [p for p in lugares if not (p['name'] in vistos or vistos.add(p['name']))][:por_ciudad + 3]
+            futs = [_pool.submit(_galeria, p, 1) for p in elegidos]
+            n = 0
+            for p, f in zip(elegidos, futs):
+                try:
+                    ph = f.result(timeout=8)
+                except Exception:
+                    ph = []
+                if not ph or n >= por_ciudad:
+                    continue
+                item = {"uri": ph[0]["uri"], "autor": ph[0]["autor"], "lugar": p["name"], "ciudad": ciudad}
+                fotos_out.append(item)
+                por.setdefault(ciudad, item)
+                n += 1
+    except Exception:
+        log.warning("portada_fallo", exc_info=True)
+    out = {"fotos": fotos_out, "ciudades": por}
+    _cache_portada.set(clave, out, ttl_s=6 * 3600 if fotos_out else 300)
+    return out

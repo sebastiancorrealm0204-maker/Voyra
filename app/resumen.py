@@ -90,6 +90,7 @@ def resumen(trip: dict, planes: list[dict], lugares: list[dict]) -> dict:
         "inicio": trip.get("inicio"), "fin": trip.get("fin"),
         "dias": (fin - ini).days + 1 if ini and fin else None,
         "planes": sum(1 for p in planes if p.get("tipo") not in ("vuelo", "transporte")),
+        "narrativa": narrativa(trip, planes),
         "terminado": terminado(trip),
         "encuesta_respondida": encuesta_respondida(trip["id"]),
         "visitados": visual.tarjetas(list(visitados.values())[:8], idioma, n_fotos=1),
@@ -121,3 +122,89 @@ def encuesta_respondida(trip_id: str) -> bool:
     from . import db
     with db.conn() as c:
         return c.execute("SELECT 1 FROM encuestas WHERE trip_id=?", (trip_id,)).fetchone() is not None
+
+
+
+# ── Resumen detallado del viaje terminado (usa TODO: itinerario, documentos y la conversación) ──
+_SISTEMA_NARRATIVA = (
+    "Eres el Companion de Voyra y escribes el RESUMEN FINAL de un viaje que ya terminó, para el viajero. "
+    "Escribe en {idioma}, en segunda persona, con tono cálido y concreto. Usa SOLO lo que aparece en los datos "
+    "(itinerario, documentos y conversación): no inventes lugares, platos, horarios, precios ni anécdotas. "
+    "Si de un día no hay datos, no lo rellenes. Responde SOLO con JSON válido con esta forma:\n"
+    '{{"titulo": "frase corta y bonita sobre el viaje", "intro": "2-3 frases", '
+    '"dias": [{{"fecha": "YYYY-MM-DD", "titulo": "…", "texto": "3-5 frases detalladas de ese día", '
+    '"lugares": ["nombres exactos de lugares de ese día"]}}], '
+    '"comida": "qué comió/probó y qué recomendaron, o vacío", '
+    '"descubrimientos": "tips locales y cosas que aprendió, o vacío", '
+    '"datos_utiles": ["transporte, reservas, vuelos y datos prácticos que usó"], '
+    '"momentos": ["3-5 momentos destacados"], "cierre": "1-2 frases para despedirlo"}}'
+)
+
+
+def _contexto_narrativa(trip: dict, planes: list[dict], mensajes: list[dict], docs: list[dict]) -> str:
+    from . import plans as plans_mod
+    partes = [f"VIAJE: {trip.get('ciudad', '')}, del {trip.get('inicio')} al {trip.get('fin')}. Hotel: {trip.get('hotel') or '—'}."]
+    if planes:
+        partes.append("ITINERARIO:")
+        for p in plans_mod.ordenar(planes):
+            partes.append(f"- {p.get('fecha') or 'sin fecha'} {p.get('hora') or ''} [{p.get('tipo')}] {p.get('titulo')}"
+                          f"{' @ ' + p['lugar'] if p.get('lugar') else ''}{' — ' + p['detalle'] if p.get('detalle') else ''}")
+    if docs:
+        partes.append("DOCUMENTOS SUBIDOS:")
+        partes += [f"- {d.get('filename')}: {(d.get('summary') or '')[:300]}" for d in docs[:10]]
+    if mensajes:
+        partes.append("CONVERSACIÓN (cronológica):")
+        for m in mensajes[-150:]:
+            quien = "Viajero" if m["role"] == "user" else "Companion"
+            partes.append(f"{quien}: {(m['content'] or '')[:400]}")
+    return "\n".join(partes)[:24000]
+
+
+def _narrativa_basica(trip: dict, planes: list[dict]) -> dict:
+    """Sin IA (o si falla): el resumen armado solo con el itinerario real, día por día."""
+    from . import plans as plans_mod
+    por_dia = plans_mod.agrupar_por_dia(planes)
+    dias = []
+    for fecha, ps in por_dia.items():
+        if fecha == "sin_fecha":
+            continue
+        dias.append({"fecha": fecha, "titulo": "", "lugares": [p["lugar"] for p in ps if p.get("lugar")],
+                     "texto": " · ".join(f"{(p.get('hora') + ' ') if p.get('hora') else ''}{p.get('titulo')}" for p in ps)})
+    return {"titulo": "", "intro": "", "dias": dias, "comida": "", "descubrimientos": "",
+            "datos_utiles": [], "momentos": [], "cierre": "", "ia": False}
+
+
+def narrativa(trip: dict, planes: list[dict]) -> dict:
+    """Resumen detallado escrito a partir de itinerario + documentos + chat. Se guarda en el viaje y solo se vuelve a
+    generar si cambió lo que lo alimenta. Si la IA falla, devuelve el resumen básico del itinerario (no se guarda)."""
+    import hashlib
+    from . import city_knowledge, db, llm
+
+    mensajes = [m for m in db.rows("messages", trip["id"], limit=400)
+                if not (m["role"] == "user" and (m["content"] or "").strip().startswith("["))]
+    docs = db.rows("documents", trip["id"], limit=20)
+    contexto = _contexto_narrativa(trip, planes, mensajes, docs)
+    idioma = trip.get("idioma") or "es"
+    firma = hashlib.sha1(f"{idioma}|{contexto}".encode("utf-8")).hexdigest()
+    guardado = trip.get("resumen_ia") or {}
+    if guardado.get("firma") == firma and guardado.get("data"):
+        return guardado["data"]
+    if not (planes or mensajes or docs) or not llm._available():
+        return _narrativa_basica(trip, planes)
+    try:
+        raw = llm._call(llm.CHAT_PROVIDER, _SISTEMA_NARRATIVA.format(idioma=city_knowledge.lang_name(idioma)),
+                        [{"role": "user", "content": contexto}], max_tokens=2500)
+        d = llm._parse_json(raw)
+        data = {"titulo": str(d.get("titulo") or ""), "intro": str(d.get("intro") or ""),
+                "dias": [{"fecha": str(x.get("fecha") or ""), "titulo": str(x.get("titulo") or ""),
+                          "texto": str(x.get("texto") or ""), "lugares": [str(y) for y in (x.get("lugares") or [])][:8]}
+                         for x in (d.get("dias") or []) if isinstance(x, dict)][:31],
+                "comida": str(d.get("comida") or ""), "descubrimientos": str(d.get("descubrimientos") or ""),
+                "datos_utiles": [str(x) for x in (d.get("datos_utiles") or [])][:10],
+                "momentos": [str(x) for x in (d.get("momentos") or [])][:6],
+                "cierre": str(d.get("cierre") or ""), "ia": True}
+        db.update_trip(trip["id"], {"resumen_ia": {"firma": firma, "data": data}})
+        return data
+    except (ValueError, TypeError, KeyError, AttributeError, llm.ProviderError) as e:
+        log.warning("narrativa_fallo trip=%s error=%s", trip["id"], type(e).__name__)
+        return _narrativa_basica(trip, planes)

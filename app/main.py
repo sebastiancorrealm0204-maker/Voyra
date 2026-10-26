@@ -1027,6 +1027,12 @@ def airport_arrival(tid: str, user: dict = Depends(current_user)):
     return traducir.profundo(watchers.airport_arrival(tid), trip.get("idioma") or "es")
 
 
+@app.get("/destinations/portada")
+def destinos_portada():
+    """Fotos reales de lugares emblemáticos de las ciudades activas, para la bienvenida y el inicio (público, cacheado)."""
+    return visual.portada(list(ciudades.ACTIVAS))
+
+
 @app.get("/destinations/{city}/places")
 def destination_places(city: str):
     """Inspecciona la base curada para una ciudad (debug / verificación)."""
