@@ -267,6 +267,16 @@ CREATE TABLE IF NOT EXISTS traducciones (
   texto TEXT NOT NULL,
   created_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS encuestas (
+  id TEXT PRIMARY KEY,          -- una por viaje: responder otra vez reemplaza la anterior
+  trip_id TEXT NOT NULL,
+  user_id TEXT,
+  ciudad TEXT,
+  gusto TEXT,                   -- claves separadas por coma (comida, lugares, tips, rutas, itinerario, chat)
+  mejora TEXT,
+  feature TEXT,
+  created_at REAL NOT NULL
+);
 """
 
 # Índices secundarios. Antes solo existían los de las PRIMARY KEY, así que cada

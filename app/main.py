@@ -22,7 +22,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import (transporte as transporte_mod, ciudades, city_knowledge, context, db, engine, geo, llm, memoria, net, places_live, push, scheduler,
                search, seed_data, verificacion, watchers, auth, limits, email_send, social_enrich,
-               waitlist, traducir, visual)
+               waitlist, traducir, visual, resumen as resumen_mod)
 
 # Logging estructurado (clave=valor) en un solo formato para toda la app. Railway
 # captura stdout; LOG_LEVEL=DEBUG para depurar.
@@ -241,6 +241,12 @@ class TripIn(BaseModel):
     pais: str = "Colombia"
     gustos: list[str] = Field(default_factory=list)
     idioma: str = "es"            # idioma del usuario (es | en | pt | fr | de | it) — en qué le habla el Companion
+
+
+class EncuestaIn(BaseModel):
+    gusto: list[str] = []
+    mejora: str = ""
+    feature: str = ""
 
 
 class TripPatchIn(BaseModel):
@@ -628,6 +634,35 @@ def confirm_plans(tid: str, body: PlansConfirmIn, user: dict = Depends(current_u
 def remove_plan(tid: str, plan_id: str, user: dict = Depends(current_user)):
     own_trip(tid, user)
     return {"planes": db.delete_plan(tid, plan_id)}
+
+
+@app.get("/trips/{tid}/plans/fotos")
+def plans_fotos(tid: str, user: dict = Depends(current_user)):
+    """Tarjeta con foto real (Google Places) de cada plan del itinerario que es un lugar de nuestra curación."""
+    trip = own_trip(tid, user)
+    try:
+        fotos = resumen_mod.fotos_de_planes(db.get_plans(tid), db.places_for_city(trip.get("ciudad", "")),
+                                            trip.get("idioma") or "es")
+    except Exception:
+        log.warning("fotos_planes_fallo trip=%s", tid, exc_info=True)
+        fotos = {}
+    return {"fotos": fotos}
+
+
+@app.post("/trips/{tid}/encuesta")
+def trip_encuesta(tid: str, e: EncuestaIn, user: dict = Depends(current_user)):
+    """Encuesta corta de cierre: qué le gustó más, qué mejoraría y qué función le gustaría."""
+    trip = own_trip(tid, user)
+    if not resumen_mod.guardar_encuesta(trip, user["id"], e.gusto, e.mejora, e.feature):
+        raise HTTPException(422, "Cuéntanos al menos una cosa.")
+    return {"ok": True}
+
+
+@app.get("/trips/{tid}/resumen")
+def trip_resumen(tid: str, user: dict = Depends(current_user)):
+    """Resumen del viaje: lo que hizo (con fotos reales) y lo que le faltó conocer (ganchos para volver)."""
+    trip = own_trip(tid, user)
+    return resumen_mod.resumen(trip, db.get_plans(tid), db.places_for_city(trip.get("ciudad", "")))
 
 
 @app.get("/trips/{tid}/plans/{plan_id}/maps")
@@ -1144,6 +1179,9 @@ _TXT_CHAT = {
 @app.post("/trips/{tid}/chat")
 def chat(tid: str, c: ChatIn, user: dict = Depends(verified_user)):
     trip = own_trip(tid, user)
+    if resumen_mod.terminado(trip):
+        raise HTTPException(409, {"codigo": "viaje_cerrado",
+                                  "mensaje": "Este viaje ya terminó. Mira tu resumen o crea uno nuevo."})
     # Los taps de notificaciones (mensajes entre corchetes) no gastan cuota de
     # chat: son acciones de UI, no conversación real con el LLM. Igual cuentan
     # poco, pero para no penalizar al usuario por interactuar, los eximimos.
@@ -1441,6 +1479,14 @@ def _waitlist_admin(x_admin_token: str | None, token: str | None) -> None:
         raise HTTPException(503, "Panel de waitlist no configurado (falta ADMIN_TOKEN).")
     if not waitlist.admin_ok(x_admin_token or token):
         raise HTTPException(403, "Acceso de administrador requerido.")
+
+
+@app.get("/admin/encuestas")
+def encuestas_admin(token: str | None = None, x_admin_token: str | None = Header(default=None)):
+    _waitlist_admin(x_admin_token, token)
+    with db.conn() as c:
+        rs = [dict(r) for r in c.execute("SELECT * FROM encuestas ORDER BY created_at DESC").fetchall()]
+    return {"count": len(rs), "encuestas": rs}
 
 
 @app.get("/admin/waitlist")

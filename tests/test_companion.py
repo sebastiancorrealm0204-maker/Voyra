@@ -52,8 +52,8 @@ def fresh_db(tmp_path):
 
 @pytest.fixture
 def trip():
-    return db.create_trip({"ciudad": "Cartagena", "hotel": "H", "inicio": "2026-07-12",
-                           "fin": "2026-07-18", "pais": "Colombia", "gustos": ["Gastronomía local"]})
+    return db.create_trip({"ciudad": "Cartagena", "hotel": "H", "inicio": "2099-07-12",
+                           "fin": "2099-07-18", "pais": "Colombia", "gustos": ["Gastronomía local"]})
 
 
 def test_operativo_siempre_push(trip):
@@ -111,8 +111,8 @@ def test_api_end_to_end():
     from app.main import app
     client = TestClient(app)
     H = _auth_headers(client)
-    t = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H", "inicio": "2026-07-12",
-                                    "fin": "2026-07-18"}, headers=H).json()
+    t = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H", "inicio": "2099-07-12",
+                                    "fin": "2099-07-18"}, headers=H).json()
     tid = t["trip_id"]
     assert "planes" not in t  # greeting devuelto
     assert client.post(f"/trips/{tid}/location", json={"zona": "Getsemaní"}, headers=H).json()["zona_actual"] == "Getsemaní"
@@ -144,7 +144,7 @@ def test_push_subscribe_guarda_y_borra():
     from app.main import app
     client = TestClient(app)
     H = _auth_headers(client)
-    tid = db.create_trip({"ciudad": "Bogotá", "hotel": "H", "inicio": "2026-07-12", "fin": "2026-07-18"})
+    tid = db.create_trip({"ciudad": "Bogotá", "hotel": "H", "inicio": "2099-07-12", "fin": "2099-07-18"})
     sub = {"endpoint": "https://push.example.com/abc123", "keys": {"p256dh": "x", "auth": "y"}}
     r = client.post(f"/trips/{tid}/push/subscribe", json={"subscription": sub}, headers=H).json()
     assert r["ok"] is True
@@ -155,7 +155,7 @@ def test_push_subscribe_guarda_y_borra():
 
 def test_push_subscribe_no_duplica():
     """Suscribir el mismo endpoint dos veces no crea duplicados (upsert)."""
-    tid = db.create_trip({"ciudad": "Bogotá", "hotel": "H", "inicio": "2026-07-12", "fin": "2026-07-18"})
+    tid = db.create_trip({"ciudad": "Bogotá", "hotel": "H", "inicio": "2099-07-12", "fin": "2099-07-18"})
     sub = '{"endpoint":"https://push.example.com/same","keys":{"p256dh":"x","auth":"y"}}'
     db.upsert_push_subscription(tid, "https://push.example.com/same", sub)
     db.upsert_push_subscription(tid, "https://push.example.com/same", sub)
@@ -224,7 +224,7 @@ def test_modo_aeropuerto_se_activa_y_payload():
     client = TestClient(app)
     H = _auth_headers(client)
     t = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "Hotel NH Teusaquillo",
-                                    "inicio": "2026-07-12", "fin": "2026-07-18"}, headers=H).json()
+                                    "inicio": "2099-07-12", "fin": "2099-07-18"}, headers=H).json()
     tid = t["trip_id"]
 
     # Llega al aeropuerto → modo aeropuerto + flag de recién llegado
@@ -249,7 +249,7 @@ def test_modo_aeropuerto_se_apaga_al_salir():
     client = TestClient(app)
     H = _auth_headers(client)
     t = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H",
-                                    "inicio": "2026-07-12", "fin": "2026-07-18"}, headers=H).json()
+                                    "inicio": "2099-07-12", "fin": "2099-07-18"}, headers=H).json()
     tid = t["trip_id"]
     client.post(f"/trips/{tid}/location", json={"zona": "Aeropuerto"}, headers=H)
     salida = client.post(f"/trips/{tid}/location", json={"zona": "Usaquén"}, headers=H).json()
@@ -263,7 +263,7 @@ def test_airport_gps_activa_modo():
     client = TestClient(app)
     H = _auth_headers(client)
     t = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H",
-                                    "inicio": "2026-07-12", "fin": "2026-07-18"}, headers=H).json()
+                                    "inicio": "2099-07-12", "fin": "2099-07-18"}, headers=H).json()
     tid = t["trip_id"]
     loc = client.post(f"/trips/{tid}/location",
                       json={"lat": 4.7016, "lng": -74.1469, "zona": "En el hotel"}, headers=H).json()
@@ -279,7 +279,7 @@ def test_airport_ciudad_sin_curacion(monkeypatch):
     client = TestClient(app)
     H = _auth_headers(client)
     t = client.post("/trips", json={"ciudad": "Cartagena", "hotel": "H",
-                                    "inicio": "2026-07-12", "fin": "2026-07-18"}, headers=H).json()
+                                    "inicio": "2099-07-12", "fin": "2099-07-18"}, headers=H).json()
     tid = t["trip_id"]
     a = client.get(f"/trips/{tid}/airport", headers=H).json()
     assert a["disponible"] is False
@@ -290,8 +290,8 @@ def test_scan_mock_mode_no_crash():
     from app.main import app
     client = TestClient(app)
     H = _auth_headers(client)
-    t = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H", "inicio": "2026-07-12",
-                                    "fin": "2026-07-18"}, headers=H).json()
+    t = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H", "inicio": "2099-07-12",
+                                    "fin": "2099-07-18"}, headers=H).json()
     tid = t["trip_id"]
     r = client.post(f"/trips/{tid}/scan", headers=H).json()
     assert r["search_mode"] == "mock"
@@ -391,8 +391,8 @@ def test_plans_crud_api():
     from app.main import app
     client = TestClient(app)
     H = _auth_headers(client)
-    tid = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H", "inicio": "2026-07-12",
-                                      "fin": "2026-07-18"}, headers=H).json()["trip_id"]
+    tid = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H", "inicio": "2099-07-12",
+                                      "fin": "2099-07-18"}, headers=H).json()["trip_id"]
     # agregar plan estructurado
     r = client.post(f"/trips/{tid}/plans", json={"titulo": "Monserrate", "fecha": "2026-07-14",
                                                  "hora": "08:00", "tipo": "actividad"}, headers=H).json()
@@ -414,8 +414,8 @@ def test_chat_devuelve_propuestas():
     from app.main import app
     client = TestClient(app)
     H = _auth_headers(client)
-    tid = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H", "inicio": "2026-07-12",
-                                      "fin": "2026-07-18"}, headers=H).json()["trip_id"]
+    tid = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H", "inicio": "2099-07-12",
+                                      "fin": "2099-07-18"}, headers=H).json()["trip_id"]
     r = client.post(f"/trips/{tid}/chat", json={"message": "mañana tengo tour a Monserrate 9am"}, headers=H).json()
     assert "planes_propuestos" in r
     # en modo mock la heurística detecta el plan; no se guarda hasta confirmar
@@ -426,8 +426,8 @@ def test_doc_devuelve_planes_propuestos():
     from app.main import app
     client = TestClient(app)
     H = _auth_headers(client)
-    tid = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H", "inicio": "2026-07-12",
-                                      "fin": "2026-07-18"}, headers=H).json()["trip_id"]
+    tid = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H", "inicio": "2099-07-12",
+                                      "fin": "2099-07-18"}, headers=H).json()["trip_id"]
     r = client.post(f"/trips/{tid}/documents", json={"filename": "vuelo.txt",
                                                      "text_content": "Vuelo AV245 13 jul 8am"}, headers=H).json()
     assert "planes_propuestos" in r
@@ -486,7 +486,7 @@ def test_maps_link_resuelve_a_direccion_curada():
     client = TestClient(app)
     H = _auth_headers(client)
     tid = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H",
-                                      "inicio": "2026-07-12", "fin": "2026-07-18"}, headers=H).json()["trip_id"]
+                                      "inicio": "2099-07-12", "fin": "2099-07-18"}, headers=H).json()["trip_id"]
     resp = client.post(f"/trips/{tid}/plans", headers=H, json={
         "titulo": "Cena en ElCielo", "lugar": "Cena en ElCielo",
         "tipo": "restaurante", "fecha": "2026-07-15", "hora": "19:00"}).json()
@@ -511,7 +511,7 @@ def test_maps_link_sin_gps_abre_busqueda():
     client = TestClient(app)
     H = _auth_headers(client)
     tid = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H",
-                                      "inicio": "2026-07-12", "fin": "2026-07-18"}, headers=H).json()["trip_id"]
+                                      "inicio": "2099-07-12", "fin": "2099-07-18"}, headers=H).json()["trip_id"]
     resp = client.post(f"/trips/{tid}/plans", headers=H, json={
         "titulo": "El Cielo", "lugar": "El Cielo",
         "tipo": "restaurante", "fecha": "2026-07-15", "hora": "19:00"}).json()
@@ -636,7 +636,7 @@ def test_nearby_chain_endpoint():
     client = TestClient(app)
     H = _auth_headers(client)
     tid = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H",
-                                      "inicio": "2026-07-12", "fin": "2026-07-18"}, headers=H).json()["trip_id"]
+                                      "inicio": "2099-07-12", "fin": "2099-07-18"}, headers=H).json()["trip_id"]
     r = client.get(f"/trips/{tid}/nearby-chain?q=Carulla&orig_lat=4.66&orig_lng=-74.05", headers=H)
     assert r.status_code == 200
     data = r.json()
@@ -777,8 +777,8 @@ def test_memoria_recuerda_perfil_y_viajes_anteriores():
     auth.set_profile(uid, {"alergias": "mariscos", "preferencias": "cafés tranquilos"})
     viejo = db.create_trip({"ciudad": "Bogotá", "hotel": "H", "inicio": "2025-03-01", "fin": "2025-03-05",
                             "planes": [{"titulo": "Museo del Oro", "fecha": "2025-03-02"}]}, user_id=uid)
-    nuevo = db.create_trip({"ciudad": "Cartagena", "hotel": "H", "inicio": "2026-07-12",
-                            "fin": "2026-07-18"}, user_id=uid)
+    nuevo = db.create_trip({"ciudad": "Cartagena", "hotel": "H", "inicio": "2099-07-12",
+                            "fin": "2099-07-18"}, user_id=uid)
     b = memoria.bloque(uid, nuevo)
     assert "mariscos" in b and "cafés tranquilos" in b
     assert "Bogotá" in b and "Museo del Oro" in b
@@ -852,8 +852,8 @@ def test_respuesta_correcta_no_gasta_llamadas(monkeypatch):
 def test_chat_entrega_y_guarda_la_version_corregida(monkeypatch):
     from app import llm, verificacion
     client, H = _auth_client()
-    tid = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H", "inicio": "2026-07-12",
-                                      "fin": "2026-07-18"}, headers=H).json()["trip_id"]
+    tid = client.post("/trips", json={"ciudad": "Bogotá", "hotel": "H", "inicio": "2099-07-12",
+                                      "fin": "2099-07-18"}, headers=H).json()["trip_id"]
 
     def _fake(system, history):
         if system == verificacion._SYSTEM_CORRECTOR:
@@ -970,3 +970,30 @@ def test_chat_en_ingles_recuerda_el_idioma_al_modelo(monkeypatch):
     client.post(f"/trips/{tid2}/chat", json={"message": "hola"}, headers=H)
     assert "[Reply in" not in capturado["history"][-1]["content"]
     assert "FINAL REMINDER" not in capturado["system"]
+
+
+def test_chat_cerrado_cuando_el_viaje_termino():
+    """Pasado el último día del viaje el chat no recibe mensajes (409) y el resumen sí se puede pedir."""
+    from datetime import date, timedelta
+    hoy = date.today()
+    tid = db.create_trip({"ciudad": "Bogotá", "hotel": "H", "inicio": (hoy - timedelta(days=10)).isoformat(),
+                          "fin": (hoy - timedelta(days=3)).isoformat()})
+    from app import resumen
+    assert resumen.terminado(db.get_trip(tid))
+    r = resumen.resumen(db.get_trip(tid), [], db.places_for_city("Bogotá"))
+    assert r["terminado"] and r["visitados"] == []
+    assert 1 <= len(r["ganchos"]) <= 3
+
+
+def test_encuesta_de_cierre():
+    from app import resumen
+    tid = db.create_trip({"ciudad": "Bogotá", "hotel": "H", "inicio": "2026-01-01", "fin": "2026-01-03"})
+    trip = db.get_trip(tid)
+    assert not resumen.guardar_encuesta(trip, None, ["nope"], "  ", "")          # vacía → no se guarda
+    assert not resumen.encuesta_respondida(tid)
+    assert resumen.guardar_encuesta(trip, None, ["comida", "comida", "x"], "más rápido", "reservas")
+    assert resumen.guardar_encuesta(trip, None, ["chat"], "", "")                # reemplaza la anterior
+    assert resumen.encuesta_respondida(tid)
+    with db.conn() as c:
+        fila = [dict(r) for r in c.execute("SELECT * FROM encuestas WHERE trip_id=?", (tid,)).fetchall()]
+    assert len(fila) == 1 and fila[0]["gusto"] == "chat"

@@ -405,7 +405,7 @@ def chat(system: str, history: list[dict]) -> str:
             return "[demo] Llama YA al número de emergencias local (123 en Colombia). La clínica con urgencias más cercana está a 5 min en taxi. ¿Puedes moverte?"
         return "[demo] ¡Anotado! ¿Algo en especial que tengas en mente, o te sorprendo con algo de la zona?"
     msgs = [{"role": ("user" if m["role"] == "user" else "assistant"), "content": m["content"]} for m in history]
-    return _call(CHAT_PROVIDER, system, msgs, max_tokens=600)
+    return _call(CHAT_PROVIDER, system, msgs, max_tokens=450)
 
 
 # ── Extracción de documentos y planes (tarea barata → DeepSeek/Groq) ──
@@ -586,7 +586,7 @@ def extract_plans_from_chat(message: str, trip: dict | None = None) -> list[dict
     )
     try:
         out = _parse_json(_call(EXTRACT_PROVIDER, "Eres el detector de planes de viaje de Voyra.",
-                                [{"role": "user", "content": prompt}], max_tokens=600))
+                                [{"role": "user", "content": prompt}], max_tokens=450))
         planes = out.get("planes", [])
         planes = planes if isinstance(planes, list) else []
         return _descartar_no_planes(planes, message)
