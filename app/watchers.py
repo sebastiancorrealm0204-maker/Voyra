@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from . import airport, context, db, engine, geo, llm, search
 
-log = logging.getLogger("voyra.watchers")
+log = logging.getLogger("companion.watchers")
 
 
 def duffel_webhook(trip_id: str, payload: dict) -> dict:

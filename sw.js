@@ -5,7 +5,7 @@
  *  - API (/trips, /health, …)  → nunca se cachea. Los POST ni siquiera entran aquí.
  *  Sube el número de versión cada vez que cambies el shell para forzar refresco.
  */
-const VERSION = "voyra-v4";
+const VERSION = "companion-v5";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 
@@ -103,7 +103,7 @@ self.addEventListener("push", (event) => {
     icon: "/manifest-icon-192.png",   // cae al ícono del manifest si no existe
     badge: "/manifest-icon-192.png",
     data: payload.data || {},
-    tag: (payload.data && payload.data.kind) || "voyra",
+    tag: (payload.data && payload.data.kind) || "companion",
     renotify: true,
   };
   event.waitUntil(self.registration.showNotification(payload.title || "Companion", options));

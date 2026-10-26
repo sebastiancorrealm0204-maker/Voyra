@@ -31,7 +31,7 @@ if not logging.getLogger().handlers:
         level=os.environ.get("LOG_LEVEL", "INFO").upper(),
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
-log = logging.getLogger("voyra.api")
+log = logging.getLogger("companion.api")
 
 # Raíz del repo: los archivos del frontend se sirven por ruta absoluta (antes
 # dependían del directorio desde el que se lanzara uvicorn).
@@ -44,7 +44,7 @@ _THREADPOOL_SIZE = int(os.environ.get("THREADPOOL_SIZE", "100"))
 
 # Pool para el fan-out del chat (respuesta LLM ∥ router ∥ extracción ∥ Places).
 _fanout = ThreadPoolExecutor(max_workers=int(os.environ.get("CHAT_FANOUT_WORKERS", "32")),
-                             thread_name_prefix="voyra-chat")
+                             thread_name_prefix="companion-chat")
 
 
 @asynccontextmanager
@@ -183,8 +183,8 @@ def verified_user(user: dict = Depends(current_user)) -> dict:
 def admin_guard(x_admin_token: str | None = Header(default=None)) -> None:
     """Protege la cola de revisión de enriquecimientos. Como aún no hay rol de
     admin en el modelo de usuario, gateamos con un token de entorno
-    (VOYRA_ADMIN_TOKEN). Si no está configurado, los endpoints quedan cerrados."""
-    esperado = os.environ.get("VOYRA_ADMIN_TOKEN", "")
+    (COMPANION_ADMIN_TOKEN, o el antiguo VOYRA_ADMIN_TOKEN). Si no está configurado, los endpoints quedan cerrados."""
+    esperado = os.environ.get("COMPANION_ADMIN_TOKEN") or os.environ.get("VOYRA_ADMIN_TOKEN", "")
     if not esperado or (x_admin_token or "").strip() != esperado:
         raise HTTPException(403, "Acceso de administrador requerido.")
 

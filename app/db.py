@@ -19,7 +19,7 @@ import time
 import uuid
 from contextlib import contextmanager
 
-log = logging.getLogger("voyra.db")
+log = logging.getLogger("companion.db")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Capa de persistencia BILINGÜE: SQLite (local/tests) o Postgres/Supabase (prod).

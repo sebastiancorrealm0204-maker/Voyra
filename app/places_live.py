@@ -20,7 +20,7 @@ import os
 
 from . import net
 
-log = logging.getLogger("voyra.places")
+log = logging.getLogger("companion.places")
 
 API_KEY = os.environ.get("GOOGLE_MAPS_API_KEY", "")
 MODE = "real" if API_KEY else "mock"

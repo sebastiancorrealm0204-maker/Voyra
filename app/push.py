@@ -22,14 +22,14 @@ from concurrent.futures import ThreadPoolExecutor
 
 from . import db, net
 
-log = logging.getLogger("voyra.push")
+log = logging.getLogger("companion.push")
 
 # Timeout por envío: pywebpush no pone ninguno por defecto, así que un endpoint
 # de push colgado (FCM/APNs/Mozilla) podía bloquear el thread indefinidamente.
 _PUSH_TIMEOUT_S = float(os.environ.get("PUSH_TIMEOUT_S", "10"))
 # Pool pequeño para despachar pushes SIN bloquear el request que los originó.
 _executor = ThreadPoolExecutor(max_workers=int(os.environ.get("PUSH_WORKERS", "4")),
-                               thread_name_prefix="voyra-push")
+                               thread_name_prefix="companion-push")
 
 VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "").strip()
 VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "").strip()

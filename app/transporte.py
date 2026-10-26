@@ -31,7 +31,7 @@ from zoneinfo import ZoneInfo
 
 from . import geo, net
 
-log = logging.getLogger("voyra.transporte")
+log = logging.getLogger("companion.transporte")
 
 API_KEY = os.environ.get("GOOGLE_MAPS_API_KEY", "")
 ROUTES_URL = "https://routes.googleapis.com/directions/v2:computeRoutes"

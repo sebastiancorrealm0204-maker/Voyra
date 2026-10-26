@@ -2,7 +2,7 @@
 # Los secretos llevan `sync: false`: Render los pide en el panel y no se guardan en el repo.
 services:
   - type: web
-    name: voyra-backend
+    name: companion-backend
     runtime: python
     plan: free            # cambia a `starter` para que no se duerma y corran los avisos programados
     region: virginia      # la más cercana a Colombia/México; no se puede cambiar después de crear
@@ -26,7 +26,7 @@ services:
       # ── Admin y URLs
       - key: ADMIN_TOKEN
         sync: false
-      - key: APP_BASE_URL   # URL del frontend, ej. https://voyra-app.onrender.com
+      - key: APP_BASE_URL   # URL del frontend, ej. https://companion-app.onrender.com
         sync: false
       # ── Notificaciones push (genera el par con generar_vapid.py)
       - key: VAPID_PUBLIC_KEY

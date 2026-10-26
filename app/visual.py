@@ -14,7 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from . import geo, net, places_live, traducir
 
-log = logging.getLogger("voyra.visual")
+log = logging.getLogger("companion.visual")
 
 _cache_foto = net.TTLCache(ttl_s=float(os.environ.get("FOTO_TTL_S", str(6 * 3600))), maxsize=1024)
 _SIN = object()

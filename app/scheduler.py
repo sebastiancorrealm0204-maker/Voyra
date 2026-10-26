@@ -22,7 +22,7 @@ from datetime import date, datetime, timedelta
 
 from . import db, geo, search, timeutil, watchers
 
-log = logging.getLogger("voyra.scheduler")
+log = logging.getLogger("companion.scheduler")
 
 MATUTINO  = (8.0, 10.0)
 NOCTURNO  = (20.0, 22.0)
@@ -226,7 +226,7 @@ def tick() -> dict:
     try:
         trips = db.list_trips()
         if TICK_WORKERS > 1 and len(trips) > 1:
-            with ThreadPoolExecutor(max_workers=TICK_WORKERS, thread_name_prefix="voyra-tick") as ex:
+            with ThreadPoolExecutor(max_workers=TICK_WORKERS, thread_name_prefix="companion-tick") as ex:
                 list(ex.map(lambda t: _procesar_trip(t, disparos), trips))
         else:
             for trip in trips:
@@ -268,7 +268,7 @@ def start() -> bool:
     _scheduler = BackgroundScheduler(daemon=True, timezone="UTC")
     # misfire_grace_time: si el proceso estuvo ocupado/dormido, un tick atrasado
     # aún corre (coalesce=True los colapsa en uno solo).
-    _scheduler.add_job(tick, "interval", minutes=TICK_MINUTES, id="voyra_proactive",
+    _scheduler.add_job(tick, "interval", minutes=TICK_MINUTES, id="companion_proactive",
                        max_instances=1, coalesce=True, misfire_grace_time=TICK_MINUTES * 60)
     _scheduler.start()
     log.info("scheduler activo — tick cada %d min", TICK_MINUTES)

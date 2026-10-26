@@ -22,7 +22,7 @@ import os
 
 from . import net
 
-log = logging.getLogger("voyra.email")
+log = logging.getLogger("companion.email")
 
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
 EMAIL_FROM = os.environ.get("EMAIL_FROM", "Companion <onboarding@resend.dev>").strip()

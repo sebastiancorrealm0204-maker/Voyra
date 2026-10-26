@@ -10,7 +10,7 @@ import logging
 
 from . import auth, db, plans
 
-log = logging.getLogger("voyra.memoria")
+log = logging.getLogger("companion.memoria")
 
 MAX_VIAJES = 4
 MAX_LUGARES_POR_VIAJE = 6

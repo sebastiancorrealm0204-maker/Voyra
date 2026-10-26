@@ -24,7 +24,7 @@ import httpx
 
 from . import net
 
-log = logging.getLogger("voyra.llm")
+log = logging.getLogger("companion.llm")
 
 PROVIDERS = {
     "anthropic": {

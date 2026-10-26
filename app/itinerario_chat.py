@@ -13,7 +13,7 @@ from datetime import timedelta
 
 from . import db, geo, plans as plans_mod, reloj, timeutil, visual
 
-log = logging.getLogger("voyra.itinerario_chat")
+log = logging.getLogger("companion.itinerario_chat")
 
 
 def _norm(s: str) -> str:

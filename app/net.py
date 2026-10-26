@@ -24,7 +24,7 @@ from collections import OrderedDict
 
 import httpx
 
-log = logging.getLogger("voyra.net")
+log = logging.getLogger("companion.net")
 
 _DEFAULT_TIMEOUT = httpx.Timeout(connect=5.0, read=20.0, write=10.0, pool=5.0)
 _LIMITS = httpx.Limits(

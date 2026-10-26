@@ -14,7 +14,7 @@ import logging
 
 from . import food_guard, llm
 
-log = logging.getLogger("voyra.verificacion")
+log = logging.getLogger("companion.verificacion")
 
 _SYSTEM_CORRECTOR = (
     "Eres el verificador de Companion. Corriges respuestas del Companion (un local con criterio que "

@@ -14,7 +14,7 @@ from datetime import date, datetime, timezone
 
 from . import net, timeutil, visual
 
-log = logging.getLogger("voyra.resumen")
+log = logging.getLogger("companion.resumen")
 
 # Un gancho por tipo de plan, en este orden: comer, conocer, salir.
 _GRUPOS_GANCHO = (

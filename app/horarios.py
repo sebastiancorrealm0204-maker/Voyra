@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 
 from . import plans as plans_mod, reloj
 
-log = logging.getLogger("voyra.horarios")
+log = logging.getLogger("companion.horarios")
 
 RUTA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "horarios_bogota.json")
 _datos: dict | None = None

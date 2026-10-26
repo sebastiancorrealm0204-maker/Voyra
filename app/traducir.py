@@ -14,7 +14,7 @@ import logging
 
 from . import city_knowledge, db, llm
 
-log = logging.getLogger("voyra.traducir")
+log = logging.getLogger("companion.traducir")
 
 IDIOMAS = {"en", "pt", "fr", "de", "it"}
 TODOS = IDIOMAS | {"es"}

@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 
 from . import geo, timeutil
 
-log = logging.getLogger("voyra.reloj")
+log = logging.getLogger("companion.reloj")
 
 AEROPUERTO = (4.7016, -74.1469)       # El Dorado
 CENTRO = (4.65, -74.07)

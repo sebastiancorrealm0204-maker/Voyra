@@ -26,7 +26,7 @@ import logging
 import re
 import unicodedata
 
-logger = logging.getLogger("voyra.food_guard")
+logger = logging.getLogger("companion.food_guard")
 
 # Platos/preparaciones típicos que un modelo tiende a "regalar" por asociación
 # con "cocina colombiana" aunque la ficha curada no los mencione.

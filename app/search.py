@@ -14,7 +14,7 @@ import os
 
 from . import net
 
-log = logging.getLogger("voyra.search")
+log = logging.getLogger("companion.search")
 
 TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY", "")
 MODE = "real" if TAVILY_API_KEY else "mock"

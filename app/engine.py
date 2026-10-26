@@ -13,7 +13,7 @@ import logging
 
 from . import context, db, llm, timeutil
 
-log = logging.getLogger("voyra.engine")
+log = logging.getLogger("companion.engine")
 
 # Avisos mesurados: el Companion avisa, pero no satura. Los operativos (vuelo,
 # seguridad) no cuentan para el presupuesto y llegan siempre.
