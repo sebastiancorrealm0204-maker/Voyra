@@ -87,6 +87,13 @@ def add(email: str, name: str = "", phone: str = "", source: str = "",
     return {"ok": True, "status": "added"}
 
 
+def esta(email: str) -> bool:
+    """¿Ese correo ya está en la lista de espera?"""
+    with db.conn() as c:
+        row = c.execute("SELECT 1 FROM waitlist WHERE email=?", ((email or "").strip().lower(),)).fetchone()
+    return row is not None
+
+
 # Contador público cacheado unos segundos: la landing lo pide en cada visita.
 _COUNT_TTL_S = float(os.environ.get("WAITLIST_COUNT_TTL_S", "30"))
 _count_cache = {"exp": 0.0, "n": 0}

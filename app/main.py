@@ -1586,6 +1586,28 @@ def waitlist_add(body: WaitlistIn, request: Request):
         raise HTTPException(400, "Email inválido.")
 
 
+class WaitlistMeIn(BaseModel):
+    momento: str = Field("", max_length=40)  # primer_viaje | dia2 | cierre | mas
+
+
+MOMENTOS_LISTA = {"primer_viaje", "dia2", "cierre", "mas"}
+
+
+@app.get("/waitlist/me")
+def waitlist_me(user: dict = Depends(current_user)):
+    """¿Este usuario ya está en la lista de espera? (La tarjeta de la app no se muestra si ya se unió.)"""
+    return {"unido": waitlist.esta(user["email"])}
+
+
+@app.post("/waitlist/me")
+def waitlist_me_add(body: WaitlistMeIn, user: dict = Depends(current_user)):
+    """Un toque desde la app: inscribe al usuario con los datos que ya dio al registrarse. Misma lista que la landing;
+    `source` queda como app-<momento> para saber en qué momento convierte mejor."""
+    momento = body.momento if body.momento in MOMENTOS_LISTA else "app"
+    return waitlist.add(user["email"], name=user.get("nombre") or "", phone=user.get("telefono") or "",
+                        source=f"app-{momento}", city=user.get("pais") or "")
+
+
 @app.get("/waitlist/count")
 def waitlist_count():
     """Contador público para la landing (cacheado unos segundos)."""
