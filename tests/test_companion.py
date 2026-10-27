@@ -701,6 +701,19 @@ def test_tope_de_trips_activos(monkeypatch):
     assert client.post("/trips", json={"ciudad": "Cali"}, headers=H).status_code == 429
 
 
+def test_borrar_un_viaje_no_devuelve_el_cupo(monkeypatch):
+    """Si borrar libera cupo, basta borrar y volver a crear el mismo viaje para usar la app sin pagar."""
+    from app import limits
+    from app.main import app
+    monkeypatch.setattr(limits, "MAX_TRIPS_PER_USER", 1)
+    client = TestClient(app)
+    H = _auth_headers(client)
+    tid = client.post("/trips", json={"ciudad": "Bogotá"}, headers=H).json()["trip_id"]
+    assert client.delete(f"/trips/{tid}", headers=H).status_code == 200
+    r = client.post("/trips", json={"ciudad": "Bogotá"}, headers=H)
+    assert r.status_code == 429 and r.json()["detail"]["error"] == "trip_limit"
+
+
 def test_cuota_chat_se_agota(monkeypatch):
     from app import limits
     from app.main import app

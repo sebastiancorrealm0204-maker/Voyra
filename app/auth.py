@@ -60,7 +60,9 @@ CREATE TABLE IF NOT EXISTS users (
   limit_chat INTEGER,
   limit_document INTEGER,
   limit_scan INTEGER,
-  limit_trips INTEGER
+  limit_trips INTEGER,
+  -- Viajes creados en total (nunca baja al borrar). NULL = aún no se contó: se usa cuántos tiene hoy.
+  trips_creados INTEGER
 );
 CREATE TABLE IF NOT EXISTS sessions (
   token TEXT PRIMARY KEY,
@@ -95,7 +97,7 @@ def init_auth():
             # que es seguro de correr múltiples veces (no falla si ya existe).
             for col, decl in (("profile", "TEXT"), ("limit_maps", "INTEGER"),
                               ("limit_chat", "INTEGER"), ("limit_document", "INTEGER"),
-                              ("limit_scan", "INTEGER"), ("limit_trips", "INTEGER"),
+                              ("limit_scan", "INTEGER"), ("limit_trips", "INTEGER"), ("trips_creados", "INTEGER"),
                               ("nombre", "TEXT"), ("telefono", "TEXT"), ("pais", "TEXT")):
                 c.execute(
                     f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} {decl}"
@@ -109,7 +111,7 @@ def init_auth():
             user_cols = {r["name"] for r in c.execute("PRAGMA table_info(users)").fetchall()}
             for col, decl in (("profile", "TEXT"), ("limit_maps", "INTEGER"),
                               ("limit_chat", "INTEGER"), ("limit_document", "INTEGER"),
-                              ("limit_scan", "INTEGER"), ("limit_trips", "INTEGER"),
+                              ("limit_scan", "INTEGER"), ("limit_trips", "INTEGER"), ("trips_creados", "INTEGER"),
                               ("nombre", "TEXT"), ("telefono", "TEXT"), ("pais", "TEXT")):
                 if col not in user_cols:
                     c.execute(f"ALTER TABLE users ADD COLUMN {col} {decl}")

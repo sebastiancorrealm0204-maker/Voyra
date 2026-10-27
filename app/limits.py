@@ -78,14 +78,14 @@ def effective_limit(user_id: str, resource: str) -> int | None:
 
 
 def effective_trip_limit(user_id: str) -> int:
-    """Tope de trips activos para este usuario (override por-usuario o default)."""
+    """Tope de viajes creados en total para este usuario (override por-usuario o default)."""
     with db.conn() as c:
         r = c.execute("SELECT limit_trips v FROM users WHERE id=?", (user_id,)).fetchone()
     if r and r["v"] is not None:
         return int(r["v"])
     return MAX_TRIPS_PER_USER
 
-# Tope de trips ACTIVOS simultáneos por usuario (no es diario; es un total vivo).
+# Tope de viajes CREADOS por usuario en el plan gratuito (total, no diario; borrar un viaje no devuelve el cupo).
 MAX_TRIPS_PER_USER = _env_int("LIMIT_TRIPS_PER_USER", 2)
 
 # Circuit breaker global de Maps: tope AGREGADO de todo el sistema por día.
@@ -190,9 +190,18 @@ def usage_summary(user_id: str) -> dict:
 
 # ── Trips activos por usuario ──
 def trips_count(user_id: str) -> int:
+    """Viajes que ya gastaron cupo: los que existen hoy o, si es mayor, los que alguna vez creó (borrar un viaje
+    no devuelve el cupo; si no, bastaría borrar y volver a crear el mismo viaje para usarlo sin pagar)."""
     with db.conn() as c:
         r = c.execute("SELECT COUNT(*) n FROM trips WHERE user_id=?", (user_id,)).fetchone()
-    return r["n"]
+        u = c.execute("SELECT trips_creados v FROM users WHERE id=?", (user_id,)).fetchone()
+    return max(int(r["n"]), int(u["v"] or 0) if u else 0)
+
+
+def registrar_viaje_creado(user_id: str, antes: int) -> None:
+    """Deja anotado que el usuario ya creó `antes + 1` viajes en total."""
+    with db.conn() as c:
+        c.execute("UPDATE users SET trips_creados=? WHERE id=?", (antes + 1, user_id))
 
 
 def can_create_trip(user_id: str) -> bool:

@@ -553,10 +553,12 @@ def create_trip(t: TripIn, user: dict = Depends(verified_user)):
         raise HTTPException(429, {
             "error": "trip_limit",
             "limite": tope,
-            "mensaje": f"Tu plan permite {tope} viajes activos. "
-                       "Borra uno para crear otro."})
+            "mensaje": f"Ya usaste los {tope} viajes de tu plan gratuito. "
+                       "Borrar un viaje no libera cupo."})
     _exigir_ciudad_activa(t.ciudad)
+    usados = limits.trips_count(user["id"])
     tid = db.create_trip(t.model_dump(exclude={"hotel_confirmado"}), user_id=user["id"])
+    limits.registrar_viaje_creado(user["id"], usados)
     if t.hotel_confirmado:
         db.update_trip(tid, {k: v for k, v in _campos_hotel(t.hotel_confirmado).items() if v is not None})
     _idi = (t.idioma or "es").lower()
@@ -637,7 +639,7 @@ def get_trip(tid: str, user: dict = Depends(current_user)):
 
 @app.delete("/trips/{tid}")
 def delete_trip(tid: str, user: dict = Depends(current_user)):
-    """Borra un viaje del usuario (libera un cupo de trips activos)."""
+    """Borra un viaje del usuario. NO devuelve el cupo de viajes: el tope cuenta los viajes creados en total."""
     own_trip(tid, user)
     with db.conn() as c:
         c.execute("DELETE FROM trips WHERE id=?", (tid,))
