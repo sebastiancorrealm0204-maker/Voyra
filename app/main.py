@@ -646,6 +646,12 @@ def delete_trip(tid: str, user: dict = Depends(current_user)):
     return {"ok": True}
 
 
+@app.get("/places/{place_id}/fotos")
+def fotos_del_lugar(place_id: str, n: int = 4, user: dict = Depends(current_user)):
+    """«Ver más fotos» de una tarjeta: las tarjetas del chat traen solo 1 foto (cada foto cuesta); el resto se pide aquí al tocar."""
+    return {"fotos": visual.fotos(place_id, max(1, min(n, 5)))}
+
+
 @app.get("/trips/{tid}/plans")
 def list_plans(tid: str, user: dict = Depends(current_user)):
     """Planes del viaje: lista plana ordenada + agrupados por día (para el calendario)."""

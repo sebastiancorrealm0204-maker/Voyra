@@ -4,15 +4,17 @@ Cuando el Companion recomienda o menciona un lugar de NUESTRA curación, la app 
 (las personas entienden mejor lo que ven). Solo lugares curados: ese es el valor de Companion.
 
 Las fotos vienen de Google Places (Place Details → foto → URL pública): son fotos REALES del lugar, nunca
-generadas ni de stock. Se cachean 6 h por lugar, así que el costo no crece con los usuarios; si Google falla o
+generadas ni de stock. Las URLs se cachean 6 h por lugar y los nombres de las fotos 30 días en la base, así que el costo no crece con los usuarios; si Google falla o
 el lugar no tiene foto, la tarjeta sale igual (sin foto) — no se rellena con nada inventado.
 """
+import json
 import logging
 import os
 import re
+import time
 from concurrent.futures import ThreadPoolExecutor
 
-from . import geo, net, places_live, traducir
+from . import db, geo, net, places_live, traducir
 
 log = logging.getLogger("companion.visual")
 
@@ -24,6 +26,55 @@ _PLACE_ID = re.compile(r"^[A-Za-z0-9_-]{10,200}$")
 # Categorías con las que una tarjeta con foto tiene sentido (no estaciones, supermercados ni clínicas).
 CATEGORIAS_VISUALES = {"restaurante", "bar", "cafe", "atraccion", "parque", "mercado", "experiencia", "excursion",
                        "compras", "museo", "hotel"}
+
+
+# ── Nombres de las fotos guardados en la base ──
+# Place Details (el paso caro que lista las fotos del lugar) se paga una vez por lugar y no cada 6 h ni tras cada
+# reinicio: los nombres de las fotos se guardan 30 días. Solo queda la llamada barata de cada foto, y solo de las que se ven.
+_NOMBRES_TTL_S = float(os.environ.get("FOTO_NOMBRES_TTL_S", str(30 * 24 * 3600)))
+_NOMBRES_MAX = 6
+_tabla_lista: set[str] = set()
+
+
+def _tabla() -> None:
+    clave = "pg" if db.IS_POSTGRES else db.DB_PATH
+    if clave in _tabla_lista:
+        return
+    sql = "CREATE TABLE IF NOT EXISTS foto_lugar (place_id TEXT PRIMARY KEY, nombres TEXT NOT NULL, created_at REAL NOT NULL)"
+    with db.conn() as c:
+        c.execute(sql)
+    _tabla_lista.add(clave)
+
+
+def _nombres_guardados(place_id: str) -> list[dict] | None:
+    try:
+        _tabla()
+        with db.conn() as c:
+            r = c.execute("SELECT nombres, created_at FROM foto_lugar WHERE place_id=?", (place_id,)).fetchone()
+        if r and time.time() - float(r["created_at"]) < _NOMBRES_TTL_S:
+            return json.loads(r["nombres"])
+    except Exception as e:
+        log.warning("foto_nombres_lectura error=%s", type(e).__name__)
+    return None
+
+
+def _guardar_nombres(place_id: str, nombres: list[dict]) -> None:
+    try:
+        _tabla()
+        with db.conn() as c:
+            c.execute("DELETE FROM foto_lugar WHERE place_id=?", (place_id,))
+            c.execute("INSERT INTO foto_lugar (place_id, nombres, created_at) VALUES (?,?,?)",
+                      (place_id, json.dumps(nombres), time.time()))
+    except Exception as e:
+        log.warning("foto_nombres_escritura error=%s", type(e).__name__)
+
+
+def _olvidar_nombres(place_id: str) -> None:
+    try:
+        with db.conn() as c:
+            c.execute("DELETE FROM foto_lugar WHERE place_id=?", (place_id,))
+    except Exception:
+        pass
 
 
 def _media(nombre: str, headers: dict, ancho: int) -> str | None:
@@ -44,22 +95,37 @@ def fotos(place_id: str | None, n: int = 1, ancho: int = 640) -> list[dict]:
         return []
     try:
         h = {"X-Goog-Api-Key": places_live.API_KEY}
-        r = net.request("GET", f"https://places.googleapis.com/v1/places/{place_id}", retries=0, timeout=4,
-                        headers={**h, "X-Goog-FieldMask": "photos.name,photos.authorAttributions"})
-        crudas = (r.json().get("photos") or [])[:n] if r.status_code == 200 else []
-        if not crudas:
-            _cache_foto.set(place_id, [], ttl_s=1800)
-            return []
-        futs = [_pool_media.submit(_media, f["name"], h, ancho) for f in crudas]
-        out = []
-        for f, fut in zip(crudas, futs):
-            try:
-                uri = fut.result(timeout=5)
-            except Exception:
-                uri = None
-            if uri:
-                autor = ((f.get("authorAttributions") or [{}])[0]).get("displayName") or ""
-                out.append({"uri": uri, "autor": autor})
+
+        def bajar(nombres: list[dict]) -> list[dict]:
+            futs = [_pool_media.submit(_media, f["name"], h, ancho) for f in nombres[:n]]
+            salida = []
+            for f, fut in zip(nombres, futs):
+                try:
+                    uri = fut.result(timeout=5)
+                except Exception:
+                    uri = None
+                if uri:
+                    salida.append({"uri": uri, "autor": f.get("autor", "")})
+            return salida
+
+        out: list[dict] = []
+        nombres = _nombres_guardados(place_id)
+        if nombres:
+            out = bajar(nombres)
+            if not out:               # los nombres guardados ya no sirven: se piden de nuevo
+                _olvidar_nombres(place_id)
+                nombres = None
+        if not nombres:
+            r = net.request("GET", f"https://places.googleapis.com/v1/places/{place_id}", retries=0, timeout=4,
+                            headers={**h, "X-Goog-FieldMask": "photos.name,photos.authorAttributions"})
+            crudas = (r.json().get("photos") or [])[:_NOMBRES_MAX] if r.status_code == 200 else []
+            if not crudas:
+                _cache_foto.set(place_id, [], ttl_s=1800)
+                return []
+            nombres = [{"name": f["name"], "autor": ((f.get("authorAttributions") or [{}])[0]).get("displayName") or ""}
+                       for f in crudas]
+            _guardar_nombres(place_id, nombres)
+            out = bajar(nombres)
         if out:
             _cache_foto.set(place_id, out)
         return [dict(f) for f in out]
@@ -154,7 +220,7 @@ def _galeria(p: dict, n: int) -> list[dict]:
 
 
 def tarjetas(lugares: list[dict], idioma: str = "es", con_foto: bool = True, distancias: dict | None = None,
-             n_fotos: int = 3) -> list[dict]:
+             n_fotos: int = 1) -> list[dict]:
     """Tarjetas listas para pintar. Fotos reales en paralelo; textos del dato local traducidos al idioma del usuario."""
     if not lugares:
         return []
