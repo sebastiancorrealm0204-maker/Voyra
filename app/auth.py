@@ -24,7 +24,7 @@ import re
 import secrets
 import time
 
-from . import db
+from . import config, db
 
 # ── Parámetros ──
 _PBKDF2_ITERATIONS = 200_000
@@ -180,9 +180,10 @@ def record_signup_attempt(ip: str):
 
 
 def ip_signup_blocked(ip: str) -> bool:
-    if _SIGNUP_MAX_PER_IP <= 0:
+    tope = config.get_int("signup_max_ip", _SIGNUP_MAX_PER_IP) or 0
+    if tope <= 0:
         return False
-    return signups_from_ip_recent(ip) >= _SIGNUP_MAX_PER_IP
+    return signups_from_ip_recent(ip) >= tope
 
 
 # ── Usuarios ──

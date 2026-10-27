@@ -13,7 +13,7 @@ import logging
 import os
 import time
 
-from . import net
+from . import config, net
 
 log = logging.getLogger("companion.search")
 
@@ -46,7 +46,7 @@ def cuota_agotada() -> bool:
         r.raise_for_status()
         cuenta = (r.json() or {}).get("account") or {}
         usado, limite = cuenta.get("plan_usage"), cuenta.get("plan_limit")
-        bloq = bool(usado is not None and limite and usado >= limite * BLOQUEO_PCT / 100)
+        bloq = bool(usado is not None and limite and usado >= limite * config.get_float("tavily_pct", BLOQUEO_PCT) / 100)
         if bloq and not _uso_cache["bloqueado"]:
             log.warning("tavily_tope usado=%s limite=%s", usado, limite)
         _uso_cache["bloqueado"] = bloq

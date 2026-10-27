@@ -189,8 +189,9 @@ def check_and_consume(user_id: str, resource: str):
     """
     # Circuit breaker global: solo aplica a Maps (el recurso que se paga por uso).
     if resource == "maps":
-        if global_used_today("maps") >= GLOBAL_MAPS_PER_DAY:
-            raise QuotaError("maps", GLOBAL_MAPS_PER_DAY, global_used_today("maps"),
+        tope_global = config.get_int("maps_global", GLOBAL_MAPS_PER_DAY) or 0
+        if global_used_today("maps") >= tope_global:
+            raise QuotaError("maps", tope_global, global_used_today("maps"),
                              global_block=True)
 
     limit = effective_limit(user_id, resource)

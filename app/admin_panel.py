@@ -3,13 +3,15 @@
 Entra el dueño con su propio usuario y contraseña (su correo va en ADMIN_EMAILS), o con el token de entorno. Todo se
 guarda en la misma base, que es Supabase en producción: lo que se cambia aquí se ve en el Table Editor y viceversa.
 """
+import os
+import re
 import time
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from . import accesos, config, db, feedback_limite, limits, waitlist
+from . import accesos, auth, config, db, feedback_limite, limits, net, waitlist
 
 # Costo aproximado por uso (USD), solo para dar una idea en el resumen. Ver el cálculo de costos en la conversación.
 COSTO_UNITARIO = {"chat": 0.006, "maps": 0.035, "document": 0.02, "scan": 0.03}
@@ -31,6 +33,9 @@ def _ajustes() -> list[dict]:
         {"key": "bonus_factor", "grupo": "Ampliación por feedback", "etiqueta": "Cuánto se amplía el recurso agotado (0.5 = la mitad del tope diario)", "tipo": "float", "default": feedback_limite.BONUS_FACTOR},
         {"key": "bonus_max_dias", "grupo": "Ampliación por feedback", "etiqueta": "Días máximos con ampliación por cuenta", "tipo": "int", "default": feedback_limite.BONUS_MAX_DIAS},
         {"key": "bonus_trips_max", "grupo": "Ampliación por feedback", "etiqueta": "Viajes extra máximos por feedback", "tipo": "int", "default": feedback_limite.BONUS_TRIPS_MAX},
+        {"key": "signup_max_ip", "grupo": "Registro", "etiqueta": "Registros por hora desde la misma conexión (0 = sin límite)", "tipo": "int", "default": int(os.environ.get("SIGNUP_MAX_PER_IP", "0") or 0)},
+        {"key": "maps_global", "grupo": "Gasto", "etiqueta": "Tope de búsquedas de Maps al día para todo el sistema", "tipo": "int", "default": limits.GLOBAL_MAPS_PER_DAY},
+        {"key": "tavily_pct", "grupo": "Gasto", "etiqueta": "% del plan mensual de Tavily en que se apagan las búsquedas automáticas", "tipo": "float", "default": float(os.environ.get("TAVILY_BLOQUEO_PCT", "90"))},
         {"key": "require_access_code", "grupo": "Registro", "etiqueta": "Exigir código de acceso para registrarse (1 = sí, 0 = no)", "tipo": "bool", "default": 1 if accesos.env_requerido() else 0},
     ]
 
@@ -43,6 +48,20 @@ class LimitesIn(BaseModel):
     limit_trips: int | None = Field(None, ge=0, le=1000)
 
 
+class DatosIn(BaseModel):
+    nombre: str | None = Field(None, max_length=120)
+    telefono: str | None = Field(None, max_length=40)   # "" = quitar
+    pais: str | None = Field(None, max_length=80)
+    plan: str | None = Field(None, max_length=20)
+
+
+class ClaveIn(BaseModel):
+    password: str = Field(..., min_length=8, max_length=200)
+
+
+PLANES = {"free", "tester", "premium"}
+
+
 class SuspenderIn(BaseModel):
     suspendido: bool
 
@@ -50,6 +69,36 @@ class SuspenderIn(BaseModel):
 class ConfigIn(BaseModel):
     key: str = Field(..., max_length=40)
     value: str | None = Field(None, max_length=20)   # None = volver al default
+
+
+def _tablas_con(columna: str, *esquemas: str) -> list[str]:
+    """Tablas (de los esquemas dados) que tienen esa columna: así el borrado de una cuenta no se olvida de ninguna tabla nueva."""
+    out = []
+    for sql in esquemas:
+        for nombre, cuerpo in re.findall(r"CREATE TABLE IF NOT EXISTS (\w+) \((.*?)\n\);", sql, re.S):
+            if nombre != "users" and re.search(r"\b" + columna + r"\b", cuerpo):
+                out.append(nombre)
+    return out
+
+
+def borrar_cuenta(uid: str) -> bool:
+    """Borra el usuario y TODO lo suyo: viajes con sus mensajes/planes/avisos, sesiones, uso y ampliaciones. Devuelve False si no existe.
+    Se conservan la lista de espera (es por correo) y el feedback de límite (aprendizaje, sin datos de contacto)."""
+    feedback_limite.asegurar_tablas()
+    with db.conn() as c:
+        if not c.execute("SELECT 1 FROM users WHERE id=?", (uid,)).fetchone():
+            return False
+        trips = [f["id"] for f in c.execute("SELECT id FROM trips WHERE user_id=?", (uid,)).fetchall()]
+        for tid in trips:
+            for tabla in _tablas_con("trip_id", db.SCHEMA):
+                c.execute(f"DELETE FROM {tabla} WHERE trip_id=?", (tid,))
+        c.execute("DELETE FROM trips WHERE user_id=?", (uid,))
+        for tabla in _tablas_con("user_id", auth.SCHEMA, limits.SCHEMA, db.SCHEMA):
+            if tabla != "trips":
+                c.execute(f"DELETE FROM {tabla} WHERE user_id=?", (uid,))
+        c.execute("DELETE FROM limit_bonus WHERE user_id=?", (uid,))
+        c.execute("DELETE FROM users WHERE id=?", (uid,))
+    return True
 
 
 def _hoy() -> str:
@@ -76,7 +125,7 @@ def _fila_usuario(c, u: dict) -> dict:
     }
 
 
-def registrar(app, current_user, admin_any):
+def registrar(app, current_user, admin_any, admin_quien):
     """Monta las rutas /admin/* (con `admin_any`: token de entorno o usuario admin)."""
     r = APIRouter(prefix="/admin", dependencies=[Depends(admin_any)])
 
@@ -159,6 +208,30 @@ def registrar(app, current_user, admin_any):
             raise HTTPException(404, "Usuario no existe.")
         return {"ok": True}
 
+    @r.post("/usuarios/{uid}/quitar-celular")
+    def quitar_celular(uid: str):
+        """Libera el número de celular de la cuenta (queda sin celular), para poder usarlo en otra."""
+        with db.conn() as c:
+            f = c.execute("SELECT profile FROM users WHERE id=?", (uid,)).fetchone()
+            if not f:
+                raise HTTPException(404, "Usuario no existe.")
+            c.execute("UPDATE users SET telefono=NULL WHERE id=?", (uid,))
+        perfil = auth.get_profile(uid)
+        if perfil.get("telefono"):
+            auth.set_profile(uid, {**perfil, "telefono": ""})
+        return {"ok": True}
+
+    @r.delete("/usuarios/{uid}")
+    def eliminar(uid: str, quien: dict = Depends(admin_quien)):
+        """Elimina la cuenta y todo lo suyo (no se puede borrar a un admin ni a sí mismo)."""
+        with db.conn() as c:
+            f = c.execute("SELECT email FROM users WHERE id=?", (uid,)).fetchone()
+        if f and (auth.es_admin({"email": f["email"]}) or (quien.get("id") == uid)):
+            raise HTTPException(403, "No se puede eliminar una cuenta de administrador.")
+        if not borrar_cuenta(uid):
+            raise HTTPException(404, "Usuario no existe.")
+        return {"ok": True}
+
     @r.post("/usuarios/{uid}/reiniciar-hoy")
     def reiniciar_hoy(uid: str):
         """Borra el uso de HOY de la cuenta (le devuelve los cupos diarios). No toca el total de la etapa."""
@@ -207,5 +280,117 @@ def registrar(app, current_user, admin_any):
         with db.conn() as c:
             filas = c.execute("SELECT email, name, phone, source, city, created_at FROM waitlist ORDER BY created_at DESC LIMIT ?", (limite,)).fetchall()
         return {"total": waitlist.count(fresh=True), "filas": [dict(f) for f in filas]}
+
+    @r.patch("/usuarios/{uid}/datos")
+    def cambiar_datos(uid: str, b: DatosIn):
+        """Edita nombre, celular, país y plan de una cuenta. El celular se normaliza y no puede repetirse."""
+        cambios = {k: getattr(b, k) for k in b.model_fields_set}
+        if not cambios:
+            raise HTTPException(422, "Nada que cambiar.")
+        sets, valores = [], []
+        with db.conn() as c:
+            if not c.execute("SELECT 1 FROM users WHERE id=?", (uid,)).fetchone():
+                raise HTTPException(404, "Usuario no existe.")
+            if "telefono" in cambios:
+                tel = (cambios["telefono"] or "").strip()
+                if tel:
+                    tel = auth.normalize_phone(tel)
+                    if not tel:
+                        raise HTTPException(422, "Celular inválido. Incluye el código de país (+57…).")
+                    otro = c.execute("SELECT id FROM users WHERE telefono=? AND id<>?", (tel, uid)).fetchone()
+                    if otro:
+                        raise HTTPException(409, "Ese celular ya lo tiene otra cuenta.")
+                sets.append("telefono=?"); valores.append(tel or None)
+            if "nombre" in cambios:
+                sets.append("nombre=?"); valores.append((cambios["nombre"] or "").strip())
+            if "pais" in cambios:
+                sets.append("pais=?"); valores.append((cambios["pais"] or "").strip())
+            if "plan" in cambios:
+                if cambios["plan"] not in PLANES:
+                    raise HTTPException(422, "Plan no válido.")
+                sets.append("plan=?"); valores.append(cambios["plan"])
+            c.execute(f"UPDATE users SET {', '.join(sets)} WHERE id=?", (*valores, uid))
+        return {"ok": True}
+
+    @r.post("/usuarios/{uid}/clave")
+    def poner_clave(uid: str, b: ClaveIn):
+        """Pone una contraseña nueva y cierra todas las sesiones de la cuenta (la persona entra con la nueva)."""
+        with db.conn() as c:
+            cur = c.execute("UPDATE users SET password_hash=? WHERE id=?", (auth._hash_password(b.password), uid))
+            if cur.rowcount != 1:
+                raise HTTPException(404, "Usuario no existe.")
+            c.execute("DELETE FROM sessions WHERE user_id=?", (uid,))
+        return {"ok": True}
+
+    @r.get("/viajes")
+    def viajes(q: str = Query("", max_length=80), limite: int = Query(50, ge=1, le=200)):
+        with db.conn() as c:
+            filas = c.execute("SELECT t.id, t.data, t.created_at, u.email FROM trips t LEFT JOIN users u ON u.id = t.user_id "
+                              "ORDER BY t.created_at DESC LIMIT 500").fetchall()
+        import json
+        out = []
+        for f in filas:
+            try:
+                d = json.loads(f["data"])
+            except (TypeError, ValueError):
+                d = {}
+            fila = {"id": f["id"], "email": f["email"] or "", "ciudad": d.get("ciudad", ""), "hotel": d.get("hotel", ""),
+                    "inicio": d.get("inicio", ""), "fin": d.get("fin", ""), "creado": f["created_at"]}
+            if q.strip() and q.strip().lower() not in f"{fila['email']} {fila['ciudad']} {fila['hotel']}".lower():
+                continue
+            out.append(fila)
+            if len(out) >= limite:
+                break
+        return {"viajes": out}
+
+    @r.delete("/viajes/{tid}")
+    def eliminar_viaje(tid: str):
+        with db.conn() as c:
+            if not c.execute("SELECT 1 FROM trips WHERE id=?", (tid,)).fetchone():
+                raise HTTPException(404, "Viaje no existe.")
+            for tabla in _tablas_con("trip_id", db.SCHEMA):
+                c.execute(f"DELETE FROM {tabla} WHERE trip_id=?", (tid,))
+            c.execute("DELETE FROM trips WHERE id=?", (tid,))
+        return {"ok": True}
+
+    @r.delete("/lista-espera/{email}")
+    def quitar_de_lista(email: str):
+        with db.conn() as c:
+            cur = c.execute("DELETE FROM waitlist WHERE email=?", (email.strip().lower(),))
+        waitlist.reset_count_cache()
+        if cur.rowcount != 1:
+            raise HTTPException(404, "Ese correo no está en la lista.")
+        return {"ok": True}
+
+    @r.get("/sistema")
+    def sistema():
+        """Estado del sistema: lo que antes tocaba mirar en Railway, en los logs o en los paneles de cada servicio."""
+        from . import email_send, llm, places_live, push, scheduler, search, transporte
+        t0 = time.time()
+        try:
+            with db.conn() as c:
+                c.execute("SELECT 1").fetchone()
+            base = {"ok": True, "motor": "postgres" if db.IS_POSTGRES else "sqlite", "ms": round((time.time() - t0) * 1000)}
+        except Exception as e:
+            base = {"ok": False, "motor": "postgres" if db.IS_POSTGRES else "sqlite", "error": type(e).__name__}
+        tavily = None
+        if search.MODE == "real":
+            try:
+                resp = net.request("GET", "https://api.tavily.com/usage", retries=0, timeout=8, headers={"Authorization": f"Bearer {search.TAVILY_API_KEY}"})
+                cuenta = (resp.json() or {}).get("account") or {}
+                tavily = {"usado": cuenta.get("plan_usage"), "limite": cuenta.get("plan_limit"), "plan": cuenta.get("current_plan")}
+            except Exception:
+                tavily = {"error": "no se pudo consultar"}
+        llaves = ["GOOGLE_MAPS_API_KEY", "TAVILY_API_KEY", "DEEPSEEK_API_KEY", "ANTHROPIC_API_KEY", "GROQ_API_KEY", "SUPABASE_URL",
+                  "SUPABASE_SERVICE_KEY", "VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "RESEND_API_KEY", "EMAIL_FROM", "COMPANION_ADMIN_TOKEN", "ADMIN_EMAILS"]
+        return {
+            "base_de_datos": base, "planificador": scheduler.running(), "ia": llm.MODE, "busqueda": search.MODE,
+            "transporte": "google" if transporte.disponible() else "demo", "notificaciones_push": push.enabled(),
+            "lugares_en_vivo": places_live.MODE, "correo": email_send.mode(), "tavily": tavily,
+            "maps_hoy": limits.global_used_today("maps"),
+            "llaves": {k: bool(os.environ.get(k)) for k in llaves},   # solo si están puestas, nunca su valor
+            "solo_en_railway": ["Las llaves y secretos (Google, DeepSeek, Tavily, Supabase, correo, push)", "La URL de la base de datos",
+                                "ADMIN_EMAILS y COMPANION_ADMIN_TOKEN (quién es administrador)"],
+        }
 
     app.include_router(r)

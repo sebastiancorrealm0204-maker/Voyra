@@ -203,6 +203,11 @@ def admin_any(x_admin_token: str | None = Header(default=None), authorization: s
     raise HTTPException(403, "Acceso de administrador requerido.")
 
 
+def admin_quien(authorization: str | None = Header(default=None)) -> dict:
+    """Quién es el admin que hace la petición (vacío si entra con el token de entorno)."""
+    return (auth.user_for_session(_token_from_header(authorization)) if authorization else None) or {}
+
+
 def own_trip(tid: str, user: dict) -> dict:
     """Carga el trip y verifica que sea del usuario. 404 si no existe, 403 si no es suyo.
     Una sola query (trip + dueño)."""
@@ -684,7 +689,7 @@ def delete_trip(tid: str, user: dict = Depends(current_user)):
     return {"ok": True}
 
 
-admin_panel.registrar(app, current_user, admin_any)
+admin_panel.registrar(app, current_user, admin_any, admin_quien)
 
 
 @app.get("/auth/config")
