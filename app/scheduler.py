@@ -9,6 +9,7 @@ viaje ACTIVO, decide en HORA LOCAL DEL DESTINO si toca disparar:
 - recordatorio de vuelo de regreso  (mañana del día 'fin') → push operativo
 - aviso_hora_de_salir (1h y 15min antes de cada plan con hora) → push operativo
 - recomendación por gustos (mediodía, tarde y noche) → un lugar curado que calza con sus gustos
+- consejos de llegada y de noche (consejos.py): bienvenida, taxi por app y jamás de la calle, ideas del día
 
 Dedup: cada evento se registra en db.proactive_log y se dispara UNA vez por día
 local. Así, aunque el tick corra varias veces dentro de la ventana, no repite.
@@ -20,7 +21,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta
 
-from . import db, geo, search, timeutil, watchers
+from . import consejos, db, geo, search, timeutil, watchers
 
 log = logging.getLogger("companion.scheduler")
 
@@ -212,6 +213,10 @@ def _procesar_trip(trip: dict, disparos: list) -> None:
         plan_disparos = _aviso_planes(trip, ahora)
         for d in plan_disparos:
             disparos.append(("aviso_salida", tid, d))
+
+        # Consejos de llegada y de noche (taxi por app, jamás uno de la calle) + una idea al mediodía
+        for k in consejos.revisar(trip, ahora):
+            disparos.append(("consejo", tid, k))
 
     except Exception:
         log.exception("tick_trip_error trip=%s", trip.get("id"))

@@ -58,6 +58,18 @@ ZONAS = {
     "Chicó": (4.6780, -74.0470), "La Candelaria": (4.5981, -74.0758), "La Macarena": (4.6120, -74.0680),
     "Teusaquillo": (4.6350, -74.0780), "Rosales": (4.6600, -74.0490), "Parque 93": (4.6760, -74.0480),
 }
+# Barrios con tradición de comida local fuera del circuito turístico (plazas de mercado, barrios populares, el occidente).
+# Solo se usan si se piden con --zonas o con --local (las corridas normales siguen con las de arriba).
+ZONAS_LOCAL = {
+    "Paloquemao": (4.6125, -74.0870), "La Perseverancia": (4.6165, -74.0650), "Las Nieves": (4.6100, -74.0700),
+    "Restrepo": (4.5850, -74.1020), "Galerías": (4.6430, -74.0720), "Palermo": (4.6540, -74.0750),
+    "Cedritos": (4.7230, -74.0420), "Niza Suba": (4.7140, -74.0730), "Fontibón": (4.6700, -74.1430),
+    "Ciudad Salitre": (4.6600, -74.1050), "Modelia": (4.6690, -74.1180), "Kennedy": (4.6280, -74.1530),
+    "Engativá": (4.7000, -74.1100), "San Cristóbal": (4.5700, -74.0850),
+}
+ZONAS_BASE = list(ZONAS)
+ZONAS.update(ZONAS_LOCAL)
+
 RADIO_BIAS_M = 1800.0
 RADIO_MAX_M = 2500
 
@@ -74,6 +86,22 @@ TIPOS = {
     # Para cenar tarde (más comida típica abierta de noche): se usan con --cierra-despues 22:30
     "colombiano": ("restaurante", ["restaurantes de comida típica colombiana", "restaurantes de cocina criolla y parrilla"]),
     "nocturno": ("restaurante", ["restaurantes abiertos hasta tarde para cenar"]),
+    # Comida local por plato («el mejor ajiaco», «la mejor bandeja paisa»…). Solo con --local o pidiéndolos por nombre.
+    "local_ajiaco": ("restaurante", ["ajiaco santafereño", "restaurante de ajiaco bogotano"]),
+    "local_bandeja": ("restaurante", ["bandeja paisa", "restaurante de comida paisa antioqueña"]),
+    "local_empanadas": ("restaurante", ["empanadas colombianas", "empanadas de pipián y ají"]),
+    "local_tamales": ("restaurante", ["tamales tolimenses y santafereños", "tamal con chocolate desayuno"]),
+    "local_lechona": ("restaurante", ["lechona tolimense", "lechona y arroz paisa"]),
+    "local_desayuno": ("restaurante", ["desayuno típico colombiano changua calentado", "caldo de costilla y desayunos tradicionales"]),
+    "local_fritanga": ("restaurante", ["fritanga picada colombiana chicharrón morcilla", "chorizo y morcilla a la brasa"]),
+    "local_sopas": ("restaurante", ["sancocho cuchuco y sopas tradicionales", "mondongo y caldos colombianos"]),
+    "local_parrilla": ("restaurante", ["carne a la llanera mamona asado", "parrilla colombiana corte tradicional"]),
+    "local_costena": ("restaurante", ["comida costeña colombiana", "mojarra frita cazuela de mariscos arroz de coco"]),
+    "local_pacifico": ("restaurante", ["comida del Pacífico colombiano", "encocado sancocho de pescado"]),
+    "local_regional": ("restaurante", ["comida santandereana", "comida boyacense", "comida valluna", "comida llanera"]),
+    "local_arepas": ("restaurante", ["arepas rellenas", "arepas de choclo con queso"]),
+    "local_pan": ("cafe", ["almojábanas pandebono y pan colombiano", "chocolate santafereño con queso"]),
+    "local_postres": ("cafe", ["obleas arequipe y postres colombianos", "cuajada con melao dulces típicos"]),
 }
 
 # Umbrales (ajustables por línea de comandos)
@@ -403,16 +431,23 @@ def main() -> None:
     ap.add_argument("--max-tavily", type=int, default=40, help="Tope de búsquedas a Tavily")
     ap.add_argument("--dry-run", action="store_true", help="Solo muestra el plan y el costo")
     ap.add_argument("--cierra-despues", default="", metavar="HH:MM", help="Solo lugares que cierran a esta hora o más tarde (≥3 días)")
+    ap.add_argument("--local", action="store_true",
+                    help="Curación de comida local por plato (tipos local_*) en las zonas tradicionales y los barrios populares")
     ap.add_argument("--prefijo", default="candidatos_bogota", help="Nombre base del reporte en reportes/ (no pisa el de siempre)")
     args = ap.parse_args()
 
-    zonas = [z.strip() for z in args.zonas.split(",") if z.strip()] or list(ZONAS)
-    tipos = [t.strip() for t in args.tipos.split(",") if t.strip()] or list(TIPOS)
+    por_defecto_z = list(ZONAS) if args.local else ZONAS_BASE
+    por_defecto_t = [t for t in TIPOS if t.startswith("local_")] if args.local else [t for t in TIPOS if not t.startswith("local_")]
+    zonas = [z.strip() for z in args.zonas.split(",") if z.strip()] or por_defecto_z
+    tipos = [t.strip() for t in args.tipos.split(",") if t.strip()] or por_defecto_t
     malos = [z for z in zonas if z not in ZONAS] + [t for t in tipos if t not in TIPOS]
     if malos:
         sys.exit(f"No reconozco: {malos}. Zonas: {list(ZONAS)}. Tipos: {list(TIPOS)}")
 
-    consultas = [(z, t, q) for z in zonas for t in tipos for q in TIPOS[t][1]][: args.max_google]
+    # En la curación local, los platos estrella llevan las dos consultas; el resto, solo la primera (cuesta la mitad).
+    estrella = {"local_ajiaco", "local_bandeja", "local_empanadas", "local_tamales", "local_fritanga"}
+    consultas = [(z, t, q) for z in zonas for t in tipos
+                 for q in (TIPOS[t][1] if t in estrella or not t.startswith("local_") else TIPOS[t][1][:1])][: args.max_google]
     print(f"Plan: {len(consultas)} consultas a Google (≈ {len(consultas) * 0.035:.1f} USD) y hasta "
           f"{args.max_tavily} búsquedas a Tavily.")
     if args.dry_run:

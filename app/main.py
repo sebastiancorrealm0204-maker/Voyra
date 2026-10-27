@@ -873,7 +873,7 @@ def push_unsubscribe(tid: str, body: PushSubIn, user: dict = Depends(current_use
 def push_test(tid: str, user: dict = Depends(current_user)):
     """Manda una notificación de prueba a los dispositivos suscritos del viaje."""
     own_trip(tid, user)
-    return push.send_to_trip(tid, "Companion", "¡Las notificaciones funcionan! Te avisaré de lo que importe.",
+    return push.send_to_trip(tid, "Notificaciones activadas", "¡Funcionan! Te avisaré cuándo salir, qué hay abierto y consejos para moverte seguro.",
                              data={"kind": "test"})
 
 

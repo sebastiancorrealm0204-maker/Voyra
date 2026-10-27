@@ -17,6 +17,7 @@ si falla, se loguea y se sigue.
 import json
 import logging
 import os
+import re
 import time
 from concurrent.futures import ThreadPoolExecutor
 
@@ -64,6 +65,16 @@ def delete_subscription(endpoint: str) -> None:
     db.delete_push_subscription(endpoint)
 
 
+def titulo_limpio(title: str, body: str) -> str:
+    """El sistema ya muestra «Companion» como origen de la notificación, así que el título no lo repite:
+    se quita un «Companion:» inicial y, si solo decía «Companion», se usa el comienzo del mensaje."""
+    t = re.sub(r"^\s*companion\s*[:\-–—]?\s*", "", title or "", flags=re.I).strip()
+    if t:
+        return t
+    primera = re.split(r"(?<=[.!?¡¿])\s", (body or "").strip(), maxsplit=1)[0]
+    return (primera[:60].rstrip() + "…") if len(primera) > 60 else (primera or "·")
+
+
 def send_to_trip(trip_id: str, title: str, body: str, data: dict | None = None) -> dict:
     """Envía una notificación push a todos los dispositivos suscritos de un viaje.
 
@@ -85,7 +96,7 @@ def send_to_trip(trip_id: str, title: str, body: str, data: dict | None = None) 
         return {"enabled": False, "enviadas": 0, "fallidas": 0}
 
     payload = json.dumps({
-        "title": title,
+        "title": titulo_limpio(title, body),
         "body": body,
         "data": data or {},
     })

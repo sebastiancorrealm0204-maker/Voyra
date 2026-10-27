@@ -6,6 +6,8 @@ from app import main
 
 
 def _usuario(c):
+    from app import waitlist
+    waitlist.init_waitlist()  # otros tests dejan db.DB_PATH apuntando a una base temporal sin esta tabla
     n = uuid.uuid4().int % 10**7
     email = f"lista_app_{n}@example.com"
     tel = f"+5730{n:07d}"
