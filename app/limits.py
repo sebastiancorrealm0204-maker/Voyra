@@ -56,6 +56,20 @@ _LIMIT_COLUMN = {
 }
 
 
+def bonus(user_id: str, resource: str, day: str | None = None) -> int:
+    """Ampliación ganada dando feedback (ver feedback_limite.py): del día para los recursos diarios, en total para los viajes."""
+    try:
+        with db.conn() as c:
+            if resource == "trips":
+                r = c.execute("SELECT COALESCE(SUM(extra),0) v FROM limit_bonus WHERE user_id=? AND resource='trips'", (user_id,)).fetchone()
+            else:
+                r = c.execute("SELECT COALESCE(SUM(extra),0) v FROM limit_bonus WHERE user_id=? AND resource=? AND day=?",
+                              (user_id, resource, day or _today_key())).fetchone()
+        return int(r["v"] or 0)
+    except Exception:
+        return 0   # sin tabla todavía (nadie ha dado feedback): sin ampliación
+
+
 def effective_limit(user_id: str, resource: str) -> int | None:
     """Límite que aplica a ESTE usuario para ESTE recurso.
 
@@ -72,18 +86,16 @@ def effective_limit(user_id: str, resource: str) -> int | None:
         return default
     with db.conn() as c:
         r = c.execute(f"SELECT {col} v FROM users WHERE id=?", (user_id,)).fetchone()
-    if r and r["v"] is not None:
-        return int(r["v"])
-    return default
+    base = int(r["v"]) if r and r["v"] is not None else default
+    return base + bonus(user_id, resource) if base is not None else None
 
 
 def effective_trip_limit(user_id: str) -> int:
     """Tope de viajes creados en total para este usuario (override por-usuario o default)."""
     with db.conn() as c:
         r = c.execute("SELECT limit_trips v FROM users WHERE id=?", (user_id,)).fetchone()
-    if r and r["v"] is not None:
-        return int(r["v"])
-    return MAX_TRIPS_PER_USER
+    base = int(r["v"]) if r and r["v"] is not None else MAX_TRIPS_PER_USER
+    return base + bonus(user_id, "trips")
 
 # Tope de viajes CREADOS por usuario en el plan gratuito (total, no diario; borrar un viaje no devuelve el cupo).
 MAX_TRIPS_PER_USER = _env_int("LIMIT_TRIPS_PER_USER", 2)

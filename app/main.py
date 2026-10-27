@@ -22,7 +22,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import (transporte as transporte_mod, ciudades, city_knowledge, context, db, engine, geo, llm, memoria, net, places_live, push, scheduler,
                search, seed_data, verificacion, watchers, auth, limits, email_send, social_enrich,
-               waitlist, traducir, visual, resumen as resumen_mod, itinerario_chat, horarios, timeutil)
+               waitlist, feedback_limite as feedback_limite_mod, traducir, visual, resumen as resumen_mod, itinerario_chat, horarios, timeutil)
 
 # Logging estructurado (clave=valor) en un solo formato para toda la app. Railway
 # captura stdout; LOG_LEVEL=DEBUG para depurar.
@@ -644,6 +644,24 @@ def delete_trip(tid: str, user: dict = Depends(current_user)):
     with db.conn() as c:
         c.execute("DELETE FROM trips WHERE id=?", (tid,))
     return {"ok": True}
+
+
+class FeedbackLimiteIn(BaseModel):
+    recurso: str = Field(..., max_length=20)       # chat | maps | document | scan | trips
+    gusta: bool
+    motivo: str = Field("", max_length=600)
+    trip_id: str | None = Field(None, max_length=64)
+
+
+@app.post("/feedback/limite")
+def feedback_limite(body: FeedbackLimiteIn, user: dict = Depends(current_user)):
+    """Al llegar a un límite, el usuario cuenta si le gusta o no y por qué, y a cambio se amplía el límite (etapa de pruebas)."""
+    r = feedback_limite_mod.registrar(user["id"], recurso=body.recurso, gusta=body.gusta, motivo=body.motivo, trip_id=body.trip_id)
+    if not r["ok"]:
+        raise HTTPException(422, {"error": r["razon"], "mensaje": "Cuéntanos un poco más: escribe por qué."
+                                  if r["razon"] == "motivo_corto" else "Recurso no válido."})
+    return {**r, "cuotas": limits.usage_summary(user["id"]),
+            "trips": {"usados": limits.trips_count(user["id"]), "limite": limits.effective_trip_limit(user["id"])}}
 
 
 @app.get("/places/{place_id}/fotos")
