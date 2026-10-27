@@ -15,7 +15,7 @@ import os
 import threading
 from datetime import datetime, timezone
 
-from . import db, limits, net
+from . import config, db, limits, net
 
 log = logging.getLogger("companion.feedback_limite")
 
@@ -101,7 +101,7 @@ def registrar(user_id: str, *, recurso: str, gusta: bool, motivo: str, trip_id: 
 
     ampliado, razon = False, ""
     if recurso == "trips":
-        if viajes_ampliados(user_id) < BONUS_TRIPS_MAX:
+        if viajes_ampliados(user_id) < config.get_int("bonus_trips_max", BONUS_TRIPS_MAX):
             with db.conn() as c:
                 c.execute("INSERT INTO limit_bonus (user_id, resource, day, extra) VALUES (?,?,?,?) "
                           "ON CONFLICT (user_id, resource, day) DO UPDATE SET extra = limit_bonus.extra + 1",
@@ -115,15 +115,15 @@ def registrar(user_id: str, *, recurso: str, gusta: bool, motivo: str, trip_id: 
         base = limits.FREE_LIMITS.get(recurso, 0)
         if ya_hoy:
             razon = "ya_ampliado_hoy"
-        elif dias_ampliados(user_id) >= BONUS_MAX_DIAS and not _ya_amplio_dia(user_id, hoy):
+        elif dias_ampliados(user_id) >= config.get_int("bonus_max_dias", BONUS_MAX_DIAS) and not _ya_amplio_dia(user_id, hoy):
             razon = "tope_dias"
-        elif limits.used_total(user_id, recurso) >= limits.TOTAL_LIMITS.get(recurso, 10**9):
+        elif limits.used_total(user_id, recurso) >= (limits.total_limit(recurso) or 10**9):
             razon = "tope_total"
         else:
             with db.conn() as c:
                 c.execute("INSERT INTO limit_bonus (user_id, resource, day, extra) VALUES (?,?,?,?) "
                           "ON CONFLICT (user_id, resource, day) DO NOTHING",
-                          (user_id, recurso, hoy, max(1, math.ceil(base * BONUS_FACTOR))))
+                          (user_id, recurso, hoy, max(1, math.ceil(base * config.get_float("bonus_factor", BONUS_FACTOR)))))
             ampliado = True
 
     if SUPABASE_URL and SUPABASE_KEY:

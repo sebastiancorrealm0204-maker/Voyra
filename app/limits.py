@@ -22,7 +22,7 @@ Para subir/bajar topes no hay que tocar código: son variables de entorno.
 import os
 from datetime import datetime, timezone, timedelta
 
-from . import db
+from . import config, db
 
 # Colombia = UTC-5 fijo (no tiene horario de verano). Simple y correcto.
 _BOGOTA = timezone(timedelta(hours=-5))
@@ -65,6 +65,15 @@ _LIMIT_COLUMN = {
 }
 
 
+def total_limit(resource: str) -> int | None:
+    """Tope total de la etapa de pruebas (el ajuste del panel manda sobre el valor del código)."""
+    return config.get_int(f"total.{resource}", TOTAL_LIMITS.get(resource))
+
+
+def max_trips() -> int:
+    return config.get_int("trips_max", MAX_TRIPS_PER_USER) or 0
+
+
 def bonus(user_id: str, resource: str, day: str | None = None) -> int:
     """Ampliación ganada dando feedback (ver feedback_limite.py): del día para los recursos diarios, en total para los viajes."""
     try:
@@ -89,7 +98,7 @@ def effective_limit(user_id: str, resource: str) -> int | None:
     Esto es lo que hace que ajustar un límite en el Table Editor de Supabase
     aplique al instante: cada chequeo de cuota lee el valor vigente del usuario.
     """
-    default = FREE_LIMITS.get(resource)
+    default = config.get_int(f"limit.{resource}", FREE_LIMITS.get(resource))
     col = _LIMIT_COLUMN.get(resource)
     if not col:
         return default
@@ -103,7 +112,7 @@ def effective_trip_limit(user_id: str) -> int:
     """Tope de viajes creados en total para este usuario (override por-usuario o default)."""
     with db.conn() as c:
         r = c.execute("SELECT limit_trips v FROM users WHERE id=?", (user_id,)).fetchone()
-    base = int(r["v"]) if r and r["v"] is not None else MAX_TRIPS_PER_USER
+    base = int(r["v"]) if r and r["v"] is not None else max_trips()
     return base + bonus(user_id, "trips")
 
 # Tope de viajes CREADOS por usuario en el plan gratuito (total, no diario; borrar un viaje no devuelve el cupo).
@@ -190,7 +199,7 @@ def check_and_consume(user_id: str, resource: str):
         record_use(user_id, resource)
         return
 
-    total = TOTAL_LIMITS.get(resource)
+    total = total_limit(resource)
     if total is not None:
         gastado = used_total(user_id, resource)
         if gastado >= total:
@@ -217,7 +226,7 @@ def usage_summary(user_id: str) -> dict:
             "limite": effective_limit(user_id, res),
             "restante": remaining(user_id, res),
             "total_usado": used_total(user_id, res),
-            "total_limite": TOTAL_LIMITS.get(res),
+            "total_limite": total_limit(res),
         }
         for res in FREE_LIMITS
     }

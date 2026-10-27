@@ -65,7 +65,9 @@ CREATE TABLE IF NOT EXISTS users (
   trips_creados INTEGER,
   -- Código de acceso con el que se registró y hotel al que pertenece (NULL = sin código).
   codigo_acceso TEXT,
-  hotel_origen TEXT
+  hotel_origen TEXT,
+  -- 1 = cuenta suspendida desde el panel de administración (no puede entrar ni usar la app).
+  suspendido INTEGER
 );
 CREATE TABLE IF NOT EXISTS sessions (
   token TEXT PRIMARY KEY,
@@ -101,7 +103,7 @@ def init_auth():
             for col, decl in (("profile", "TEXT"), ("limit_maps", "INTEGER"),
                               ("limit_chat", "INTEGER"), ("limit_document", "INTEGER"),
                               ("limit_scan", "INTEGER"), ("limit_trips", "INTEGER"), ("trips_creados", "INTEGER"),
-                              ("codigo_acceso", "TEXT"), ("hotel_origen", "TEXT"), ("nombre", "TEXT"), ("telefono", "TEXT"), ("pais", "TEXT")):
+                              ("codigo_acceso", "TEXT"), ("hotel_origen", "TEXT"), ("suspendido", "INTEGER"), ("nombre", "TEXT"), ("telefono", "TEXT"), ("pais", "TEXT")):
                 c.execute(
                     f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} {decl}"
                 )
@@ -115,7 +117,7 @@ def init_auth():
             for col, decl in (("profile", "TEXT"), ("limit_maps", "INTEGER"),
                               ("limit_chat", "INTEGER"), ("limit_document", "INTEGER"),
                               ("limit_scan", "INTEGER"), ("limit_trips", "INTEGER"), ("trips_creados", "INTEGER"),
-                              ("codigo_acceso", "TEXT"), ("hotel_origen", "TEXT"), ("nombre", "TEXT"), ("telefono", "TEXT"), ("pais", "TEXT")):
+                              ("codigo_acceso", "TEXT"), ("hotel_origen", "TEXT"), ("suspendido", "INTEGER"), ("nombre", "TEXT"), ("telefono", "TEXT"), ("pais", "TEXT")):
                 if col not in user_cols:
                     c.execute(f"ALTER TABLE users ADD COLUMN {col} {decl}")
         # Un celular, una cuenta. Los NULL no chocan entre sí (usuarios sin celular).
@@ -165,6 +167,12 @@ def signups_from_ip_recent(ip: str) -> int:
             (ip, cutoff),
         ).fetchone()
     return r["n"]
+
+
+def es_admin(user: dict | None) -> bool:
+    """Admin = su correo está en ADMIN_EMAILS (variable de entorno, separada por comas). No hay forma de volverse admin desde la app."""
+    lista = {e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()}
+    return bool(user and lista and (user.get("email") or "").strip().lower() in lista)
 
 
 def record_signup_attempt(ip: str):

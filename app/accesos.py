@@ -9,14 +9,20 @@ import re
 import secrets
 import time
 
-from . import db
+from . import config, db
 
 _ALFABETO = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"   # sin 0/O ni 1/I: se leen bien en una tarjeta
 _lista: set[str] = set()
 
 
-def requerido() -> bool:
+def env_requerido() -> bool:
     return os.environ.get("REQUIRE_ACCESS_CODE", "0") == "1"
+
+
+def requerido() -> bool:
+    """El ajuste del panel manda; si no hay, la variable de entorno REQUIRE_ACCESS_CODE."""
+    v = config.get("require_access_code")
+    return env_requerido() if v is None else str(v).strip() in ("1", "1.0", "true")
 
 
 def normalizar(codigo: str) -> str:

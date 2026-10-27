@@ -22,7 +22,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import (transporte as transporte_mod, ciudades, city_knowledge, context, db, engine, geo, llm, memoria, net, places_live, push, scheduler,
                search, seed_data, verificacion, watchers, auth, limits, email_send, social_enrich,
-               waitlist, accesos, feedback_limite as feedback_limite_mod, traducir, visual, resumen as resumen_mod, itinerario_chat, horarios, timeutil)
+               waitlist, accesos, admin_panel, feedback_limite as feedback_limite_mod, traducir, visual, resumen as resumen_mod, itinerario_chat, horarios, timeutil)
 
 # Logging estructurado (clave=valor) en un solo formato para toda la app. Railway
 # captura stdout; LOG_LEVEL=DEBUG para depurar.
@@ -168,6 +168,8 @@ def current_user(authorization: str | None = Header(default=None)) -> dict:
     user = auth.user_for_session(_token_from_header(authorization))
     if not user:
         raise HTTPException(401, "No autenticado. Inicia sesión.")
+    if user.get("suspendido"):
+        raise HTTPException(403, {"error": "cuenta_suspendida", "mensaje": "Tu cuenta está suspendida. Escríbenos si crees que es un error."})
     return user
 
 
@@ -187,6 +189,18 @@ def admin_guard(x_admin_token: str | None = Header(default=None)) -> None:
     esperado = os.environ.get("COMPANION_ADMIN_TOKEN") or os.environ.get("VOYRA_ADMIN_TOKEN", "")
     if not esperado or (x_admin_token or "").strip() != esperado:
         raise HTTPException(403, "Acceso de administrador requerido.")
+
+
+def admin_any(x_admin_token: str | None = Header(default=None), authorization: str | None = Header(default=None)) -> None:
+    """Acceso de administrador: el token de entorno (X-Admin-Token) o una sesión de un usuario cuyo correo está en ADMIN_EMAILS."""
+    import hmac
+    esperado = os.environ.get("COMPANION_ADMIN_TOKEN") or os.environ.get("VOYRA_ADMIN_TOKEN", "")
+    if esperado and x_admin_token and hmac.compare_digest(x_admin_token.strip(), esperado):
+        return
+    user = auth.user_for_session(_token_from_header(authorization)) if authorization else None
+    if user and auth.es_admin(user) and not user.get("suspendido"):
+        return
+    raise HTTPException(403, "Acceso de administrador requerido.")
 
 
 def own_trip(tid: str, user: dict) -> dict:
@@ -463,6 +477,8 @@ def login(body: LoginIn):
     user = auth.authenticate(body.email, body.password)
     if not user:
         raise HTTPException(401, "Email o contraseña incorrectos.")
+    if user.get("suspendido"):
+        raise HTTPException(403, {"error": "cuenta_suspendida", "mensaje": "Tu cuenta está suspendida. Escríbenos si crees que es un error."})
     if auth.verification_required() and not user["email_verified"]:
         raise HTTPException(403, {"error": "email_no_verificado",
                                   "mensaje": "Confirma tu email antes de entrar. "
@@ -483,6 +499,7 @@ def me(user: dict = Depends(current_user)):
     """Datos del usuario + perfil global + cuánto le queda de cada cuota hoy."""
     return {"id": user["id"], "email": user["email"], "plan": user["plan"],
             "email_verified": bool(user["email_verified"]),
+            "es_admin": auth.es_admin(user),
             "perfil": auth.get_profile(user["id"]),
             "cuotas": limits.usage_summary(user["id"]),
             "trips": {"usados": limits.trips_count(user["id"]),
@@ -667,6 +684,9 @@ def delete_trip(tid: str, user: dict = Depends(current_user)):
     return {"ok": True}
 
 
+admin_panel.registrar(app, current_user, admin_any)
+
+
 @app.get("/auth/config")
 def auth_config():
     """Lo que la pantalla de registro necesita saber: si exige código de acceso."""
@@ -686,7 +706,7 @@ class CodigoIn(BaseModel):
     codigo: str | None = Field(None, max_length=40)
 
 
-@app.post("/admin/codigos", dependencies=[Depends(admin_guard)])
+@app.post("/admin/codigos", dependencies=[Depends(admin_any)])
 def admin_crear_codigo(b: CodigoIn):
     try:
         return accesos.crear(b.hotel, b.max_usos, b.codigo)
@@ -700,7 +720,7 @@ class LoteIn(BaseModel):
     max_usos: int = Field(1, ge=0, le=100000)   # 1 = un código por huésped
 
 
-@app.post("/admin/codigos/lote", dependencies=[Depends(admin_guard)])
+@app.post("/admin/codigos/lote", dependencies=[Depends(admin_any)])
 def admin_lote_codigos(b: LoteIn):
     try:
         return {"codigos": accesos.crear_lote(b.hotel, b.cantidad, b.max_usos)}
@@ -708,12 +728,12 @@ def admin_lote_codigos(b: LoteIn):
         raise HTTPException(422, {"error": str(e)})
 
 
-@app.get("/admin/codigos", dependencies=[Depends(admin_guard)])
+@app.get("/admin/codigos", dependencies=[Depends(admin_any)])
 def admin_listar_codigos():
     return {"codigos": accesos.listar()}
 
 
-@app.post("/admin/codigos/{codigo}/desactivar", dependencies=[Depends(admin_guard)])
+@app.post("/admin/codigos/{codigo}/desactivar", dependencies=[Depends(admin_any)])
 def admin_desactivar_codigo(codigo: str):
     if not accesos.desactivar(codigo):
         raise HTTPException(404, "Código no existe.")
