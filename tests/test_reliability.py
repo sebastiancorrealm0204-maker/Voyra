@@ -254,6 +254,7 @@ def test_search_cachea_consultas_repetidas(fake_http, monkeypatch):
     from app import search
     set_handler, vistos = fake_http
     monkeypatch.setattr(search, "MODE", "real")
+    monkeypatch.setattr(search, "cuota_agotada", lambda: False)
     search._cache.clear()
     set_handler(lambda req: httpx.Response(200, json={"results": [
         {"title": "T", "content": "C", "url": "https://u"}]}))
@@ -263,10 +264,43 @@ def test_search_cachea_consultas_repetidas(fake_http, monkeypatch):
     search._cache.clear()
 
 
+def test_search_se_apaga_al_llegar_al_tope_mensual(fake_http, monkeypatch):
+    from app import search
+    set_handler, vistos = fake_http
+    monkeypatch.setattr(search, "MODE", "real")
+    monkeypatch.setattr(search, "_uso_cache", {"t": 0.0, "bloqueado": False})
+    search._cache.clear()
+
+    def h(req):
+        if req.url.path.endswith("/usage"):
+            return httpx.Response(200, json={"account": {"plan_usage": 920, "plan_limit": 1000}})
+        return httpx.Response(200, json={"results": [{"title": "T", "content": "C", "url": "https://u"}]})
+    set_handler(h)
+    assert search.search("bogota tope", max_results=2) == []
+    assert not any(str(r.url).endswith("/search") for r in vistos)  # no gastó cuota
+
+
+def test_search_sigue_si_falla_la_consulta_de_uso(fake_http, no_sleep, monkeypatch):
+    from app import search
+    set_handler, _ = fake_http
+    monkeypatch.setattr(search, "MODE", "real")
+    monkeypatch.setattr(search, "_uso_cache", {"t": 0.0, "bloqueado": False})
+    search._cache.clear()
+
+    def h(req):
+        if req.url.path.endswith("/usage"):
+            return httpx.Response(500)
+        return httpx.Response(200, json={"results": [{"title": "T", "content": "C", "url": "https://u"}]})
+    set_handler(h)
+    assert len(search.search("bogota sigue", max_results=2)) == 1
+    search._cache.clear()
+
+
 def test_search_falla_devuelve_lista_vacia(fake_http, no_sleep, monkeypatch):
     from app import search
     set_handler, _ = fake_http
     monkeypatch.setattr(search, "MODE", "real")
+    monkeypatch.setattr(search, "cuota_agotada", lambda: False)
     search._cache.clear()
     set_handler(lambda req: httpx.Response(500))
     assert search.search("x") == []

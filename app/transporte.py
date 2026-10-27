@@ -481,7 +481,7 @@ _CLAVE_MOVILIDAD = re.compile(
     r"\b(paro|paros|marcha|marchas|manifestaci|protesta|bloqueo|bloqueos|plant[oó]n|disturbio|cierre|cierres|"
     r"cerrad[ao]|desv[ií]o|transmilenio|sitp|trancon|trancón|movilidad|pico y placa)", re.I)
 _ES_BOGOTA = re.compile(r"bogot[aá]|transmilenio|sitp|distrito capital", re.I)
-_cache_alertas = net.TTLCache(ttl_s=float(os.environ.get("ALERTAS_TTL_S", "1800")), maxsize=2)
+_cache_alertas = net.TTLCache(ttl_s=float(os.environ.get("ALERTAS_TTL_S", "10800")), maxsize=2)
 _lock_alertas = threading.Lock()
 
 
@@ -506,7 +506,7 @@ def filtrar_alertas(resultados: list[dict], max_n: int = 3) -> list[dict]:
 
 def alertas() -> dict:
     """Paros, marchas y cierres que afectan moverse por Bogotá en los últimos 2 días (Tavily, noticias).
-    Una sola búsqueda compartida por todos los viajeros, cacheada ALERTAS_TTL_S (30 min). Sin Tavily: lista vacía."""
+    Una sola búsqueda compartida por todos los viajeros, cacheada ALERTAS_TTL_S (3 h). Sin Tavily: lista vacía."""
     from . import search
     if search.MODE == "mock":
         return {"disponible": False, "alertas": []}
