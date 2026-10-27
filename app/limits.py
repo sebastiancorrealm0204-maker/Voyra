@@ -44,9 +44,18 @@ def _env_int(name: str, default: int) -> int:
 
 FREE_LIMITS = {
     "maps":     _env_int("LIMIT_MAPS_PER_DAY", 6),     # búsquedas Google Places en vivo
-    "chat":     _env_int("LIMIT_CHAT_PER_DAY", 15),    # mensajes al LLM
+    "chat":     _env_int("LIMIT_CHAT_PER_DAY", 20),    # mensajes al LLM
     "document": _env_int("LIMIT_DOCS_PER_DAY", 3),     # documentos extraídos (visión = caro)
-    "scan":     _env_int("LIMIT_SCAN_PER_DAY", 2),      # scans Tavily
+    "scan":     _env_int("LIMIT_SCAN_PER_DAY", 1),      # scans Tavily
+}
+
+# Tope TOTAL por cuenta durante la etapa de pruebas (todos los días juntos). Es lo que acota el costo por usuario:
+# el feedback amplía el tope DIARIO, pero nunca pasa de este total. Más adelante, aquí entra el plan de pago.
+TOTAL_LIMITS = {
+    "chat":     _env_int("LIMIT_CHAT_TOTAL", 200),
+    "maps":     _env_int("LIMIT_MAPS_TOTAL", 50),
+    "document": _env_int("LIMIT_DOCS_TOTAL", 10),
+    "scan":     _env_int("LIMIT_SCAN_TOTAL", 8),
 }
 
 # Mapea cada recurso a su columna de override por-usuario en la tabla `users`.
@@ -122,6 +131,12 @@ def init_limits():
 
 
 # ── Conteo ──
+def used_total(user_id: str, resource: str) -> int:
+    with db.conn() as c:
+        r = c.execute("SELECT COUNT(*) n FROM usage_log WHERE user_id=? AND resource=?", (user_id, resource)).fetchone()
+    return r["n"]
+
+
 def used_today(user_id: str, resource: str) -> int:
     with db.conn() as c:
         r = c.execute(
@@ -147,11 +162,12 @@ def record_use(user_id: str, resource: str):
 # ── Chequeos ──
 class QuotaError(Exception):
     """Se lanza cuando un usuario excede su cuota. Lleva detalle para el front."""
-    def __init__(self, resource: str, limit: int, used: int, global_block: bool = False):
+    def __init__(self, resource: str, limit: int, used: int, global_block: bool = False, total_block: bool = False):
         self.resource = resource
         self.limit = limit
         self.used = used
         self.global_block = global_block
+        self.total_block = total_block   # llegó al tope TOTAL de la etapa de pruebas (el feedback no lo amplía)
         super().__init__(f"quota:{resource}")
 
 
@@ -174,6 +190,11 @@ def check_and_consume(user_id: str, resource: str):
         record_use(user_id, resource)
         return
 
+    total = TOTAL_LIMITS.get(resource)
+    if total is not None:
+        gastado = used_total(user_id, resource)
+        if gastado >= total:
+            raise QuotaError(resource, total, gastado, total_block=True)
     used = used_today(user_id, resource)
     if used >= limit:
         raise QuotaError(resource, limit, used)
@@ -195,6 +216,8 @@ def usage_summary(user_id: str) -> dict:
             "usado": used_today(user_id, res),
             "limite": effective_limit(user_id, res),
             "restante": remaining(user_id, res),
+            "total_usado": used_total(user_id, res),
+            "total_limite": TOTAL_LIMITS.get(res),
         }
         for res in FREE_LIMITS
     }

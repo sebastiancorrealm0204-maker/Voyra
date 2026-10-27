@@ -32,7 +32,7 @@ _SESSION_TTL_DAYS = 30
 _VERIFY_TTL_HOURS = 24
 # Ventana y tope de creación de cuentas por IP (anti registro masivo).
 _SIGNUP_WINDOW_SECONDS = 3600
-_SIGNUP_MAX_PER_IP = int(os.environ.get("SIGNUP_MAX_PER_IP", "5"))
+_SIGNUP_MAX_PER_IP = int(os.environ.get("SIGNUP_MAX_PER_IP", "0"))  # 0 = sin límite por IP (el control son los códigos de acceso)
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -62,7 +62,10 @@ CREATE TABLE IF NOT EXISTS users (
   limit_scan INTEGER,
   limit_trips INTEGER,
   -- Viajes creados en total (nunca baja al borrar). NULL = aún no se contó: se usa cuántos tiene hoy.
-  trips_creados INTEGER
+  trips_creados INTEGER,
+  -- Código de acceso con el que se registró y hotel al que pertenece (NULL = sin código).
+  codigo_acceso TEXT,
+  hotel_origen TEXT
 );
 CREATE TABLE IF NOT EXISTS sessions (
   token TEXT PRIMARY KEY,
@@ -98,7 +101,7 @@ def init_auth():
             for col, decl in (("profile", "TEXT"), ("limit_maps", "INTEGER"),
                               ("limit_chat", "INTEGER"), ("limit_document", "INTEGER"),
                               ("limit_scan", "INTEGER"), ("limit_trips", "INTEGER"), ("trips_creados", "INTEGER"),
-                              ("nombre", "TEXT"), ("telefono", "TEXT"), ("pais", "TEXT")):
+                              ("codigo_acceso", "TEXT"), ("hotel_origen", "TEXT"), ("nombre", "TEXT"), ("telefono", "TEXT"), ("pais", "TEXT")):
                 c.execute(
                     f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} {decl}"
                 )
@@ -112,7 +115,7 @@ def init_auth():
             for col, decl in (("profile", "TEXT"), ("limit_maps", "INTEGER"),
                               ("limit_chat", "INTEGER"), ("limit_document", "INTEGER"),
                               ("limit_scan", "INTEGER"), ("limit_trips", "INTEGER"), ("trips_creados", "INTEGER"),
-                              ("nombre", "TEXT"), ("telefono", "TEXT"), ("pais", "TEXT")):
+                              ("codigo_acceso", "TEXT"), ("hotel_origen", "TEXT"), ("nombre", "TEXT"), ("telefono", "TEXT"), ("pais", "TEXT")):
                 if col not in user_cols:
                     c.execute(f"ALTER TABLE users ADD COLUMN {col} {decl}")
         # Un celular, una cuenta. Los NULL no chocan entre sí (usuarios sin celular).
@@ -169,6 +172,8 @@ def record_signup_attempt(ip: str):
 
 
 def ip_signup_blocked(ip: str) -> bool:
+    if _SIGNUP_MAX_PER_IP <= 0:
+        return False
     return signups_from_ip_recent(ip) >= _SIGNUP_MAX_PER_IP
 
 

@@ -22,7 +22,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import (transporte as transporte_mod, ciudades, city_knowledge, context, db, engine, geo, llm, memoria, net, places_live, push, scheduler,
                search, seed_data, verificacion, watchers, auth, limits, email_send, social_enrich,
-               waitlist, feedback_limite as feedback_limite_mod, traducir, visual, resumen as resumen_mod, itinerario_chat, horarios, timeutil)
+               waitlist, accesos, feedback_limite as feedback_limite_mod, traducir, visual, resumen as resumen_mod, itinerario_chat, horarios, timeutil)
 
 # Logging estructurado (clave=valor) en un solo formato para toda la app. Railway
 # captura stdout; LOG_LEVEL=DEBUG para depurar.
@@ -221,6 +221,13 @@ def _consume_or_429(user: dict, resource: str):
                 "resource": resource,
                 "mensaje": "La búsqueda en vivo está temporalmente pausada por alta demanda. "
                            "Vuelve a intentar más tarde."})
+        if e.total_block:
+            raise HTTPException(429, {
+                "error": "quota_total",
+                "resource": resource,
+                "limite": e.limit,
+                "usado": e.used,
+                "mensaje": "Llegaste al máximo gratis de la etapa de pruebas. ¡Gracias por ayudarnos a mejorar!"})
         raise HTTPException(429, {
             "error": "quota",
             "resource": resource,
@@ -339,6 +346,7 @@ class SignupIn(BaseModel):
     nombre: str = ""
     telefono: str = ""   # con código de país, ej. "+57 300 123 4567"; único por cuenta
     pais: str = ""
+    codigo: str = ""    # código de acceso del hotel
 
 
 class LoginIn(BaseModel):
@@ -381,13 +389,26 @@ def signup(body: SignupIn, request: Request):
             raise HTTPException(409, {"error": "phone_exists",
                                       "mensaje": "Ese celular ya tiene una cuenta. Inicia sesión."})
 
+    # Código de acceso del hotel: obligatorio con REQUIRE_ACCESS_CODE=1; si no, opcional (si lo traen válido, se anota el hotel).
+    acceso = None
+    if body.codigo.strip() or accesos.requerido():
+        acceso = accesos.consumir(body.codigo)
+        if not acceso and accesos.requerido():
+            raise HTTPException(403, {"error": "codigo_invalido",
+                                      "mensaje": "Ese código no es válido o ya no tiene cupos. Pídelo en la recepción de tu hotel."})
+
     auth.record_signup_attempt(ip)
     try:
         user = auth.create_user(email, body.password, ip=ip, nombre=nombre,
                                 telefono=telefono, pais=body.pais)
     except ValueError as e:  # carrera: otro registro idéntico justo antes
+        if acceso:
+            accesos.devolver(acceso["codigo"])
         code = "phone_exists" if "celular" in str(e) else "email_exists"
         raise HTTPException(409, {"error": code, "mensaje": str(e)})
+    if acceso:
+        with db.conn() as c:
+            c.execute("UPDATE users SET codigo_acceso=?, hotel_origen=? WHERE id=?", (acceso["codigo"], acceso["hotel"], user["id"]))
     if nombre or telefono:
         auth.set_profile(user["id"], {"nombre": nombre, "telefono": telefono})
     if not auth.verification_required():
@@ -643,6 +664,59 @@ def delete_trip(tid: str, user: dict = Depends(current_user)):
     own_trip(tid, user)
     with db.conn() as c:
         c.execute("DELETE FROM trips WHERE id=?", (tid,))
+    return {"ok": True}
+
+
+@app.get("/auth/config")
+def auth_config():
+    """Lo que la pantalla de registro necesita saber: si exige código de acceso."""
+    return {"codigo_requerido": accesos.requerido()}
+
+
+@app.get("/auth/codigo/{codigo}")
+def auth_codigo(codigo: str):
+    """¿Es válido este código? Devuelve el hotel para saludar al huésped. No gasta ningún uso."""
+    v = accesos.validar(codigo)
+    return {"valido": bool(v), "hotel": v["hotel"] if v else ""}
+
+
+class CodigoIn(BaseModel):
+    hotel: str = Field(..., max_length=80)
+    max_usos: int = Field(0, ge=0, le=100000)   # 0 = sin tope
+    codigo: str | None = Field(None, max_length=40)
+
+
+@app.post("/admin/codigos", dependencies=[Depends(admin_guard)])
+def admin_crear_codigo(b: CodigoIn):
+    try:
+        return accesos.crear(b.hotel, b.max_usos, b.codigo)
+    except ValueError as e:
+        raise HTTPException(422, {"error": str(e)})
+
+
+class LoteIn(BaseModel):
+    hotel: str = Field(..., max_length=80)
+    cantidad: int = Field(..., ge=1, le=500)
+    max_usos: int = Field(1, ge=0, le=100000)   # 1 = un código por huésped
+
+
+@app.post("/admin/codigos/lote", dependencies=[Depends(admin_guard)])
+def admin_lote_codigos(b: LoteIn):
+    try:
+        return {"codigos": accesos.crear_lote(b.hotel, b.cantidad, b.max_usos)}
+    except ValueError as e:
+        raise HTTPException(422, {"error": str(e)})
+
+
+@app.get("/admin/codigos", dependencies=[Depends(admin_guard)])
+def admin_listar_codigos():
+    return {"codigos": accesos.listar()}
+
+
+@app.post("/admin/codigos/{codigo}/desactivar", dependencies=[Depends(admin_guard)])
+def admin_desactivar_codigo(codigo: str):
+    if not accesos.desactivar(codigo):
+        raise HTTPException(404, "Código no existe.")
     return {"ok": True}
 
 
@@ -1631,7 +1705,8 @@ def waitlist_me_add(body: WaitlistMeIn, user: dict = Depends(current_user)):
     `source` queda como app-<momento> para saber en qué momento convierte mejor."""
     momento = body.momento if body.momento in MOMENTOS_LISTA else "app"
     return waitlist.add(user["email"], name=user.get("nombre") or "", phone=user.get("telefono") or "",
-                        source=f"app-{momento}", city=user.get("pais") or "")
+                        source=(f"app-{momento}" + (f"-{user['hotel_origen']}" if user.get("hotel_origen") else ""))[:60],
+                        city=user.get("pais") or "")
 
 
 @app.get("/waitlist/count")

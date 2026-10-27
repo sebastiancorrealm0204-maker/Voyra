@@ -26,13 +26,14 @@ def test_feedback_amplia_el_limite_del_dia(monkeypatch):
 
     r = c.post("/feedback/limite", json={"recurso": "chat", "gusta": True, "motivo": "Me ayudó a encontrar dónde cenar"}, headers=H)
     assert r.status_code == 200 and r.json()["ampliado"] is True
-    assert r.json()["cuotas"]["chat"]["limite"] == 4
+    assert r.json()["cuotas"]["chat"]["limite"] == 3   # solo el chat, y la mitad del tope: 2 + 1
     assert c.post(f"/trips/{tid}/chat", json={"message": "hola"}, headers=H).status_code == 200
 
     # una sola ampliación por día
     r2 = c.post("/feedback/limite", json={"recurso": "chat", "gusta": False, "motivo": "Falta más información de rutas"}, headers=H)
     assert r2.json()["ampliado"] is False and r2.json()["razon"] == "ya_ampliado_hoy"
-    assert r2.json()["cuotas"]["chat"]["limite"] == 4
+    assert r2.json()["cuotas"]["chat"]["limite"] == 3
+    assert r2.json()["cuotas"]["maps"]["limite"] == limits.FREE_LIMITS["maps"]   # lo demás no se amplió
 
 
 def test_el_porque_es_obligatorio(monkeypatch):
@@ -57,3 +58,17 @@ def test_feedback_suma_un_viaje_hasta_el_maximo(monkeypatch):
     assert c.post("/trips", json={"ciudad": "Bogotá"}, headers=H).status_code == 200
     r = c.post("/feedback/limite", json={"recurso": "trips", "gusta": True, "motivo": "Quiero planear otro viaje más"}, headers=H)
     assert r.json()["ampliado"] is False and r.json()["razon"] == "tope_viajes"
+
+
+def test_el_total_de_la_etapa_no_se_amplia(monkeypatch):
+    monkeypatch.setitem(limits.FREE_LIMITS, "chat", 2)
+    monkeypatch.setitem(limits.TOTAL_LIMITS, "chat", 3)
+    c = TestClient(app)
+    H = _usuario(c)
+    tid = c.post("/trips", json={"ciudad": "Bogotá"}, headers=H).json()["trip_id"]
+    for _ in range(2):
+        assert c.post(f"/trips/{tid}/chat", json={"message": "hola"}, headers=H).status_code == 200
+    assert c.post("/feedback/limite", json={"recurso": "chat", "gusta": True, "motivo": "Me sirvió muchísimo"}, headers=H).json()["ampliado"]
+    assert c.post(f"/trips/{tid}/chat", json={"message": "hola"}, headers=H).status_code == 200   # 3 de 3 totales
+    r = c.post(f"/trips/{tid}/chat", json={"message": "hola"}, headers=H)
+    assert r.status_code == 429 and r.json()["detail"]["error"] == "quota_total"

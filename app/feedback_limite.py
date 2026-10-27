@@ -2,13 +2,15 @@
 no me gusta» y el porqué, y a cambio se amplía el límite sin costo.
 
 La idea de esta etapa es aprender, no cobrar. Reglas (ajustables por variables de entorno):
-- Recursos diarios (chat, maps, document, scan): una ampliación por día, que suma LIMIT_BONUS_FACTOR × el tope normal
-  (por defecto ×1: el tope se duplica ese día). Máximo LIMIT_BONUS_MAX_DIAS días por usuario.
+- Recursos diarios (chat, maps, document, scan): se amplía SOLO el recurso que se agotó, una vez por día, en
+  LIMIT_BONUS_FACTOR × su tope normal (por defecto ×0.5, redondeado hacia arriba). Máximo LIMIT_BONUS_MAX_DIAS días por usuario.
+- Ninguna ampliación pasa del TOTAL de la etapa de pruebas por cuenta (limits.TOTAL_LIMITS): ese es el tope de costo.
 - Viajes: cada feedback desde el tope de viajes suma 1 viaje, hasta LIMIT_BONUS_TRIPS_MAX veces por usuario.
 - El texto del porqué es obligatorio (mínimo MIN_MOTIVO caracteres): es lo que de verdad buscamos.
 Todo queda guardado en nuestra base y se copia (si hay clave) a la tabla `feedback_limite` de Supabase.
 """
 import logging
+import math
 import os
 import threading
 from datetime import datetime, timezone
@@ -22,8 +24,8 @@ MIN_MOTIVO = 8
 MAX_MOTIVO = 500
 MAX_POR_DIA = 5   # feedbacks guardados por usuario y día (frena el spam; solo el primero amplía)
 
-BONUS_FACTOR = float(os.environ.get("LIMIT_BONUS_FACTOR", "1"))
-BONUS_MAX_DIAS = int(os.environ.get("LIMIT_BONUS_MAX_DIAS", "14"))
+BONUS_FACTOR = float(os.environ.get("LIMIT_BONUS_FACTOR", "0.5"))
+BONUS_MAX_DIAS = int(os.environ.get("LIMIT_BONUS_MAX_DIAS", "7"))
 BONUS_TRIPS_MAX = int(os.environ.get("LIMIT_BONUS_TRIPS_MAX", "2"))
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
@@ -53,6 +55,11 @@ def dias_ampliados(user_id: str) -> int:
     with db.conn() as c:
         r = c.execute("SELECT COUNT(DISTINCT day) n FROM limit_bonus WHERE user_id=? AND resource<>'trips'", (user_id,)).fetchone()
     return int(r["n"])
+
+
+def _ya_amplio_dia(user_id: str, dia: str) -> bool:
+    with db.conn() as c:
+        return c.execute("SELECT 1 FROM limit_bonus WHERE user_id=? AND day=? AND resource<>'trips'", (user_id, dia)).fetchone() is not None
 
 
 def viajes_ampliados(user_id: str) -> int:
@@ -104,17 +111,19 @@ def registrar(user_id: str, *, recurso: str, gusta: bool, motivo: str, trip_id: 
             razon = "tope_viajes"
     else:
         with db.conn() as c:
-            ya_hoy = c.execute("SELECT 1 FROM limit_bonus WHERE user_id=? AND day=? AND resource<>'trips'", (user_id, hoy)).fetchone()
+            ya_hoy = c.execute("SELECT 1 FROM limit_bonus WHERE user_id=? AND resource=? AND day=?", (user_id, recurso, hoy)).fetchone()
+        base = limits.FREE_LIMITS.get(recurso, 0)
         if ya_hoy:
             razon = "ya_ampliado_hoy"
-        elif dias_ampliados(user_id) >= BONUS_MAX_DIAS:
+        elif dias_ampliados(user_id) >= BONUS_MAX_DIAS and not _ya_amplio_dia(user_id, hoy):
             razon = "tope_dias"
+        elif limits.used_total(user_id, recurso) >= limits.TOTAL_LIMITS.get(recurso, 10**9):
+            razon = "tope_total"
         else:
             with db.conn() as c:
-                for res, base in limits.FREE_LIMITS.items():
-                    c.execute("INSERT INTO limit_bonus (user_id, resource, day, extra) VALUES (?,?,?,?) "
-                              "ON CONFLICT (user_id, resource, day) DO NOTHING",
-                              (user_id, res, hoy, max(1, round(base * BONUS_FACTOR))))
+                c.execute("INSERT INTO limit_bonus (user_id, resource, day, extra) VALUES (?,?,?,?) "
+                          "ON CONFLICT (user_id, resource, day) DO NOTHING",
+                          (user_id, recurso, hoy, max(1, math.ceil(base * BONUS_FACTOR))))
             ampliado = True
 
     if SUPABASE_URL and SUPABASE_KEY:
