@@ -147,3 +147,43 @@ def clasificar(mensaje: str, trip: dict | None = None) -> dict:
     except Exception:
         return {"intencion": "charla", "confianza": 0.3, "destino": None,
                 "que_busca": None, "_via": "error"}
+
+
+# ── Resolución de DESTINO para «cómo llego a…» ──
+# Las reglas (transporte.detectar_destino) resuelven casi todo sin costo. Si no reconocen nada pero el mensaje SÍ pide
+# una ruta, una llamada barata y pequeña interpreta el destino y lo VALIDA contra lo que sí sabemos rutear (zonas,
+# hotel, aeropuerto, lugares curados). Nunca se acepta un destino inventado por el modelo.
+_RESOLVER_SCHEMA = (
+    'El usuario pregunta cómo llegar a algún sitio de Bogotá. Identifica A DÓNDE quiere ir (el destino, no el origen) y '
+    'responde SOLO JSON sin markdown: {"tipo": "<zona|hotel|aeropuerto|lugar|otro|ninguno>", '
+    '"zona": "<%s o null>", "texto": "<nombre del lugar tal como lo dijo, o null>"}\n'
+    'tipo=zona si es un barrio/área (usa la clave de zona más cercana), hotel si va a su hotel, aeropuerto si va al '
+    'aeropuerto, lugar si nombra un sitio concreto, otro si el destino no es de Bogotá o no es un sitio, ninguno si '
+    'NO se entiende a dónde quiere ir.'
+)
+
+
+def resolver_destino(mensaje: str, lugares: list[dict]) -> dict | None:
+    """Destino {'tipo': 'lugar'|'hotel'|'aeropuerto', ...} como detectar_destino, o None si no se pudo resolver."""
+    from . import transporte
+    if llm.EXTRACT_PROVIDER == "mock" or not llm._available():
+        return None
+    try:
+        raw = llm._call(llm.EXTRACT_PROVIDER, "Eres el resolvedor de destinos de Companion. Respondes solo JSON.",
+                        [{"role": "user", "content": f'Mensaje:\n"{mensaje}"\n\n' + _RESOLVER_SCHEMA % "|".join(transporte.ZONAS)}],
+                        max_tokens=120)
+        out = json.loads(raw.replace("```json", "").replace("```", "").strip())
+        tipo = out.get("tipo")
+        if tipo == "hotel":
+            return {"tipo": "hotel"}
+        if tipo == "aeropuerto":
+            return {"tipo": "aeropuerto"}
+        if tipo == "zona" and out.get("zona") in transporte.ZONAS:
+            z = transporte.ZONAS[out["zona"]]
+            return {"tipo": "lugar", "lat": z["lat"], "lng": z["lng"], "nombre": z["nombre"], "zona": out["zona"]}
+        if tipo == "lugar" and out.get("texto"):
+            # Se valida contra la curación: si no calza con un lugar conocido, no hay ruta (se tratará como destino libre).
+            return transporte.detectar_destino(f"cómo llego a {out['texto']}", lugares)
+    except Exception:
+        pass
+    return None

@@ -998,7 +998,7 @@ def push_unsubscribe(tid: str, body: PushSubIn, user: dict = Depends(current_use
 def push_test(tid: str, user: dict = Depends(current_user)):
     """Manda una notificación de prueba a los dispositivos suscritos del viaje."""
     own_trip(tid, user)
-    return push.send_to_trip(tid, "Notificaciones activadas", "¡Funcionan! Te avisaré cuándo salir, qué hay abierto y consejos para moverte seguro.",
+    return push.send_to_trip(tid, "✅ Notificaciones activadas", "Te avisaré cuándo salir y qué hay abierto",
                              data={"kind": "test"})
 
 
@@ -1089,17 +1089,31 @@ def _bloque_rutas(trip: dict, user: dict, mensaje: str) -> tuple[str, dict | Non
     if not transporte_mod.disponible():
         return alerta, None
     try:
-        d = transporte_mod.detectar_destino(mensaje, db.places_for_city(trip.get("ciudad") or "Bogotá"))
+        lugares = db.places_for_city(trip.get("ciudad") or "Bogotá")
+        d = transporte_mod.detectar_destino(mensaje, lugares)
+        libre = None if d else transporte_mod.destino_libre(mensaje)
+        if not d and (libre or transporte_mod.pide_ruta(mensaje)):
+            # Las reglas no lo reconocieron: una llamada barata lo interpreta y se valida contra lo que sí sabemos rutear.
+            from . import router as router_mod
+            d = router_mod.resolver_destino(mensaje, lugares)
+        if not d and libre:
+            # Solo damos ruta a lugares de nuestra curación, zonas conocidas, hotel y aeropuerto. NO se desvía al usuario a
+            # otro sitio: se le dice la verdad sobre ESE destino y se le pregunta qué prefiere.
+            return ("RUTAS: el usuario pregunta cómo llegar a «%s». No lo tengo como destino con ruta exacta: no inventes "
+                    "la ruta, líneas ni tiempos. Responde SOBRE «%s»: dile que no tienes la ruta exacta ahí y pídele la "
+                    "dirección o la zona (o que comparta su ubicación) para orientarlo. NO le des indicaciones a otro "
+                    "lugar a menos que él lo pida; como máximo, ofrécele UNA alternativa curada que quede en esa misma "
+                    "zona y aclara que es una sugerencia aparte." % (libre, libre)), None
         if not d:
-            libre = transporte_mod.destino_libre(mensaje)
-            if libre:
-                # Solo damos ruta a lugares de nuestra curación (más hotel y aeropuerto): ese es el valor de Companion.
-                return ("RUTAS: el usuario pregunta cómo llegar a «%s», que NO está en nuestra curación. No calcules ni "
-                        "inventes la ruta ni tiempos. Dile con naturalidad que ahí no te metes, y ofrécele 1-2 lugares "
-                        "CURADOS parecidos o cercanos a su zona (de los que tienes en LUGARES) con los que sí puedes ayudarle "
-                        "a llegar." % libre), None
-        if not d:
+            if transporte_mod.pide_ruta(mensaje):
+                return "\n\n".join(x for x in (
+                    "RUTAS: el usuario quiere llegar a un sitio pero NO está claro a cuál. Pregúntale a dónde exactamente "
+                    "(una sola pregunta corta). No inventes ni adivines un destino.", alerta) if x), None
             return alerta, None
+        # Destino resuelto: el texto y la tarjeta hablan del MISMO sitio.
+        alerta = "\n\n".join(x for x in (
+            "DESTINO RESUELTO: «%s». Responde SOLO sobre cómo llegar a este destino; no cambies a otro lugar." % (
+                d.get("nombre") or ("el hotel" if d["tipo"] == "hotel" else "el aeropuerto")), alerta) if x)
         if d["tipo"] == "aeropuerto":
             dest = transporte_mod.AEROPUERTO
         elif d["tipo"] == "hotel":

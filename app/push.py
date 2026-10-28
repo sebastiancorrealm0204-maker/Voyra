@@ -75,6 +75,23 @@ def titulo_limpio(title: str, body: str) -> str:
     return (primera[:60].rstrip() + "…") if len(primera) > 60 else (primera or "·")
 
 
+# Una notificación es un GANCHO para abrir la app, no el mensaje completo (ese vive en el chat). Los celulares recortan
+# a ~2 líneas de todos modos: se corta en una frontera de frase/palabra para que nunca salga una oración a medias.
+MAX_TITULO = 40
+MAX_CUERPO = 72
+
+
+def acortar(texto: str, maximo: int) -> str:
+    """Primera frase si cabe; si no, recorta en palabra y pone «…»."""
+    t = " ".join((texto or "").split())
+    if len(t) <= maximo:
+        return t
+    primera = re.split(r"(?<=[.!?])\s", t, maxsplit=1)[0]
+    if 0 < len(primera) <= maximo:
+        return primera
+    return t[: maximo - 1].rsplit(" ", 1)[0].rstrip(" ,;:.¿¡") + "…"
+
+
 def send_to_trip(trip_id: str, title: str, body: str, data: dict | None = None) -> dict:
     """Envía una notificación push a todos los dispositivos suscritos de un viaje.
 
@@ -95,10 +112,11 @@ def send_to_trip(trip_id: str, title: str, body: str, data: dict | None = None) 
         log.warning("push pywebpush no instalado — push real desactivado")
         return {"enabled": False, "enviadas": 0, "fallidas": 0}
 
+    # data.open = a dónde lleva el toque: chat | planes | como_llegar (con data.dest = hotel | aeropuerto | nombre de lugar).
     payload = json.dumps({
-        "title": titulo_limpio(title, body),
-        "body": body,
-        "data": data or {},
+        "title": acortar(titulo_limpio(title, body), MAX_TITULO),
+        "body": acortar(body, MAX_CUERPO),
+        "data": {"open": "chat", **(data or {})},
     })
     claims = {"sub": VAPID_SUBJECT}
 

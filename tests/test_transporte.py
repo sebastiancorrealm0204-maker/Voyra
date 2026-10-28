@@ -390,10 +390,15 @@ def test_chat_da_tarjeta_solo_para_lugares_curados(monkeypatch):
     r = c.post(f"/trips/{tid}/chat", json={"message": "¿Cómo llego al Museo del Oro?"}, headers=H)
     assert r.status_code == 200, r.text
     assert r.json()["ruta"]["destino"]["nombre"] == "Museo del Oro"
-    # fuera de la curación → sin tarjeta, sin ruta, y el Companion recibe la instrucción de ofrecer curados
+    # fuera de la curación → sin tarjeta, sin ruta; el Companion responde SOBRE ese destino (no lo desvía a otro sitio)
     r = c.post(f"/trips/{tid}/chat", json={"message": "quiero ir a la Universidad Javeriana"}, headers=H)
     assert r.json()["ruta"] is None
-    assert "NO está en nuestra curación" in capturado["system"] and "Universidad Javeriana" in capturado["system"]
+    assert "Responde SOBRE «Universidad Javeriana»" in capturado["system"]
+    assert "NO le des indicaciones a otro lugar" in capturado["system"]
+    # una zona («el centro», «downtown») SÍ se rutea, y el prompt fija el destino para que texto y tarjeta coincidan
+    r = c.post(f"/trips/{tid}/chat", json={"message": "how do I get downtown"}, headers=H)
+    assert r.json()["ruta"]["destino"]["nombre"] == "Centro Histórico (La Candelaria)"
+    assert "DESTINO RESUELTO: «Centro Histórico (La Candelaria)»" in capturado["system"]
     # charla normal → sin tarjeta
     assert c.post(f"/trips/{tid}/chat", json={"message": "recomiéndame un café"}, headers=H).json()["ruta"] is None
 
@@ -440,3 +445,23 @@ def test_destinos_curados_se_reconocen_en_otros_idiomas(msg, esperado):
 def test_una_palabra_generica_sola_no_es_un_destino():
     lugares = [{"name": "Museo del Oro", "lat": 4.6, "lng": -74.07}, {"name": "Museo Botero", "lat": 4.6, "lng": -74.07}]
     assert t.detectar_destino("how do I get to the museum", lugares) is None
+
+
+# ── zonas: «el centro» / «downtown» son un área ruteable, no «un lugar que no tenemos» ──
+@pytest.mark.parametrize("msg,zona", [
+    ("how do I get downtown", "centro"),
+    ("como llego al centro", "centro"),
+    ("take me downtown from my hotel", "centro"),
+    ("como llego de mi hotel al centro", "centro"),
+    ("how do I get to the Zona T", "zona_t"),
+    ("como llego a la zona rosa", "zona_t"),
+])
+def test_zonas_se_resuelven(msg, zona):
+    d = t.detectar_destino(msg, LUGARES)
+    assert d and d["tipo"] == "lugar" and d["zona"] == zona
+
+
+def test_zona_no_pisa_origen_ni_centro_comercial():
+    assert t.detectar_destino("como llego al aeropuerto desde el centro", LUGARES) == {"tipo": "aeropuerto"}
+    assert t.zona("quiero ir al centro comercial") is None
+    assert t.detectar_destino("que hay de comer en el centro", LUGARES) is None  # no pide ruta

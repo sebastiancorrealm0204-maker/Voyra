@@ -265,7 +265,7 @@ def _opciones_google(o, d, salida) -> dict:
 _PIDE_RUTA = re.compile(
     r"(c[oó]mo (llego|voy|ir|me muevo|salgo|se llega)|como llegar|llegar a|\bir (a|al)\b|\bvoy (a|al)\b|"
     r"cu[aá]nto (tarda|demora|se demora|cuesta)|\bruta\b|tranc[oó]n|transmilenio|\bsitp\b|\btaxi\b|\buber\b|\bbus\b|"
-    r"how (do i|can i|to|long)|get to|getting to|directions|\broute\b|traffic|"
+    r"take me|llevame|quiero ir|how (do i|can i|to|long)|get to|getting to|directions|\broute\b|traffic|"
     r"comment (aller|je vais|y aller)|aller (\u00e0|au)\b|combien de temps|wie komme|wie lange|anreise|"
     r"come (arrivo|si arriva|vado)|arrivare|quanto (ci vuole|tempo)|como (chego|ir|vou)|chegar)", re.I)
 _AEROPUERTO = re.compile(r"aeropuerto|airport|a[eé]roport|flughafen|aeroporto|el dorado|eldorado", re.I)
@@ -314,6 +314,49 @@ def _palabras_es(txt: str) -> set[str]:
     return out - _VACIAS
 
 
+# ── zonas: «el centro», «downtown», «Zona T» son un ÁREA, no un lugar curado. Se rutea al punto de referencia de la zona
+#    (en vez de tratarlas como «no está en la curación» y desviar al usuario a otro sitio). Patrones sobre texto normalizado. ──
+ZONAS: dict[str, dict] = {
+    "centro": {"nombre": "Centro Histórico (La Candelaria)", "lat": 4.5981, "lng": -74.0760,
+               "pat": re.compile(r"\b(downtown|centro(?! comercial)|(?:the |to the |in the )?(?:city )?cent(?:er|re)(?! comercial)\b|"
+                                 r"centro historico|centro de la ciudad|la candelaria|candelaria|old town|historic(?:al)? (?:center|centre)|"
+                                 r"centre[- ]ville|centro storico|innenstadt|stadtzentrum|centro da cidade)")},
+    "zona_t": {"nombre": "Zona T", "lat": 4.6670, "lng": -74.0530,
+               "pat": re.compile(r"\b(zona t|zona rosa|zona viva)\b")},
+    "zona_g": {"nombre": "Zona G", "lat": 4.6516, "lng": -74.0560,
+               "pat": re.compile(r"\b(zona g|zona gourmet)\b")},
+    "chapinero": {"nombre": "Chapinero", "lat": 4.6486, "lng": -74.0620,
+                  "pat": re.compile(r"\bchapinero\b")},
+    "parque_93": {"nombre": "Parque de la 93", "lat": 4.6762, "lng": -74.0488,
+                  "pat": re.compile(r"\b(parque (?:de )?(?:la )?93|calle 93|93 park)\b")},
+}
+
+
+def zona(texto: str) -> dict | None:
+    """Si el texto nombra una zona conocida, devuelve el destino {'tipo': 'lugar', ..., 'zona': clave}; si no, None."""
+    n = _norm(texto or "")
+    if not n:
+        return None
+    for clave, z in ZONAS.items():
+        if z["pat"].search(n):
+            return {"tipo": "lugar", "lat": z["lat"], "lng": z["lng"], "nombre": z["nombre"], "zona": clave}
+    return None
+
+
+def _frase_destino(mensaje: str) -> str | None:
+    """El texto que sigue a «ir a / to / hacia…» (sin colas como «desde mi hotel»), o None si no hay."""
+    m = _DESTINO_LIBRE.search(mensaje or "")
+    if not m:
+        return None
+    return _COLA.sub("", m.group("d")).strip(" 	\"'") or None
+
+
+
+def pide_ruta(mensaje: str) -> bool:
+    """¿El mensaje pide cómo llegar / moverse a algún sitio?"""
+    return bool(mensaje and _PIDE_RUTA.search(mensaje))
+
+
 def detectar_destino(mensaje: str, lugares: list[dict]) -> dict | None:
     """Si el mensaje pide cómo llegar a un sitio que conocemos, devuelve el destino:
     {'tipo': 'aeropuerto'} | {'tipo': 'hotel'} | {'tipo': 'lugar', 'lat', 'lng', 'nombre'}. Si no, None.
@@ -345,9 +388,15 @@ def detectar_destino(mensaje: str, lugares: list[dict]) -> dict | None:
             mejor, puntaje = p, score
     if mejor:
         return {"tipo": "lugar", "lat": float(mejor["lat"]), "lng": float(mejor["lng"]), "nombre": mejor["name"]}
-    if _AEROPUERTO.search(mensaje):
+    # Si el mensaje dice «a X», el destino es X: «de mi hotel al centro» no es una ruta al hotel.
+    frase = _frase_destino(mensaje)
+    objetivo = frase or mensaje
+    z = zona(objetivo)
+    if z:
+        return z
+    if _AEROPUERTO.search(objetivo):
         return {"tipo": "aeropuerto"}
-    if _HOTEL.search(mensaje):
+    if _HOTEL.search(objetivo):
         return {"tipo": "hotel"}
     return None
 

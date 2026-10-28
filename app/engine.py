@@ -58,6 +58,21 @@ _TITULOS_FALLBACK = {
 }
 
 
+# A dónde lleva el toque a una notificación: la pantalla donde ESO se resuelve (no siempre el chat).
+_ABRIR_VALIDOS = {"chat", "planes", "como_llegar"}
+_ABRIR_POR_CATEGORIA = {"vuelo": "planes", "itinerario": "planes"}
+
+
+def _destino_toque(category: str, pedido: str | None, extra: dict | None) -> tuple[str, str | None]:
+    """(pantalla, destino). Un lugar curado en la señal → «Cómo llegar» a ese lugar; si no, según la categoría o lo que
+    sugiera el modelo (validado); por defecto, el chat."""
+    lugar = (extra or {}).get("place_name")
+    if lugar:
+        return "como_llegar", lugar
+    abrir = pedido if pedido in _ABRIR_VALIDOS and pedido != "como_llegar" else _ABRIR_POR_CATEGORIA.get(category, "chat")
+    return abrir, None
+
+
 def _score_fallback(category: str, operational: bool, payload: str) -> dict:
     """Scoring determinístico cuando el LLM falla (caído, timeout, JSON roto).
 
@@ -153,9 +168,11 @@ def ingest(trip_id: str, source: str, category: str, operational: bool, payload:
         if decision == "push":
             try:
                 from . import push
-                push.send_to_trip_async(trip_id, r["titulo"], r["mensaje"],
-                                        data={"notification_id": nid, "category": category,
-                                              "action": r.get("accion")})
+                abrir, dest = _destino_toque(category, r.get("abrir"), extra)
+                data = {"notification_id": nid, "category": category, "action": r.get("accion"), "open": abrir}
+                if dest:
+                    data["dest"] = dest
+                push.send_to_trip_async(trip_id, r["titulo"], r["mensaje"], data=data)
             except Exception:
                 log.exception("push_dispatch_error trip=%s", trip_id)
 

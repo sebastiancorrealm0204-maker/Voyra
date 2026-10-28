@@ -179,20 +179,19 @@ def check_in_matutino(trip_id: str) -> dict:
 CHECKIN_SIN_PUSH_SI_ACTIVO_MIN = 180
 
 
-def _push_checkin(trip_id: str, title: str, texto: str) -> None:
-    """Manda el check-in al celular como push (si hay VAPID). El cuerpo va corto
-    a propósito: la notificación es solo el 'gancho' para abrir la app, donde el
-    mensaje completo ya quedó guardado en el chat. Nunca rompe el flujo."""
+def _push_checkin(trip_id: str, title: str, texto: str, abrir: str = "chat", dest: str | None = None,
+                  gancho: str | None = None) -> None:
+    """Manda el check-in al celular como push (si hay VAPID). La notificación es solo el 'gancho' para abrir la app
+    (corto: una frase), y el toque lleva a la pantalla útil (`abrir`: chat | planes | como_llegar + `dest`); el mensaje
+    completo ya quedó guardado en el chat. Nunca rompe el flujo."""
     if db.user_active_within(trip_id, CHECKIN_SIN_PUSH_SI_ACTIVO_MIN):
         return
     try:
         from . import push
-        # Cuerpo breve para la notificación (1 línea). El texto completo vive en
-        # el chat (tabla messages), que la app carga al abrirse.
-        cuerpo = texto if len(texto) <= 90 else texto[:87].rstrip() + "…"
-        # data.kind="checkin" + open_chat le dice al service worker / la app que
-        # al tocar debe abrir directamente la conversación.
-        push.send_to_trip_async(trip_id, title, cuerpo, data={"kind": "checkin", "open": "chat"})
+        data = {"kind": "checkin", "open": abrir}
+        if dest:
+            data["dest"] = dest
+        push.send_to_trip_async(trip_id, title, gancho or push.acortar(texto, push.MAX_CUERPO), data=data)
     except Exception:
         log.exception("push_checkin_error trip=%s", trip_id)
 
@@ -429,6 +428,20 @@ _SLOTS_RECO = {
     "tarde": {"cats": {"atraccion", "parque", "mercado", "experiencia", "mirador", "cafe"}},
     "noche": {"cats": {"bar", "restaurante"}},
 }
+# Cuerpo del push de recomendación (el título es el nombre del lugar). El toque abre «Cómo llegar» a ese lugar.
+_GANCHO_RECO = {
+    "mediodia": {"es": "🍽️ Para almorzar hoy · toca y te llevo", "en": "🍽️ For lunch today · tap for directions",
+                 "pt": "🍽️ Para almoçar hoje · toque e te levo", "fr": "🍽️ Pour déjeuner · touche pour y aller",
+                 "de": "🍽️ Fürs Mittagessen · tippen für den Weg", "it": "🍽️ Per pranzo · tocca per arrivare"},
+    "tarde": {"es": "☀️ Plan para esta tarde · toca y te llevo", "en": "☀️ This afternoon · tap for directions",
+              "pt": "☀️ Para esta tarde · toque e te levo", "fr": "☀️ Cet après-midi · touche pour y aller",
+              "de": "☀️ Heute Nachmittag · tippen für den Weg", "it": "☀️ Questo pomeriggio · tocca per arrivare"},
+    "noche": {"es": "🌙 Para esta noche · toca y te llevo", "en": "🌙 For tonight · tap for directions",
+              "pt": "🌙 Para esta noite · toque e te levo", "fr": "🌙 Pour ce soir · touche pour y aller",
+              "de": "🌙 Für heute Abend · tippen für den Weg", "it": "🌙 Per stasera · tocca per arrivare"},
+}
+
+
 _PLANTILLA_RECO = {
     "mediodia": {"es": "Para almorzar hoy: {name} ({zona}). {clave} ¿Te cuento cómo llegar?",
                  "en": "For lunch today: {name} ({zona}). {clave} Want directions?",
@@ -495,5 +508,6 @@ def recomendar_por_gustos(trip_id: str, slot: str) -> dict:
     texto = " ".join(plantilla.format(name=p["name"], zona=p.get("zona", ""), clave=clave).split())
     db.insert("messages", {"trip_id": trip_id, "role": "companion", "content": texto})
     db.mark_recommended(trip_id, p["name"])
-    _push_checkin(trip_id, p["name"], texto)
+    gancho = _GANCHO_RECO[slot].get(idioma, _GANCHO_RECO[slot]["es"])
+    _push_checkin(trip_id, p["name"], texto, abrir="como_llegar", dest=p["name"], gancho=gancho)
     return {"enviado": True, "lugar": p["name"], "slot": slot}

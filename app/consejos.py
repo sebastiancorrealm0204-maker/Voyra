@@ -86,6 +86,73 @@ TXT: dict[str, dict[str, tuple[str, str]]] = {
     },
 }
 
+# Push de cada consejo: un gancho corto (el texto completo queda en el chat). kind → idioma → (título, cuerpo).
+PUSH: dict[str, dict[str, tuple[str, str]]] = {
+    "llegada_pre_dia": {
+        "es": ("✈️ Ya casi aterrizas", "Te digo cómo salir del aeropuerto"),
+        "en": ("✈️ Almost landing", "Here's how to leave the airport"),
+        "pt": ("✈️ Quase pousando", "Te digo como sair do aeroporto"),
+        "fr": ("✈️ Presque arrivé", "Voici comment sortir de l'aéroport"),
+        "de": ("✈️ Gleich Landung", "So kommst du aus dem Flughafen"),
+        "it": ("✈️ Quasi atterrato", "Ti dico come uscire dall'aeroporto"),
+    },
+    "llegada_pre_noche": {
+        "es": ("🌙 Aterrizas de noche", "Jamás un taxi de la calle: pide por app"),
+        "en": ("🌙 Landing at night", "Never a street taxi: book by app"),
+        "pt": ("🌙 Você pousa à noite", "Jamais táxi de rua: peça por app"),
+        "fr": ("🌙 Tu atterris de nuit", "Jamais de taxi de rue : commande par appli"),
+        "de": ("🌙 Landung bei Nacht", "Nie ein Straßentaxi: bestell per App"),
+        "it": ("🌙 Atterri di notte", "Mai un taxi di strada: prenota con app"),
+    },
+    "aterrizaje_dia": {
+        "es": ("👋 Bienvenido a {ciudad}", "Toca y te llevo al hotel"),
+        "en": ("👋 Welcome to {ciudad}", "Tap and I'll get you to your hotel"),
+        "pt": ("👋 Bem-vindo a {ciudad}", "Toque e te levo ao hotel"),
+        "fr": ("👋 Bienvenue à {ciudad}", "Touche, je t'emmène à l'hôtel"),
+        "de": ("👋 Willkommen in {ciudad}", "Tippen, ich bringe dich zum Hotel"),
+        "it": ("👋 Benvenuto a {ciudad}", "Tocca e ti porto in hotel"),
+    },
+    "aterrizaje_noche": {
+        "es": ("👋 Bienvenido a {ciudad}", "Directo al hotel, jamás un taxi de la calle"),
+        "en": ("👋 Welcome to {ciudad}", "Straight to your hotel, no street taxis"),
+        "pt": ("👋 Bem-vindo a {ciudad}", "Direto ao hotel, sem táxi de rua"),
+        "fr": ("👋 Bienvenue à {ciudad}", "Droit à l'hôtel, pas de taxi de rue"),
+        "de": ("👋 Willkommen in {ciudad}", "Direkt zum Hotel, kein Straßentaxi"),
+        "it": ("👋 Benvenuto a {ciudad}", "Dritto in hotel, niente taxi di strada"),
+    },
+    "noche_plan": {
+        "es": ("🌙 Tu plan de esta noche", "Pide taxi por app, jamás uno de la calle"),
+        "en": ("🌙 Tonight's plan", "Book a taxi by app, never from the street"),
+        "pt": ("🌙 Seu plano de hoje à noite", "Peça táxi por app, nunca de rua"),
+        "fr": ("🌙 Ton plan de ce soir", "Taxi par appli, jamais dans la rue"),
+        "de": ("🌙 Dein Plan für heute Abend", "Taxi per App, nie von der Straße"),
+        "it": ("🌙 Il piano di stasera", "Taxi con app, mai dalla strada"),
+    },
+    "vuelta_tarde": {
+        "es": ("🚕 ¿Vuelves al hotel?", "Pide taxi por app, jamás uno de la calle"),
+        "en": ("🚕 Heading back?", "Book a taxi by app, never from the street"),
+        "pt": ("🚕 Voltando ao hotel?", "Peça táxi por app, nunca de rua"),
+        "fr": ("🚕 Tu rentres ?", "Taxi par appli, jamais dans la rue"),
+        "de": ("🚕 Zurück zum Hotel?", "Taxi per App, nie von der Straße"),
+        "it": ("🚕 Torni in hotel?", "Taxi con app, mai dalla strada"),
+    },
+    "primera_noche": {
+        "es": ("🍽️ ¿Dónde cenas hoy?", "Toca y te digo qué está abierto"),
+        "en": ("🍽️ Where to eat tonight?", "Tap and I'll tell you what's open"),
+        "pt": ("🍽️ Onde jantar hoje?", "Toque e digo o que está aberto"),
+        "fr": ("🍽️ Où dîner ce soir ?", "Touche, je te dis ce qui est ouvert"),
+        "de": ("🍽️ Wo isst du heute?", "Tippen: ich sage dir, was offen ist"),
+        "it": ("🍽️ Dove cenare stasera?", "Tocca, ti dico cosa è aperto"),
+    },
+}
+# A dónde lleva el toque: (pantalla, destino). «como_llegar» abre Cómo llegar con ese destino ya elegido.
+ABRIR: dict[str, tuple[str, str | None]] = {
+    "llegada_pre_dia": ("chat", None), "llegada_pre_noche": ("chat", None),
+    "aterrizaje_dia": ("como_llegar", "hotel"), "aterrizaje_noche": ("como_llegar", "hotel"),
+    "noche_plan": ("planes", None), "vuelta_tarde": ("como_llegar", "hotel"),
+    "primera_noche": ("chat", None), "tip_dia": ("chat", None),
+}
+
 # Ideas del mediodía (rotan por día). Cada una invita a pedirle algo concreto al Companion.
 TIPS: dict[str, list[tuple[str, str]]] = {
     "es": [("Una idea para hoy", "Pregúntame por el mejor ajiaco o las mejores empanadas cerca de donde estás."),
@@ -175,15 +242,23 @@ def _plan_nocturno(plan: dict, ciudad: str, fecha: str) -> float | None:
     return None
 
 
-def _enviar(trip: dict, kind: str, fecha: str, titulo: str, cuerpo: str) -> bool:
-    """Marca y envía (push + mensaje en el chat). Devuelve True si salió."""
+def _enviar(trip: dict, kind: str, fecha: str, titulo: str, cuerpo: str, corto: str | None = None) -> bool:
+    """Marca y envía (push + mensaje en el chat). Devuelve True si salió. `corto` = clave de PUSH/ABRIR: el celular
+    recibe un gancho breve que lleva directo a la pantalla útil; el texto completo queda en el chat."""
     tid = trip["id"]
     if not db.mark_proactive_sent(tid, kind, fecha):
         return False
     try:
         db.insert("messages", {"trip_id": tid, "role": "companion", "content": cuerpo})
         from . import push
-        push.send_to_trip_async(tid, titulo, cuerpo, data={"kind": kind, "open": "chat"})
+        abrir, dest = ABRIR.get(corto or "", ("chat", None))
+        pt, pb = titulo, cuerpo
+        if corto in PUSH:
+            pt, pb = (x.format(ciudad=trip.get("ciudad") or "") for x in PUSH[corto][_lang(trip)])
+        data = {"kind": kind, "open": abrir}
+        if dest:
+            data["dest"] = dest
+        push.send_to_trip_async(tid, pt, pb, data=data)
     except Exception:
         log.exception("consejo_fallo kind=%s trip=%s", kind, tid)
         try:
@@ -222,11 +297,11 @@ def revisar(trip: dict, ahora: datetime, planes: list[dict] | None = None) -> li
                 aun_en_vuelo = falta > 0
                 if 20 <= falta <= 90:
                     k = "llegada_pre_noche" if noche else "llegada_pre_dia"
-                    if _enviar(trip, "consejo_" + k, hoy, *_texto(k, trip)):
+                    if _enviar(trip, "consejo_" + k, hoy, *_texto(k, trip), corto=k):
                         enviados.append(k)
                 if 10 <= -falta <= 120:
                     k = "aterrizaje_noche" if noche else "aterrizaje_dia"
-                    if _enviar(trip, "consejo_" + k, hoy, *_texto(k, trip)):
+                    if _enviar(trip, "consejo_" + k, hoy, *_texto(k, trip), corto=k):
                         enviados.append(k)
 
         # ── Noche: planes nocturnos de hoy ──
@@ -235,13 +310,13 @@ def revisar(trip: dict, ahora: datetime, planes: list[dict] | None = None) -> li
             tarde = [x for x in nocturnos if x >= 5]
             antes = (min(tarde) - h) * 60 if tarde else None
             if antes is not None and 30 <= antes <= 120:
-                if _enviar(trip, "consejo_noche_plan", hoy, *_texto("noche_plan", trip)):
+                if _enviar(trip, "consejo_noche_plan", hoy, *_texto("noche_plan", trip), corto="noche_plan"):
                     enviados.append("noche_plan")
             if h >= 22.5 or h < 4:
-                if _enviar(trip, "consejo_vuelta_tarde", hoy, *_texto("vuelta_tarde", trip)):
+                if _enviar(trip, "consejo_vuelta_tarde", hoy, *_texto("vuelta_tarde", trip), corto="vuelta_tarde"):
                     enviados.append("vuelta_tarde")
         elif 21.0 <= h < 22.5 and hoy == trip.get("inicio") and not aun_en_vuelo:
-            if _enviar(trip, "consejo_primera_noche", hoy, *_texto("primera_noche", trip)):
+            if _enviar(trip, "consejo_primera_noche", hoy, *_texto("primera_noche", trip), corto="primera_noche"):
                 enviados.append("primera_noche")
 
         # ── Idea del mediodía, si todavía no abrió la app ──

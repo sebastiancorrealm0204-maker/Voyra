@@ -56,7 +56,8 @@ def test_plan_nocturno_aconseja_taxi_por_app(enviados):
     planes = [{"tipo": "actividad", "titulo": "Rumba en Andrés", "fecha": "2026-11-03", "hora": "22:00"}]
     t = trip()
     assert consejos.revisar(t, en(20, 30, dia=3), planes=planes) == ["noche_plan"]
-    assert "Jamás tomes un taxi de la calle" in enviados[0][1]
+    assert "jamás uno de la calle" in enviados[0][1]  # el push corto conserva la advertencia de seguridad
+    assert "Jamás tomes un taxi de la calle" in consejos._texto("noche_plan", trip())[1]  # y el chat, el texto completo
     assert consejos.revisar(t, en(23, 0, dia=3), planes=planes) == ["vuelta_tarde"]
 
 
