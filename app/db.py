@@ -930,6 +930,15 @@ def recently_recommended(trip_id: str, hours: float = 24) -> set[str]:
     return {r["place_name"] for r in rs}
 
 
+def recommended_within(trip_id: str, minutes: float) -> bool:
+    """¿Se le recomendó algún lugar hace menos de `minutes`? (evita juntar dos recomendaciones seguidas)."""
+    cutoff = now() - minutes * 60
+    with conn() as c:
+        r = c.execute("SELECT 1 FROM place_recommendations WHERE trip_id=? AND created_at>? LIMIT 1",
+                      (trip_id, cutoff)).fetchone()
+    return r is not None
+
+
 def mark_recommended(trip_id: str, place_name: str):
     insert("place_recommendations", {"trip_id": trip_id, "place_name": place_name})
 

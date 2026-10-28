@@ -7,7 +7,7 @@ documentos extraídos y planes contados por el usuario.
 import os
 import re
 
-from . import airport, city_knowledge, db, geo, horarios, plans, reloj, timeutil
+from . import agenda, airport, city_knowledge, db, geo, horarios, plans, reloj, timeutil
 
 # Cuántos mensajes previos del chat se mandan al LLM. Antes se mandaban hasta 200
 # (y eran los 200 MÁS VIEJOS): en viajes largos eso eran decenas de miles de
@@ -377,6 +377,7 @@ def build(trip: dict, docs: list[dict] | None = None, mensaje: str = "", memoria
         f"cuánto tráfico hay). <<<\n"
     )
     tiempo_block += reloj.bloque(trip, mensaje, db.places_for_city(trip.get('ciudad', '')))
+    tiempo_block += agenda.bloque(trip, ahora, planes_norm)
 
     idioma_code = (trip.get("idioma") or "es").lower()
     idioma_nombre = city_knowledge.lang_name(idioma_code)

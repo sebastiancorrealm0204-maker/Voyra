@@ -369,7 +369,7 @@ def score_event(system: str, source: str, payload: str, category: str,
         '"accion": "<botón 1 tap máx 4 palabras o null>", "abrir": "<chat|planes>"}\n'
         "FORMATO DE NOTIFICACIÓN (CRÍTICO): es el gancho de un push de celular, NO un mensaje. Título y mensaje MUY cortos, "
         "concretos y con un dato útil (qué, dónde o cuándo); sin saludos ni relleno ni explicaciones. El detalle lo "
-        "da el Companion en el chat al tocar. Ej. bueno: título «🚕 Sal ya al tour», mensaje «Monserrate empieza en 60 min». "
+        "da el Companion en el chat al tocar. Ej. bueno: título «⚠️ Marcha en el centro», mensaje «Cierres viales hasta las 4 pm». "
         "Ej. malo: un párrafo. 'abrir' = planes si trata de un vuelo o un plan del itinerario; chat en otro caso.\n"
         "Criterios: vuelo/seguridad = score alto siempre. Recomendaciones = alto solo si cruzan "
         "con gustos y ubicación. ≥70 push, 40-69 feed, <40 silencio.\n"

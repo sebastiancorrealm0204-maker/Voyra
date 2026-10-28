@@ -108,7 +108,7 @@ def _score(system_fn, source: str, payload: str, category: str, operational: boo
 
 
 def ingest(trip_id: str, source: str, category: str, operational: bool, payload: str,
-           extra: dict | None = None) -> dict:
+           extra: dict | None = None, plantilla: dict | None = None) -> dict:
     """Punto de entrada de toda señal. Devuelve la decisión completa.
 
     `extra`: datos adicionales calculados por el backend (no por el LLM) que se
@@ -136,8 +136,13 @@ def ingest(trip_id: str, source: str, category: str, operational: bool, payload:
 
     # El idioma del viaje viaja aparte (clave privada, no se persiste en la notificación): el título y el mensaje
     # de la señal deben salir en el idioma del usuario, no en el del prompt.
-    r = _score(lambda: context.build(trip), source, payload, category, operational,
-               {**(extra or {}), "_idioma": (trip.get("idioma") or "es").lower()})
+    if plantilla:
+        # Texto determinístico (horas y minutos reales calculados por el backend): un LLM no puede contradecirlo.
+        r = {"score": 90, "razon": "Plantilla determinística", "titulo": plantilla["titulo"],
+             "mensaje": plantilla["mensaje"], "accion": plantilla.get("accion"), "_mode": "plantilla"}
+    else:
+        r = _score(lambda: context.build(trip), source, payload, category, operational,
+                   {**(extra or {}), "_idioma": (trip.get("idioma") or "es").lower()})
     score = max(int(r["score"]), 90) if operational else int(r["score"])
     decision = "push" if score >= 70 else "feed" if score >= 40 else "silence"
     if decision == "push" and not operational and db.user_active_within(trip_id, EN_APP_MINUTOS):
@@ -168,7 +173,10 @@ def ingest(trip_id: str, source: str, category: str, operational: bool, payload:
         if decision == "push":
             try:
                 from . import push
-                abrir, dest = _destino_toque(category, r.get("abrir"), extra)
+                if plantilla:
+                    abrir, dest = plantilla.get("abrir", "chat"), plantilla.get("dest")
+                else:
+                    abrir, dest = _destino_toque(category, r.get("abrir"), extra)
                 data = {"notification_id": nid, "category": category, "action": r.get("accion"), "open": abrir}
                 if dest:
                     data["dest"] = dest

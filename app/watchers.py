@@ -211,16 +211,47 @@ def recordatorio_vuelo_regreso(trip_id: str) -> dict:
                          category="vuelo", operational=True, payload=payload)
 
 
-def aviso_hora_de_salir(trip_id: str, plan: str, minutos_antes: int = 60,
-                        extra_msg: str = "") -> dict:
-    """'Es hora de salir' antes de una actividad reservada. Operacional → push."""
-    msg = extra_msg or (
-        f"Se acerca una actividad del usuario: '{plan}'. Faltan ~{minutos_antes} minutos. "
-        f"Recuérdaselo en tono cálido, dile que es buen momento para ir saliendo y, si sabes la zona, "
-        f"sugiere cómo llegar desde su ubicación actual."
-    )
-    return engine.ingest(trip_id, source="Itinerary watcher (hora de salir)",
-                         category="itinerario", operational=True, payload=msg)
+# Avisos de salida: texto determinístico con las horas REALES (antes los redactaba un LLM, que a veces ponía «Sal ya» en el
+# título mientras el cuerpo decía «sal a las 8:22»). Dos fases: «aviso» (con margen, dice a qué hora salir) y «ya»
+# (cerca de la hora de salir; el título sale de los minutos que de verdad faltan).
+_TXT_SALIDA = {
+    "es": {"aviso": ("⏰ {plan}", "A las {hora} · sal a las {salida} (~{min} min)"),
+           "ya_ahora": "🚕 Sal ya", "ya_min": "🚕 Sal en {r} min", "ya_cuerpo": "{plan} a las {hora} · ~{min} min de viaje"},
+    "en": {"aviso": ("⏰ {plan}", "At {hora} · leave at {salida} (~{min} min)"),
+           "ya_ahora": "🚕 Leave now", "ya_min": "🚕 Leave in {r} min", "ya_cuerpo": "{plan} at {hora} · ~{min} min trip"},
+    "pt": {"aviso": ("⏰ {plan}", "Às {hora} · saia às {salida} (~{min} min)"),
+           "ya_ahora": "🚕 Saia agora", "ya_min": "🚕 Saia em {r} min", "ya_cuerpo": "{plan} às {hora} · ~{min} min de viagem"},
+    "fr": {"aviso": ("⏰ {plan}", "À {hora} · pars à {salida} (~{min} min)"),
+           "ya_ahora": "🚕 Pars maintenant", "ya_min": "🚕 Pars dans {r} min", "ya_cuerpo": "{plan} à {hora} · ~{min} min de trajet"},
+    "de": {"aviso": ("⏰ {plan}", "Um {hora} · los um {salida} (~{min} Min.)"),
+           "ya_ahora": "🚕 Jetzt los", "ya_min": "🚕 In {r} Min. los", "ya_cuerpo": "{plan} um {hora} · ~{min} Min. Fahrt"},
+    "it": {"aviso": ("⏰ {plan}", "Alle {hora} · parti alle {salida} (~{min} min)"),
+           "ya_ahora": "🚕 Parti ora", "ya_min": "🚕 Parti tra {r} min", "ya_cuerpo": "{plan} alle {hora} · ~{min} min di viaggio"},
+}
+
+
+def texto_salida(idioma: str, fase: str, plan: str, hora: str, salida: str, viaje_min: int, faltan_min: float) -> tuple[str, str]:
+    """(título, cuerpo) del aviso de salida. `faltan_min` = minutos que faltan para la hora de salir."""
+    t = _TXT_SALIDA.get(idioma, _TXT_SALIDA["es"])
+    datos = {"plan": plan, "hora": hora, "salida": salida, "min": viaje_min}
+    if fase == "aviso":
+        return t["aviso"][0].format(**datos), t["aviso"][1].format(**datos)
+    r = max(0, int(round(faltan_min / 5.0)) * 5)  # a múltiplos de 5: «sal en 10 min», nunca «sal en 13 min»
+    titulo = t["ya_ahora"] if r <= 5 else t["ya_min"].format(r=r)
+    return titulo, t["ya_cuerpo"].format(**datos)
+
+
+def aviso_hora_de_salir(trip_id: str, plan: dict, fase: str, salida: str, viaje_min: int, faltan_min: float,
+                        lugar: str | None = None) -> dict:
+    """Aviso de salida antes de una actividad con hora. Operacional → push. El toque abre «Cómo llegar» al lugar del plan
+    si es uno curado (`lugar`); si no, la pestaña de Planes."""
+    trip = db.get_trip(trip_id)
+    idioma = (trip.get("idioma") or "es").lower()
+    titulo, mensaje = texto_salida(idioma, fase, plan.get("titulo") or "…", plan.get("hora") or "", salida, viaje_min, faltan_min)
+    plantilla = {"titulo": titulo, "mensaje": mensaje,
+                 "abrir": "como_llegar" if lugar else "planes", "dest": lugar}
+    return engine.ingest(trip_id, source=f"Itinerary watcher (salida {fase})", category="itinerario",
+                         operational=True, payload=f"{titulo} — {mensaje}", plantilla=plantilla)
 
 
 def scan_destination(trip_id: str) -> dict:
@@ -423,6 +454,25 @@ def nearby_recommendations(trip_id: str, limit: int = 3) -> dict:
 # Tres momentos del día. En cada uno se elige UN lugar curado que calce con los gustos declarados (tags ∩ gustos),
 # de la categoría que tiene sentido a esa hora, que no se haya recomendado ya en este viaje ni esté en su itinerario.
 # Sin gustos o sin match no se manda nada: preferimos callar a mandar algo genérico. Cero costo de API.
+# Muchos lugares (sobre todo cafés) no traen etiquetas de gusto: la categoría también cuenta. «Café de especialidad» →
+# cualquier café; «Vida nocturna» → bares; etc. Las claves son EXACTAMENTE las etiquetas del onboarding (constants.ts → GUSTOS).
+_GUSTO_CATEGORIAS = {
+    "Café de especialidad": {"cafe"}, "Dulces y repostería": {"cafe"}, "Brunch y desayunos": {"cafe"},
+    "Cervecerías y vino": {"bar"}, "Vida nocturna": {"bar"}, "Bares de coctelería": {"bar"}, "Antros y baile": {"bar"},
+    "Naturaleza y aire libre": {"parque"}, "Planes tranquilos": {"parque"}, "Miradores y vistas": {"mirador"},
+    "Mercados y artesanías": {"mercado"}, "Compras": {"compras", "mercado"},
+    "Historia y cultura": {"atraccion"}, "Museos y galerías": {"atraccion"},
+}
+
+
+def gustos_que_calzan(lugar: dict, gustos) -> list[str]:
+    """Gustos del usuario con los que calza este lugar curado (por etiqueta o por categoría), en orden estable."""
+    gustos = set(gustos or ())
+    por_tag = gustos & set(lugar.get("tags") or [])
+    por_cat = {g for g in gustos if lugar.get("category") in _GUSTO_CATEGORIAS.get(g, ())}
+    return sorted(por_tag) + sorted(por_cat - por_tag)
+
+
 _SLOTS_RECO = {
     "mediodia": {"cats": {"restaurante"},},
     "tarde": {"cats": {"atraccion", "parque", "mercado", "experiencia", "mirador", "cafe"}},
@@ -478,7 +528,7 @@ def elegir_reco_por_gustos(trip: dict, slot: str) -> dict | None:
             continue
         if p["name"].lower() in en_plan:
             continue
-        match = len(gustos & set(p.get("tags") or []))
+        match = len(gustos_que_calzan(p, gustos))
         if not match:
             continue
         d = geo.haversine_km(origin[0], origin[1], p["lat"], p["lng"]) if origin else 0.0
@@ -493,6 +543,8 @@ def recomendar_por_gustos(trip_id: str, slot: str) -> dict:
     """Mensaje proactivo corto con UN lugar acorde a los gustos. Queda en el chat y sale como push."""
     from . import traducir
     trip = db.get_trip(trip_id)
+    if db.recommended_within(trip_id, 90):
+        return {"enviado": False, "motivo": "recomendacion_reciente"}
     p = elegir_reco_por_gustos(trip, slot)
     if not p:
         return {"enviado": False}

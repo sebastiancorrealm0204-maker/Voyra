@@ -145,26 +145,23 @@ ZONE_COORDS: dict[str, dict[str, tuple[float, float]]] = {
 
 
 def travel_minutes(dist_km: float | None, city: str = "") -> int:
-    """Estima minutos de viaje dado distancia en km.
+    """Estima minutos de viaje puerta a puerta dada la distancia EN LÍNEA RECTA (haversine), en km.
 
-    Bogotá tiene tráfico pesado, así que los factores son conservadores:
-    - A pie  (<1.5 km):  ~15 min/km  (promedio caminando con semáforos)
-    - Taxi/Uber/carro:   ~4 km/h efectivos en Bogotá hora pico → 15 min/km
-      (suena lento pero la velocidad promedio real en hora pico en Bogotá
-       ronda 20-25 km/h; con la espera del taxi se va a ~4 km efectivos/h)
-    - Mínimo: 10 min (tiempo de bajar, esperar taxi, etc.)
-
-    Para otras ciudades usamos factores más optimistas (menos tráfico).
+    - A pie (<1.5 km): ~12 min/km (5 km/h).
+    - Bogotá en carro/taxi/app: la línea recta subestima el recorrido real (×1.35) y la velocidad media con tráfico
+      ronda 20-25 km/h (~2.8 min/km), más ~8 min de espera/abordaje. 8.5 km en línea recta ≈ 40 min.
+      (Antes eran 15 min/km, ritmo de caminata: un tramo de 8 km daba 2 horas y los avisos de salida llegaban 3 h antes.)
+    - Otras ciudades: menos tráfico (~30 km/h) y ~5 min de espera.
+    - Mínimo: 10 min.
     """
     if dist_km is None:
         return 45  # sin info, margen conservador
-    ciudad_baja = (city or "").lower()
     if dist_km < 1.5:
-        minutos = dist_km * 15  # caminando
-    elif "bogot" in ciudad_baja:
-        minutos = dist_km * 15  # tráfico pesado bogotano
+        minutos = dist_km * 12
+    elif "bogot" in (city or "").lower():
+        minutos = 8 + dist_km * 1.35 * 2.8
     else:
-        minutos = dist_km * 8   # ciudades más fluidas
+        minutos = 5 + dist_km * 1.35 * 2.0
     return max(10, round(minutos))
 
 
