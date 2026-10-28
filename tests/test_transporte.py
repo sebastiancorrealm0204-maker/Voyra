@@ -465,3 +465,29 @@ def test_zona_no_pisa_origen_ni_centro_comercial():
     assert t.detectar_destino("como llego al aeropuerto desde el centro", LUGARES) == {"tipo": "aeropuerto"}
     assert t.zona("quiero ir al centro comercial") is None
     assert t.detectar_destino("que hay de comer en el centro", LUGARES) is None  # no pide ruta
+
+
+# ── nombres propios únicos y zonas frente a lugares que solo las nombran ──
+LUGARES_COLPATRIA = LUGARES + [
+    {"name": "Mirador Torre Colpatria", "lat": 4.6, "lng": -74.07},
+    {"name": "Open Chapinero Café", "lat": 4.64, "lng": -74.05},
+    {"name": "Café de Chapinero Alto", "lat": 4.65, "lng": -74.06},
+]
+
+
+@pytest.mark.parametrize("msg", [
+    "how do I get to the Colpatria tower?", "como llego a colpatria", "cómo llego a la torre colpatria",
+])
+def test_nombre_propio_unico_basta(msg):
+    d = t.detectar_destino(msg, LUGARES_COLPATRIA)
+    assert d and d["nombre"] == "Mirador Torre Colpatria"
+
+
+def test_la_zona_gana_a_un_lugar_que_solo_la_nombra():
+    d = t.detectar_destino("como llego a chapinero", LUGARES_COLPATRIA)
+    assert d and d.get("zona") == "chapinero"
+
+
+def test_palabra_generica_o_compartida_no_adivina_lugar():
+    assert t.detectar_destino("how do I get to the tower", LUGARES_COLPATRIA) is None
+    assert t.detectar_destino("como llego a la universidad javeriana", LUGARES_COLPATRIA) is None

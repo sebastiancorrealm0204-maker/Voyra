@@ -296,6 +296,8 @@ _A_ES = {
     "salt": "sal", "sel": "sal", "salz": "sal",
     "old": "antiguo", "downtown": "centro", "center": "centro", "centre": "centro",
     "mall": "centro comercial",
+    "tower": "torre", "towers": "torre", "turm": "torre", "tour": "torre", "tur": "torre", "torre": "torre",
+    "lookout": "mirador", "viewpoint": "mirador", "aussichtspunkt": "mirador",
 }
 # Palabras vacías de cualquier idioma: no cuentan al comparar nombres.
 _VACIAS = {"de", "del", "la", "el", "los", "las", "of", "the", "des", "du", "le", "les", "l", "di", "da", "do", "das",
@@ -352,6 +354,12 @@ def _frase_destino(mensaje: str) -> str | None:
 
 
 
+def _distintivas(nombre: str) -> set[str]:
+    """Palabras que identifican a un lugar: largas, no genéricas ni vacías («colpatria», «monserrate»)."""
+    n = _norm(re.sub(r"\(.*?\)", "", nombre or ""))
+    return {w for w in n.split() if len(w) >= 6 and w not in _GENERICAS and w not in _VACIAS and w not in _A_ES}
+
+
 def pide_ruta(mensaje: str) -> bool:
     """¿El mensaje pide cómo llegar / moverse a algún sitio?"""
     return bool(mensaje and _PIDE_RUTA.search(mensaje))
@@ -367,6 +375,10 @@ def detectar_destino(mensaje: str, lugares: list[dict]) -> dict | None:
     palabras = set(n.split())
     msg_es = _palabras_es(mensaje)
     mejor, puntaje = None, 0
+    usos: dict[str, int] = {}  # en cuántos lugares aparece cada palabra distintiva
+    for p in lugares:
+        for w in _distintivas(p.get("name", "")):
+            usos[w] = usos.get(w, 0) + 1
     for p in lugares:
         pn = _norm(re.sub(r"\(.*?\)", "", p.get("name", "")))  # «Usaquén (centro histórico)» → «usaquen»
         if not pn:
@@ -384,14 +396,20 @@ def detectar_destino(mensaje: str, lugares: list[dict]) -> dict | None:
                 score = 50 + 10 * len(cont)             # «museum of gold» ⊇ {museo, oro}
             elif comun >= 2 and (len(cont) - comun <= 1 or (len(cont) >= 4 and comun / len(cont) >= 0.4)):
                 score = 20 + 10 * comun                 # «salt cathedral» ≈ «Catedral de Sal de Zipaquirá»
+        if not score:
+            # Una palabra propia que solo tiene ESE lugar («colpatria») basta, aunque falten «mirador» o «torre».
+            unicas = [w for w in _distintivas(p.get("name", "")) if usos.get(w) == 1 and (w in palabras or w in msg_es)]
+            if unicas:
+                score = 30 + max(len(w) for w in unicas)
         if score > puntaje:
             mejor, puntaje = p, score
-    if mejor:
-        return {"tipo": "lugar", "lat": float(mejor["lat"]), "lng": float(mejor["lng"]), "nombre": mejor["name"]}
     # Si el mensaje dice «a X», el destino es X: «de mi hotel al centro» no es una ruta al hotel.
     frase = _frase_destino(mensaje)
     objetivo = frase or mensaje
     z = zona(objetivo)
+    # Una zona gana sobre un lugar que solo la nombra («Open Chapinero Café» no es «Chapinero»); un nombre completo, no.
+    if mejor and not (z and puntaje < 100):
+        return {"tipo": "lugar", "lat": float(mejor["lat"]), "lng": float(mejor["lng"]), "nombre": mejor["name"]}
     if z:
         return z
     if _AEROPUERTO.search(objetivo):
