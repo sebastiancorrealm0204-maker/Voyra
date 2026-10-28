@@ -939,6 +939,16 @@ def recommended_within(trip_id: str, minutes: float) -> bool:
     return r is not None
 
 
+def engagement_count(trip_id: str, local_date: str) -> int:
+    """Cuántos avisos «de interés» (recomendaciones, huecos, vísperas, ideas del día) se marcaron hoy: para no saturar al usuario."""
+    with conn() as c:
+        r = c.execute(
+            "SELECT COUNT(*) n FROM proactive_log WHERE trip_id=? AND local_date=? AND "
+            "(kind LIKE 'reco_%' OR kind LIKE 'hueco_%' OR kind LIKE 'vispera_%' OR kind='consejo_tip_dia')",
+            (trip_id, local_date)).fetchone()
+    return int(r["n"] if r else 0)
+
+
 def mark_recommended(trip_id: str, place_name: str):
     insert("place_recommendations", {"trip_id": trip_id, "place_name": place_name})
 

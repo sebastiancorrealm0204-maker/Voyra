@@ -462,7 +462,13 @@ _GUSTO_CATEGORIAS = {
     "Naturaleza y aire libre": {"parque"}, "Planes tranquilos": {"parque"}, "Miradores y vistas": {"mirador"},
     "Mercados y artesanías": {"mercado"}, "Compras": {"compras", "mercado"},
     "Historia y cultura": {"atraccion"}, "Museos y galerías": {"atraccion"},
+    "Comida callejera": {"mercado"}, "Senderismo": {"parque", "excursion"}, "Escapadas desde Bogotá": {"excursion"},
 }
+# Emoji por categoría (avisos de recomendación).
+EMOJI_CATEGORIA = {"cafe": "☕", "restaurante": "🍽️", "bar": "🍸", "parque": "🌿", "mirador": "🌄", "mercado": "🛍️",
+                   "atraccion": "📍", "experiencia": "✨", "excursion": "🏔️"}
+# Tope diario de avisos «de interés» (recomendaciones, huecos, vísperas, ideas del día): los operativos no cuentan.
+ENGAGEMENT_MAX_DIA = 5
 
 
 def gustos_que_calzan(lugar: dict, gustos) -> list[str]:
@@ -541,10 +547,15 @@ def elegir_reco_por_gustos(trip: dict, slot: str) -> dict | None:
 
 def recomendar_por_gustos(trip_id: str, slot: str) -> dict:
     """Mensaje proactivo corto con UN lugar acorde a los gustos. Queda en el chat y sale como push."""
-    from . import traducir
+    from . import timeutil, traducir
     trip = db.get_trip(trip_id)
     if db.recommended_within(trip_id, 90):
         return {"enviado": False, "motivo": "recomendacion_reciente"}
+    try:
+        if db.engagement_count(trip_id, timeutil.now_local(trip).date().isoformat()) > ENGAGEMENT_MAX_DIA:
+            return {"enviado": False, "motivo": "tope_diario"}
+    except Exception:
+        pass
     p = elegir_reco_por_gustos(trip, slot)
     if not p:
         return {"enviado": False}
@@ -561,5 +572,15 @@ def recomendar_por_gustos(trip_id: str, slot: str) -> dict:
     db.insert("messages", {"trip_id": trip_id, "role": "companion", "content": texto})
     db.mark_recommended(trip_id, p["name"])
     gancho = _GANCHO_RECO[slot].get(idioma, _GANCHO_RECO[slot]["es"])
+    # Señuelo atado a SUS gustos: «☕ Café de especialidad · #9 del mundo en 2026» en vez de un genérico «para almorzar hoy».
+    calzan = gustos_que_calzan(p, trip.get("gustos") or [])
+    if calzan and clave:
+        gusto = calzan[0]
+        if idioma != "es":
+            try:
+                gusto = traducir.traducir([gusto], idioma)[0]
+            except Exception:
+                pass
+        gancho = f"{EMOJI_CATEGORIA.get(p.get('category'), '📍')} {gusto} · {clave}"
     _push_checkin(trip_id, p["name"], texto, abrir="como_llegar", dest=p["name"], gancho=gancho)
     return {"enviado": True, "lugar": p["name"], "slot": slot}

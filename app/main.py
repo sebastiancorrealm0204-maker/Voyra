@@ -1089,6 +1089,8 @@ def _bloque_rutas(trip: dict, user: dict, mensaje: str) -> tuple[str, dict | Non
     if not transporte_mod.disponible():
         return alerta, None
     try:
+        if transporte_mod.pedido_generico(mensaje):
+            return alerta, None  # «quiero ir a un museo»: es una recomendación (ver estrategia), no una ruta
         lugares = db.places_for_city(trip.get("ciudad") or "Bogotá")
         d = transporte_mod.detectar_destino(mensaje, lugares)
         libre = None if d else transporte_mod.destino_libre(mensaje)

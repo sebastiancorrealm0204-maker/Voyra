@@ -7,7 +7,7 @@ documentos extraídos y planes contados por el usuario.
 import os
 import re
 
-from . import agenda, airport, city_knowledge, db, geo, horarios, plans, reloj, timeutil
+from . import agenda, airport, estrategia, city_knowledge, db, geo, horarios, plans, reloj, timeutil
 
 # Cuántos mensajes previos del chat se mandan al LLM. Antes se mandaban hasta 200
 # (y eran los 200 MÁS VIEJOS): en viajes largos eso eran decenas de miles de
@@ -323,6 +323,17 @@ def _gustos_block(trip: dict) -> str:
     )
 
 
+# Cómo razonar CUALQUIER recomendación (no solo café o comida). Cuando el código pudo calcularlo, el bloque «ESTRATEGIA PARA ESTE
+# PEDIDO» y la «AGENDA DE HOY CALCULADA» traen los números ya resueltos; esta regla cubre el resto de los casos.
+_ESTRATEGIA_BLOCK = """
+RAZONAMIENTO ESTRATÉGICO — aplica a CUALQUIER cosa que te pida o que sugieras (comida, museos, vistas, compras, «qué hago»), no solo a una:
+1. Entiende la NECESIDAD de fondo, no solo la palabra: qué momento es (hora, día del viaje), cuánto tiempo libre tiene antes de su próximo plan (mira la AGENDA DE HOY CALCULADA), dónde está y qué marcó que le gusta (sus gustos son lo que MÁS le importa: úsalos para elegir, no los recites).
+2. Respuesta con inteligencia: 1-2 opciones CERCA (lo cómodo) y, si le sobra tiempo, UNA «mejor experiencia» (lo que de verdad vale la pena en la ciudad para lo que le gusta) que le quede DE PASO para su siguiente plan. Explica el porqué con el tiempo real («tienes 2 h libres antes de tu tour; esa queda camino»). Si NO le sobra tiempo, no lo mandes lejos y dilo.
+3. Si aparece el bloque «ESTRATEGIA PARA ESTE PEDIDO», ya trae lugares, tiempos y horarios resueltos: úsalo tal cual. Si no aparece, razona igual con lo que tengas, pero sin inventar tiempos, distancias ni lugares.
+4. Piensa un paso adelante: si el itinerario está apretado o el plan siguiente queda lejos, avísalo antes de que él lo note.
+"""
+
+
 def build(trip: dict, docs: list[dict] | None = None, mensaje: str = "", memoria: str = "", rutas: str = "") -> str:
     docs = docs if docs is not None else db.rows("documents", trip["id"])
     docs_block = ""
@@ -356,7 +367,7 @@ def build(trip: dict, docs: list[dict] | None = None, mensaje: str = "", memoria
 
     lugares_block = _lugares_block(trip, mensaje)
     ciudad_block = city_knowledge.build_block(trip["ciudad"])
-    gustos_block = _gustos_block(trip)
+    gustos_block = _gustos_block(trip) + _ESTRATEGIA_BLOCK
 
     # Contexto temporal: el Companion debe saber qué hora y qué día del viaje es,
     # o sus respuestas sobre transporte, comida y planes salen genéricas
@@ -378,6 +389,7 @@ def build(trip: dict, docs: list[dict] | None = None, mensaje: str = "", memoria
     )
     tiempo_block += reloj.bloque(trip, mensaje, db.places_for_city(trip.get('ciudad', '')))
     tiempo_block += agenda.bloque(trip, ahora, planes_norm)
+    estrategia_txt = estrategia.bloque(trip, mensaje, ahora, planes_norm)
 
     idioma_code = (trip.get("idioma") or "es").lower()
     idioma_nombre = city_knowledge.lang_name(idioma_code)
@@ -475,6 +487,8 @@ ESTILO CONVERSACIONAL:
 - Acciones (rebooking, reservas): describe qué harías y pide confirmación final. Nunca ejecutas directo."""
     if rutas:
         prompt += "\n\n" + rutas  # rutas REALES de este turno (Google): el Companion responde con ellas
+    if estrategia_txt:
+        prompt += "\n" + estrategia_txt  # razonamiento ya calculado para ESTE pedido (cerca + mejor experiencia de paso); al final pesa más
     if idioma_code != "es":
         # Este prompt es largo y está en español: los modelos baratos tienden a contestar en español
         # aunque la instrucción de idioma esté al principio. El recordatorio va AL FINAL (lo último

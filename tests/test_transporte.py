@@ -491,3 +491,31 @@ def test_la_zona_gana_a_un_lugar_que_solo_la_nombra():
 def test_palabra_generica_o_compartida_no_adivina_lugar():
     assert t.detectar_destino("how do I get to the tower", LUGARES_COLPATRIA) is None
     assert t.detectar_destino("como llego a la universidad javeriana", LUGARES_COLPATRIA) is None
+
+
+# ── pedidos genéricos («un museo», «algo de arte») son recomendaciones, no destinos ──
+@pytest.mark.parametrize("msg", [
+    "quiero ir a un museo", "quiero ir a un lugar tranquilo", "voy a comer algo", "quiero ir a conocer algo de arte",
+    "how can I get to a good coffee place", "quiero ir a tomar un café",
+])
+def test_un_pedido_generico_no_es_un_destino(msg):
+    assert t.pedido_generico(msg)
+    assert t.detectar_destino(msg, LUGARES) is None and t.destino_libre(msg) is None
+
+
+@pytest.mark.parametrize("msg", ["quiero ir al Museo del Oro", "cómo llego a la Plaza de Bolívar", "how do I get to Monserrate"])
+def test_un_sitio_con_nombre_sigue_siendo_destino(msg):
+    assert not t.pedido_generico(msg) and t.detectar_destino(msg, LUGARES) is not None
+
+
+def test_el_chat_no_pregunta_a_cual_ni_rutea_un_pedido_generico(monkeypatch):
+    from app import llm
+    monkeypatch.setattr(t, "API_KEY", "x")
+    capturado = {}
+    monkeypatch.setattr(llm, "chat", lambda system, history: capturado.__setitem__("system", system) or "ok")
+    monkeypatch.setattr(t, "rutas", lambda o, d, s=0: _ruta_falsa(d[2]))
+    c, H = _cliente()
+    tid = c.post("/trips", json={"ciudad": "Bogotá", "hotel": "H", "zona_actual": "Zona G"}, headers=H).json()["trip_id"]
+    r = c.post(f"/trips/{tid}/chat", json={"message": "quiero ir a un museo"}, headers=H)
+    assert r.status_code == 200 and r.json()["ruta"] is None
+    assert "NO está claro a cuál" not in capturado["system"] and "no lo tengo como destino" not in capturado["system"].lower()

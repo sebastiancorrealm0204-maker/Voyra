@@ -173,6 +173,8 @@ def zone_coords(city: str, zona: str) -> tuple[float, float] | None:
     if not ciudad:
         return None
     z = norm_city(zona)
+    if not z:
+        return None  # sin zona: antes «cualquier cosa contiene ''» y devolvía las coordenadas de la PRIMERA zona de la ciudad
     if z in ciudad:
         return ciudad[z]
     # match parcial: "zona t / zona rosa" -> "zona t"

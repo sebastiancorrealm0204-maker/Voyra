@@ -21,7 +21,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta
 
-from . import agenda, consejos, db, huecos, search, timeutil, watchers
+from . import agenda, anzuelos, consejos, db, huecos, search, timeutil, watchers
 
 log = logging.getLogger("companion.scheduler")
 
@@ -169,6 +169,10 @@ def _procesar_trip(trip: dict, disparos: list) -> None:
         # Hueco libre antes del próximo plan → recomendación que cruza con sus gustos
         for k in huecos.revisar(trip, ahora):
             disparos.append(("hueco", tid, k))
+
+        # Víspera de un plan: dato de local + invitación a planear
+        for k in anzuelos.vispera(trip, ahora):
+            disparos.append(("vispera", tid, k))
 
         # Consejos de llegada y de noche (taxi por app, jamás uno de la calle) + una idea al mediodía
         for k in consejos.revisar(trip, ahora):

@@ -360,6 +360,20 @@ def _distintivas(nombre: str) -> set[str]:
     return {w for w in n.split() if len(w) >= 6 and w not in _GENERICAS and w not in _VACIAS and w not in _A_ES}
 
 
+# «un museo», «algo de arte», «a good coffee place», «comer algo»: es una CATEGORÍA o un plan, no un destino con nombre. Hay que
+# recomendar, no rutear (ni decir «no tengo la ruta a "un museo"», ni mandarlo a un café cualquiera por coincidir una palabra).
+_GENERICO = re.compile(
+    r"^(?:un|una|unos|unas|algun|alguna|algunos|algunas|algo|a|an|any|some|something|somewhere|good|great|nice|best|buen|buena|"
+    r"bueno|buenos|buenas|mejor|mejores|cualquier)\b|"
+    r"^(?:comer|cenar|almorzar|desayunar|tomar\w*|beber|conocer|ver|hacer|pasear|caminar|rumbear|bailar|salir)\b")
+
+
+def pedido_generico(mensaje: str) -> bool:
+    """True si lo que pide como «destino» es una categoría o un plan («quiero ir a un museo»), no un sitio concreto."""
+    frase = _frase_destino(mensaje)
+    return bool(frase and _GENERICO.search(_norm(frase)))
+
+
 def pide_ruta(mensaje: str) -> bool:
     """¿El mensaje pide cómo llegar / moverse a algún sitio?"""
     return bool(mensaje and _PIDE_RUTA.search(mensaje))
@@ -369,7 +383,7 @@ def detectar_destino(mensaje: str, lugares: list[dict]) -> dict | None:
     """Si el mensaje pide cómo llegar a un sitio que conocemos, devuelve el destino:
     {'tipo': 'aeropuerto'} | {'tipo': 'hotel'} | {'tipo': 'lugar', 'lat', 'lng', 'nombre'}. Si no, None.
     Exige una palabra de transporte/ruta Y un destino reconocible (pocos falsos positivos)."""
-    if not mensaje or not _PIDE_RUTA.search(mensaje):
+    if not mensaje or not _PIDE_RUTA.search(mensaje) or pedido_generico(mensaje):
         return None
     n = _norm(mensaje)
     palabras = set(n.split())
@@ -445,6 +459,8 @@ def destino_libre(mensaje: str) -> str | None:
         return None
     d = _COLA.sub("", m.group("d")).strip(" 	\"'")
     n = _norm(d)
+    if _GENERICO.search(n):
+        return None  # «un museo», «algo de arte»: una categoría, no un sitio (ver pedido_generico)
     if len(re.sub(r"[^A-Za-zÁ-ú]", "", d)) < 3 or n in _NO_LUGAR or n.split()[0] in ("mi", "my", "mon", "ma", "mein", "meu", "minha", "il"):
         return None  # «mi casa», «my place»: no sabemos dónde es
     return d
