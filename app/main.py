@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import (transporte as transporte_mod, ciudades, city_knowledge, context, db, engine, geo, llm, memoria, net, places_live, push, scheduler,
+from . import (transporte as transporte_mod, ciudades, ficha as ficha_mod, city_knowledge, context, db, engine, geo, llm, memoria, net, places_live, push, scheduler,
                search, seed_data, verificacion, watchers, auth, limits, email_send, social_enrich,
                waitlist, accesos, admin_panel, feedback_limite as feedback_limite_mod, traducir, visual, resumen as resumen_mod, itinerario_chat, horarios, timeutil)
 
@@ -767,6 +767,17 @@ def feedback_limite(body: FeedbackLimiteIn, user: dict = Depends(current_user)):
 def fotos_del_lugar(place_id: str, n: int = 4, user: dict = Depends(current_user)):
     """«Ver más fotos» de una tarjeta: las tarjetas del chat traen solo 1 foto (cada foto cuesta); el resto se pide aquí al tocar."""
     return {"fotos": visual.fotos(place_id, max(1, min(n, 5)))}
+
+
+@app.get("/trips/{tid}/lugar")
+def lugar_ficha(tid: str, nombre: str, user: dict = Depends(current_user)):
+    """Ficha completa de un lugar curado (al tocar una notificación o una tarjeta): descripción, dato local, historia, qué
+    hacer, qué no hacer, qué probar, secretos, horario de hoy y galería. 404 si el nombre no es de nuestra curación."""
+    trip = own_trip(tid, user)
+    f = ficha_mod.ficha(trip, (nombre or "")[:160])
+    if not f:
+        raise HTTPException(404, "Ese lugar no está en la guía de Companion.")
+    return f
 
 
 @app.get("/trips/{tid}/plans")

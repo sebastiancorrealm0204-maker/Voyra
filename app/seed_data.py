@@ -2603,6 +2603,19 @@ def _local_extra() -> dict:
     return out
 
 
+def _profundo() -> dict:
+    """Ficha profunda por lugar (app/lugares_profundo.json, de investigar_lugares.py): historia, hacer, no_hacer, probar y
+    secretos. Se pega como local["profundo"]: la usa la ficha completa del lugar y, los secretos, el prompt del Companion."""
+    import json
+    import os
+    try:
+        with open(os.path.join(os.path.dirname(__file__), "lugares_profundo.json"), encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    return {k: v for k, v in data.items() if isinstance(v, dict) and not k.startswith("_")}
+
+
 def _tags_bogota(p: dict) -> list[str]:
     """Tags propios de Bogotá según lo que el lugar ES (categoría/nombre), sumados a los que ya traiga."""
     nombre = (p.get("name") or "").lower()
@@ -2633,6 +2646,7 @@ def all_seeds() -> list[dict]:
 
     capa = _capa_verificacion()
     extras = _local_extra()
+    profundo = _profundo()
     out = []
     nombres_bogota = {q["name"] for q in BOGOTA}
     nuevos = [q for q in _candidatos_aprobados() if q["name"] not in nombres_bogota]
@@ -2662,6 +2676,8 @@ def all_seeds() -> list[dict]:
             for k, v in extra.items():
                 if not local.get(k):
                     local[k] = v
+        if p["city_display"] == "Bogotá" and p["name"] in profundo:
+            local = {**(local or {}), "profundo": profundo[p["name"]]}
         tags = list(p.get("tags") or [])
         if p["city_display"] == "Bogotá":
             tags += [t for t in _tags_bogota(p) if t not in tags]
