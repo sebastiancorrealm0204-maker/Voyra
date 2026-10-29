@@ -36,7 +36,8 @@ def test_los_lugares_aprobados_traen_bloque_local_coherente():
     import json
     import os
     ruta = os.path.join(os.path.dirname(seed_data.__file__), "seed_candidatos.json")
-    permitidos = {"clave", "pedir", "ver", "momento", "ojo", "dato", "practico"}
+    # preguntar / frase / extranjero: capa para viajeros extranjeros (ver enriquecer_extranjeros.py)
+    permitidos = {"clave", "pedir", "ver", "momento", "ojo", "dato", "practico", "preguntar", "frase", "extranjero"}
     for p in json.load(open(ruta, encoding="utf-8")):
         loc = p.get("local")
         assert loc and loc.get("clave") and loc.get("practico"), p["name"]
@@ -54,6 +55,24 @@ def test_local_extra_rellena_solo_lo_vacio(monkeypatch):
     assert seeds["Museo Botero"]["local"]["ojo"] == "NUEVO OJO"           # lo vacío se rellena
     from app.local_bogota import LOCAL_BOGOTA
     assert "NUEVO OJO" not in str(LOCAL_BOGOTA["Museo Botero"])           # no se muta el original
+
+
+def test_local_extranjeros_real_es_coherente():
+    """La capa para extranjeros solo suma preguntar/frase/extranjero a lugares que EXISTEN y que ya tienen ficha, con texto real."""
+    import json
+    import os
+    ruta = os.path.join(os.path.dirname(seed_data.__file__), "local_extranjeros.json")
+    data = {k: v for k, v in json.load(open(ruta, encoding="utf-8")).items() if not k.startswith("_")}
+    assert data, "la capa no debería estar vacía"
+    nombres = {s["name"]: s for s in seed_data.all_seeds()}
+    for n, campos in data.items():
+        assert n in nombres, f"{n}: no está en la curación"
+        assert set(campos) <= {"preguntar", "frase", "extranjero"}, n
+        assert all(isinstance(v, str) and v.strip() for v in campos.values()), n
+        for k in campos:                                  # y llegan de verdad a la ficha que ve el Companion
+            assert nombres[n]["local"].get(k) == campos[k], (n, k)
+        if "frase" in campos:                             # una frase solo tiene sentido si hay algo respaldado que pedir
+            assert nombres[n]["local"].get("pedir") or nombres[n]["local"].get("preguntar"), n
 
 
 def test_local_extra_real_es_coherente():

@@ -35,7 +35,11 @@ cargar_env()
 GOOGLE_KEY = os.environ.get("GOOGLE_MAPS_API_KEY", "")
 TAVILY_KEY = os.environ.get("TAVILY_API_KEY", "")
 DETAILS = "https://places.googleapis.com/v1/places/{pid}"
-MASK = "id,displayName,regularOpeningHours.weekdayDescriptions,priceLevel,websiteUri,editorialSummary,rating,userRatingCount"
+# Los últimos cinco campos son los de la capa para EXTRANJEROS (pago, reserva, vegetariano, teléfono, reseñas con su idioma).
+# Ojo: Google suele facturar `reviews`, `paymentOptions`, `reservable` y `servesVegetarianFood` en un nivel de precio más alto que
+# el horario o el rating: confirma el costo en tu consola de Google Cloud antes de correr un lote grande.
+MASK = ("id,displayName,regularOpeningHours.weekdayDescriptions,priceLevel,websiteUri,editorialSummary,rating,userRatingCount,"
+        "paymentOptions,reservable,servesVegetarianFood,internationalPhoneNumber,reviews")
 CACHE_RUTA = "reportes/cache_local.json"
 
 PRECIO = {"PRICE_LEVEL_FREE": "gratis", "PRICE_LEVEL_INEXPENSIVE": "económico", "PRICE_LEVEL_MODERATE": "precio medio",
@@ -90,6 +94,51 @@ def practico_de(hechos: dict) -> str:
     return ". ".join(bits) + ("." if bits else "")
 
 
+def extranjero_hechos(g: dict) -> dict:
+    """Hechos ESTRUCTURADOS de Google útiles para un viajero extranjero. Son booleanos y códigos de idioma, no texto libre: no hay
+    nada que un modelo pueda inventar. Lo que Google no publica queda en None (y no se afirma nada)."""
+    pago = g.get("paymentOptions") or {}
+    if pago.get("acceptsCashOnly"):
+        tarjeta = "solo_efectivo"
+    elif pago.get("acceptsCreditCards") and pago.get("acceptsDebitCards"):
+        tarjeta = "credito_y_debito"
+    elif pago.get("acceptsCreditCards"):
+        tarjeta = "credito"
+    elif pago.get("acceptsDebitCards"):
+        tarjeta = "debito"
+    else:
+        tarjeta = None
+    idiomas = []
+    for r in g.get("reviews") or []:
+        cod = ((r.get("originalText") or r.get("text") or {}).get("languageCode") or "").lower()
+        if cod:
+            idiomas.append(cod.split("-")[0])
+    return {"tarjeta": tarjeta, "reservable": g.get("reservable"), "vegetariano": g.get("servesVegetarianFood"),
+            "telefono": g.get("internationalPhoneNumber") or "",
+            "resenas_en_ingles": sum(1 for c in idiomas if c == "en"), "resenas_muestra": len(idiomas)}
+
+
+_TARJETA = {"solo_efectivo": "Solo efectivo: lleva pesos.", "credito_y_debito": "Aceptan tarjeta de crédito y débito.",
+            "credito": "Aceptan tarjeta de crédito.", "debito": "Aceptan tarjeta de débito."}
+
+
+def extranjero_texto(e: dict) -> str:
+    """Texto corto y SOLO con lo que Google confirma. Un `False` de Google (no reservable, sin vegetariano) no se afirma: Google a
+    veces pone False por falta de dato, y decir «no hay opciones vegetarianas» sin certeza sería peor que callar."""
+    bits = []
+    if e.get("tarjeta") in _TARJETA:
+        bits.append(_TARJETA[e["tarjeta"]])
+    if e.get("reservable") is True:
+        bits.append("Se puede reservar.")
+    if e.get("vegetariano") is True:
+        bits.append("Tienen opciones vegetarianas.")
+    if e.get("resenas_muestra", 0) >= 3 and e.get("resenas_en_ingles", 0) >= 2:
+        bits.append(f"Hay reseñas de viajeros en inglés ({e['resenas_en_ingles']} de {e['resenas_muestra']} de la muestra).")
+    if e.get("telefono"):
+        bits.append(f"Teléfono: {e['telefono']}.")
+    return " ".join(bits)
+
+
 def mejores_fragmentos(nombre: str, resultados: list[dict], n: int = 6) -> list[dict]:
     """Fragmentos que nombran el lugar Y hablan de Bogotá; primero los que traen pistas útiles."""
     clave = _norm(nombre)
@@ -125,7 +174,7 @@ def _guardar_cache() -> None:
 
 
 def hechos_google(cl: httpx.Client, place_id: str) -> dict:
-    k = f"g|{place_id}"
+    k = f"g2|{place_id}"  # g2: incluye los campos de la capa para extranjeros (la caché vieja no los tiene)
     if k not in _cache:
         r = cl.get(DETAILS.format(pid=place_id), headers={"X-Goog-Api-Key": GOOGLE_KEY, "X-Goog-FieldMask": MASK,
                                                           "Accept-Language": "es"})
@@ -134,7 +183,8 @@ def hechos_google(cl: httpx.Client, place_id: str) -> dict:
         _cache[k] = {"horario": resumir_horario((g.get("regularOpeningHours") or {}).get("weekdayDescriptions") or []),
                      "precio": PRECIO.get(g.get("priceLevel", ""), ""), "web": g.get("websiteUri", ""),
                      "resumen_google": (g.get("editorialSummary") or {}).get("text", ""),
-                     "rating": g.get("rating"), "resenas": g.get("userRatingCount")}
+                     "rating": g.get("rating"), "resenas": g.get("userRatingCount"),
+                     "extranjero": extranjero_hechos(g)}
     return _cache[k]
 
 
@@ -186,6 +236,7 @@ def main() -> None:
         for i, p in enumerate(lugares):
             h = hechos_google(cl, p["place_id"]) if p.get("place_id") else {"horario": "", "precio": ""}
             h["practico"] = practico_de(h)
+            h["extranjero_texto"] = extranjero_texto(h.get("extranjero") or {})
             frags = []
             if i < args.max_tavily:
                 try:

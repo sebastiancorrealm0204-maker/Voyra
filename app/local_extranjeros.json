@@ -1,0 +1,48 @@
+{
+ "Afluente": {
+  "preguntar": "Pregunta si puedes probar el pato.",
+  "frase": "¿Nos trae el menú de temporada para probar y compartir al centro?",
+  "extranjero": "Aceptan tarjeta de crédito y débito. Se puede reservar. Teléfono: +57 323 8117763."
+ },
+ "URO": {
+  "extranjero": "Aceptan tarjeta de crédito y débito. Se puede reservar. Teléfono: +57 316 3382501."
+ },
+ "Fogo da Bahia": {
+  "preguntar": "Pregunta por el 2x1 en caipiriñas de miércoles a jueves.",
+  "frase": "Quiero el Rodizio de Mar con pulpo y langostinos.",
+  "extranjero": "Aceptan tarjeta de crédito y débito. Se puede reservar. Teléfono: +57 318 9569793."
+ },
+ "TANGO PASIÓN POR LA CARNE": {
+  "preguntar": "Pregunta si el all-you-can-eat está disponible hoy y qué incluye.",
+  "frase": "Quiero el all-you-can-eat con costicharrón y carne a la llanera.",
+  "extranjero": "Aceptan tarjeta de crédito y débito. Teléfono: +57 320 4044514."
+ },
+ "Prudencia": {
+  "extranjero": "Aceptan tarjeta de crédito y débito. Se puede reservar. Tienen opciones vegetarianas. Teléfono: +57 318 7981836."
+ },
+ "Mini-Mal": {
+  "preguntar": "Pregunta por los Arrullos de Tumaco, el clásico del Pacífico.",
+  "frase": "¿Nos trae los arrullos de Tumaco para probar el Pacífico?",
+  "extranjero": "Aceptan tarjeta de crédito y débito. Se puede reservar. Tienen opciones vegetarianas. Teléfono: +57 601 4550630."
+ },
+ "Tropicalia Coffee": {
+  "preguntar": "Pregunta por la trucha fresca del bowl o de los huevos pochados.",
+  "frase": "Quisiera un método V60 para probar un origen colombiano.",
+  "extranjero": "Aceptan tarjeta de crédito y débito. Tienen opciones vegetarianas. Teléfono: +57 322 6802553."
+ },
+ "AALTO | Bistró & Piano Bar": {
+  "frase": "Quiero probar la torta de chocolate, por favor.",
+  "extranjero": "Aceptan tarjeta de crédito y débito. Se puede reservar. Teléfono: +57 311 2103928."
+ },
+ "lohas café": {
+  "preguntar": "Pregunta por los cafés de competencia que preparan en la barra.",
+  "frase": "¿Me recomiendas un café de competencia para hoy?",
+  "extranjero": "Aceptan tarjeta de crédito y débito. Teléfono: +57 317 6603432."
+ },
+ "Habibi Parkway": {
+  "preguntar": "Pregunta por alguna opción fuera de carta o especialidad del día.",
+  "frase": "Quiero falafel y shawarma, por favor.",
+  "extranjero": "Aceptan tarjeta de crédito y débito. Se puede reservar. Tienen opciones vegetarianas. Teléfono: +57 300 9014132."
+ },
+ "_nota": "Capa para extranjeros (preguntar/frase/extranjero): generada por enriquecer_extranjeros.py y revisada a mano."
+}

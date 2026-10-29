@@ -2587,13 +2587,20 @@ def _local_extra() -> dict:
     Solo rellenan lo que está vacío: lo escrito a mano en local_bogota.py siempre gana."""
     import json
     import os
-    ruta = os.path.join(os.path.dirname(__file__), "local_extra.json")
-    try:
-        with open(ruta, encoding="utf-8") as f:
-            data = json.load(f)
-    except (OSError, ValueError):
-        return {}
-    return {k: v for k, v in data.items() if isinstance(v, dict) and not k.startswith("_")}
+    out: dict = {}
+    # local_extra.json (ojo/dato) y local_extranjeros.json (preguntar/frase/extranjero: capa para viajeros extranjeros, ver
+    # enriquecer_extranjeros.py). Se combinan por lugar; ningún campo pisa a otro de la misma capa.
+    for nombre in ("local_extra.json", "local_extranjeros.json"):
+        ruta = os.path.join(os.path.dirname(__file__), nombre)
+        try:
+            with open(ruta, encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            continue
+        for k, v in data.items():
+            if isinstance(v, dict) and not k.startswith("_"):
+                out[k] = {**out.get(k, {}), **v}
+    return out
 
 
 def _tags_bogota(p: dict) -> list[str]:

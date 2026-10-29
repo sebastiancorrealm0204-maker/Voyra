@@ -4935,5 +4935,273 @@
    "ver": "Música en vivo y buenas bebidas y postres.",
    "practico": "horario según Google: lun–vie 12:00–22:00; sáb 11:00–22:00; dom 11:00–17:00."
   }
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "La Kasta 106",
+  "category": "restaurante",
+  "zona": "Usaquén",
+  "dir": "Cl. 106 #18a - 41, Usaquén, Bogotá, Cundinamarca",
+  "maps_query": "La Kasta 106 Bogotá",
+  "lat": 4.692245,
+  "lng": -74.050206,
+  "place_id": "ChIJ56sdrr6bP44RAwR7Uwc05e8",
+  "rating": 4.9,
+  "price_level": "PRICE_LEVEL_EXPENSIVE",
+  "descripcion": "Restaurante en Usaquén conocido por su servicio atento y su ambiente abierto, bueno para ir en familia o con amigos. La carta incluye carnes como el Rib Eye.",
+  "confianza": "media",
+  "tags": [],
+  "local": {
+   "clave": "Parrilla de carnes en Usaquén con ambiente abierto y servicio muy elogiado.",
+   "pedir": "El Rib Eye, uno de los platos que destacan los reseñadores.",
+   "ver": "Ambiente abierto, bueno para compartir en familia o con amigos.",
+   "dato": "El personal recibe elogios por nombre, como Paola Cantillo y Juan David.",
+   "practico": "Caro. horario según Google: lun–mié 12:00–21:00; jue–sáb 12:00–22:00; dom 12:00–18:00.",
+   "extranjero": "Aceptan tarjeta de crédito y débito. Se puede reservar. Teléfono: +57 317 5812190."
+  },
+  "_fuentes": [
+   "tripadvisor.es"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Storia D'Amore",
+  "category": "restaurante",
+  "zona": "Zona T",
+  "dir": "Kr 13 #82-36, Bogotá",
+  "maps_query": "Storia D'Amore Bogotá",
+  "lat": 4.667219,
+  "lng": -74.054657,
+  "place_id": "ChIJv5caPvybP44RcRWTKtso-Fo",
+  "rating": 4.7,
+  "price_level": "PRICE_LEVEL_EXPENSIVE",
+  "descripcion": "Restaurante italiano de ambiente lujoso en la Zona T, con bar agradable y una extensa selección de vinos. Cocina italiana presentada como una historia de amor servida en la mesa.",
+  "confianza": "media",
+  "tags": [],
+  "local": {
+   "clave": "Italiano de ambiente lujoso en la Zona T, con bar y buena carta de vinos.",
+   "pedir": "Platos tradicionales italianos, con porciones grandes.",
+   "preguntar": "Pregunta por las recomendaciones de la casa para tu primera visita.",
+   "dato": "Tiene sedes en Bogotá, Cali y Barranquilla.",
+   "frase": "¿Me recomiendas algo para mi primera visita?",
+   "practico": "Caro. horario según Google: lun–mié 12:00–21:00; jue 12:00–22:00; vie–sáb 12:00–23:00; dom 12:00–20:00.",
+   "extranjero": "Aceptan tarjeta de crédito y débito. Se puede reservar. Tienen opciones vegetarianas. Teléfono: +57 310 7620025."
+  },
+  "_fuentes": [
+   "tripadvisor.com"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "WOK Usaquén",
+  "category": "restaurante",
+  "zona": "Usaquén",
+  "dir": "Cra. 6a #117-02, Usaquén, Bogotá",
+  "maps_query": "WOK Usaquén Bogotá",
+  "lat": 4.694387,
+  "lng": -74.031685,
+  "place_id": "ChIJ6zJZwKeaP44R7Q2jQyAOSJM",
+  "rating": 4.6,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Restaurante de comida del sudeste asiático en Usaquén, con 22 años de trayectoria y también sushi en su carta. Conviene ir con paciencia porque suele haber fila.",
+  "confianza": "media",
+  "tags": [],
+  "local": {
+   "clave": "Comida del sudeste asiático y sushi en Usaquén, con 22 años de trayectoria.",
+   "pedir": "Sushi, si vas por ese lado de la carta.",
+   "ojo": "Suele haber fila y la atención en la entrada puede ser lenta.",
+   "practico": "Precio medio. horario según Google: lun–mié 11:45–21:30; jue–sáb 11:45–22:00; dom 11:45–20:00.",
+   "extranjero": "Aceptan tarjeta de crédito y débito. Se puede reservar. Tienen opciones vegetarianas. Teléfono: +57 601 5807272 ext. 6009."
+  },
+  "_fuentes": [
+   "tripadvisor.es"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Hornitos Chicó",
+  "category": "cafe",
+  "zona": "Chicó",
+  "dir": "Cra. 11 #98-07 Loc 2, Bogotá",
+  "maps_query": "Hornitos Chicó Bogotá",
+  "lat": 4.681538,
+  "lng": -74.044263,
+  "place_id": "ChIJU7w3bH2QP44RfEHWHlOBl3c",
+  "rating": 4.4,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Café en el sector del Chicó, con buena calificación y amplio volumen de reseñas. Un lugar de referencia para tomar algo en la zona.",
+  "confianza": "media",
+  "tags": [],
+  "local": {
+   "clave": "Café del Chicó con carta propia y muchas reseñas.",
+   "practico": "Precio medio. horario según Google: lun–dom 6:30–21:00.",
+   "extranjero": "Aceptan tarjeta de crédito y débito. Teléfono: +57 601 7561515."
+  },
+  "_fuentes": [
+   "tripadvisor.es"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "WOK Parque de la 93",
+  "category": "restaurante",
+  "zona": "Parque 93",
+  "dir": "Cl 93b #12-28, Chapinero, Bogotá, Cundinamarca",
+  "maps_query": "WOK Parque de la 93 Bogotá",
+  "lat": 4.677421,
+  "lng": -74.048461,
+  "place_id": "ChIJRzwHk42aP44R9jvyQO6pV2I",
+  "rating": 4.5,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Restaurante asiático en el Parque de la 93 con menú extenso, desde ramen hasta sushi. Buen sitio para cenar comida asiática en un ambiente local.",
+  "confianza": "media",
+  "tags": [],
+  "local": {
+   "clave": "Comida asiática variada en el Parque de la 93, con ramen, sushi y platos de wok.",
+   "pedir": "El wok n roll, que la propia cuenta marca como obligatorio, o el sake maguro don.",
+   "preguntar": "Pregunta por el wok n roll, que ellos mismos recomiendan como obligatorio.",
+   "ver": "Los rollitos de pollo de primavera y las láminas de sashimi.",
+   "frase": "¿Me trae el wok n roll, por favor?",
+   "practico": "Precio medio. horario según Google: lun 11:45–21:00; mar–mié 11:45–21:30; jue–sáb 11:45–22:00; dom 12:00–20:30.",
+   "extranjero": "Aceptan tarjeta de crédito y débito. Se puede reservar. Tienen opciones vegetarianas. Teléfono: +57 601 5807272 ext. 6011."
+  },
+  "_fuentes": [
+   "tripadvisor.es"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "El Irish Pub Usaquén",
+  "category": "bar",
+  "zona": "Usaquén",
+  "dir": "Cra. 6a #117-45, Bogotá",
+  "maps_query": "El Irish Pub Usaquén Bogotá",
+  "lat": 4.694785,
+  "lng": -74.031628,
+  "place_id": "ChIJ6-8qwqeaP44Rkkoe2914LYU",
+  "rating": 4.6,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Bar en Usaquén con ambiente animado y buen servicio incluso cuando está lleno. Un sitio para sentarse cómodo y pasar el rato.",
+  "confianza": "media",
+  "tags": [],
+  "local": {
+   "clave": "Bar de Usaquén con gran ambiente y servicio atento aunque esté lleno.",
+   "momento": "Suele llenarse; aun así se consigue mesa cómoda.",
+   "practico": "Precio medio. horario según Google: lun–jue 12:00–23:00; vie–sáb 12:00–1:00; dom 12:00–23:00.",
+   "extranjero": "Aceptan tarjeta de crédito y débito. Se puede reservar. Teléfono: +57 601 6916391."
+  },
+  "_fuentes": [
+   "tripadvisor.com"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "La Fabbrica",
+  "category": "restaurante",
+  "zona": "Chicó",
+  "dir": "Cra. 11a #93b-12, Bogotá",
+  "maps_query": "La Fabbrica Bogotá",
+  "lat": 4.676809,
+  "lng": -74.047286,
+  "place_id": "ChIJJ79ybpKaP44RkCO14Rz_XjQ",
+  "rating": 4.6,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "La Fabbrica es un restaurante italiano en Chicó. Los visitantes opinan que la pizza, los canelones y la lasaña son recomendación, y que el panna cotta era perfecto.",
+  "confianza": "media",
+  "tags": [],
+  "local": {
+   "clave": "Un restaurante italiano en Chicó con pizza, canelones y lasaña recomendados por los visitantes.",
+   "pedir": "Pide pizza, canelones o lasaña. Deja espacio para el panna cotta.",
+   "ver": "Fíjate en el panna cotta: azúcar justo y fruta decorativa fresca.",
+   "dato": "Tiene estacionamiento disponible para clientes.",
+   "practico": "Precio medio. horario según Google: lun–sáb 12:00–22:30; dom 12:00–17:30.",
+   "extranjero": "Aceptan tarjeta de crédito y débito. Se puede reservar. Tienen opciones vegetarianas. Teléfono: +57 324 2537404."
+  },
+  "_fuentes": [
+   "tripadvisor.es"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Las Cazuelas de la Abuela",
+  "category": "restaurante",
+  "zona": "Chapinero",
+  "dir": "Cl. 59 #9 16, Bogotá",
+  "maps_query": "Las Cazuelas de la Abuela Bogotá",
+  "lat": 4.645317,
+  "lng": -74.062906,
+  "place_id": "ChIJzbKlZziaP44RHsU6cXa-Rds",
+  "rating": 4.4,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Restaurante bogotano de comida colombiana en Chapinero, con dos sedes sobre la Calle 59. Su ajiaco con pollo es lo que más repiten las reseñas.",
+  "confianza": "media",
+  "tags": [],
+  "local": {
+   "clave": "Icónico restaurante bogotano de comida colombiana en Chapinero, con dos sedes sobre la Calle 59.",
+   "pedir": "El ajiaco con pollo, sopa típica bogotana con dos clases de papa, mazorca y pollo.",
+   "preguntar": "Pregunta por las alcaparras para el ajiaco; vienen aparte.",
+   "ver": "Se ven los cocineros trabajando justo detrás del mostrador.",
+   "momento": "Se llena hacia el mediodía, así que llega un poco antes.",
+   "dato": "Las porciones son buenas, incluso para compartir.",
+   "frase": "¿Me trae el ajiaco con pollo con las alcaparras aparte?",
+   "practico": "Precio medio. horario según Google: lun–dom 12:00–17:00.",
+   "extranjero": "Aceptan tarjeta de crédito y débito. Teléfono: +57 311 4483211."
+  },
+  "_fuentes": [
+   "tripadvisor.es"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "La Monferrina",
+  "category": "restaurante",
+  "zona": "La Macarena",
+  "dir": "Cra. 4a #26B-22, Bogotá",
+  "maps_query": "La Monferrina Bogotá",
+  "lat": 4.612273,
+  "lng": -74.066702,
+  "place_id": "ChIJuZSGIpqZP44RLzFcPC8seu4",
+  "rating": 4.4,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Restaurante italiano en La Macarena con clásicos como pizza frita, carbonara y porchetta. Sus defensores destacan la comida y los precios justos; otros critican la pasta.",
+  "confianza": "media",
+  "tags": [],
+  "local": {
+   "clave": "Italiano de La Macarena; muchos lo recomiendan por sus platos y precios justos.",
+   "pedir": "Pizza frita, carbonara o porchetta.",
+   "ver": "Prueba las berenjenas y las pizzas.",
+   "dato": "Está en La Macarena y vale la pena conocerlo, según sus reseñas.",
+   "frase": "¿Me trae la pizza frita y una carbonara?",
+   "practico": "Precio medio. horario según Google: lun–sáb 12:00–22:00; dom 12:00–16:00.",
+   "extranjero": "Aceptan tarjeta de crédito y débito. Se puede reservar. Teléfono: +57 601 5085839."
+  },
+  "_fuentes": [
+   "tripadvisor.es"
+  ]
+ },
+ {
+  "city_display": "Bogotá",
+  "name": "Osaki Usaquén",
+  "category": "restaurante",
+  "zona": "Usaquén",
+  "dir": "Cl. 118 #6A - 37, Bogotá",
+  "maps_query": "Osaki Usaquén Bogotá",
+  "lat": 4.695031,
+  "lng": -74.03186,
+  "place_id": "ChIJqZvOwqeaP44RfgjuVIeKfIE",
+  "rating": 4.6,
+  "price_level": "PRICE_LEVEL_MODERATE",
+  "descripcion": "Restaurante en Usaquén que recorre los sabores de la cocina asiática con preparaciones clásicas y contemporáneas. Buena valoración constante entre los locales.",
+  "confianza": "media",
+  "tags": [],
+  "local": {
+   "clave": "Cocina asiática de clásicos y propuestas contemporáneas en Usaquén.",
+   "ver": "Probar las preparaciones que mezclan lo clásico asiático con propuestas nuevas.",
+   "practico": "Precio medio. horario según Google: lun–mié 12:00–21:00; jue–sáb 12:00–22:00; dom 12:00–21:00.",
+   "extranjero": "Aceptan tarjeta de crédito y débito. Se puede reservar. Tienen opciones vegetarianas. Teléfono: +57 601 6447777."
+  },
+  "_fuentes": [
+   "tripadvisor.es"
+  ]
  }
 ]

@@ -34,11 +34,14 @@ def historial(trip_id: str, max_msgs: int | None = None) -> list[dict]:
 _LOCAL_LABELS = [
     ("clave",    "CLAVE"),     # la frase de un local en 5 segundos — el "move"
     ("pedir",    "PEDIR"),     # qué pedir (comida/café/trago/mercado)
+    ("preguntar", "PREGUNTA POR"),  # algo específico que pedir/preguntar al llegar (valor para el extranjero)
+    ("frase",    "CÓMO DECIRLO EN ESPAÑOL"),  # la frase para pedirlo (ayuda al extranjero)
     ("ver",      "VER"),       # qué no perderte (atracción/parque/experiencia)
     ("momento",  "MOMENTO"),   # mejor hora / fila / multitud / reserva
     ("ojo",      "OJO"),       # la trampa / el cuidado / lo que decepciona
     ("dato",     "DATO"),      # el dato local que no sale en Google
     ("practico", "PRÁCTICO"),  # pago / reserva / precio / tiempo / cómo llegar
+    ("extranjero", "PARA VIAJEROS EXTRANJEROS"),  # tarjeta / reserva / vegetariano / teléfono / reseñas en inglés (hechos de Google)
 ]
 
 
@@ -334,6 +337,15 @@ RAZONAMIENTO ESTRATÉGICO — aplica a CUALQUIER cosa que te pida o que sugieras
 """
 
 
+# Valor para el viajero extranjero: no solo «ve a X» sino «pide ESTO, y se dice ASÍ». Solo con lo que trae la ficha del lugar.
+_EXTRANJERO_BLOCK = """
+VIAJERO EXTRANJERO — cuando recomiendes un lugar y su ficha traiga «PREGUNTA POR», «CÓMO DECIRLO EN ESPAÑOL» o «PARA VIAJEROS EXTRANJEROS»:
+• Dile QUÉ pedir o por qué preguntar y CÓMO decirlo: la frase en español tal cual viene en la ficha, entre comillas, con su significado en el idioma del usuario si no habla español.
+• Usa de «PARA VIAJEROS EXTRANJEROS» solo lo que le sirva a esa persona ahora (¿acepta tarjeta o lleva efectivo?, ¿conviene reservar?, ¿hay opciones vegetarianas si las necesita?); no lo recites completo.
+• Solo con lo que está en la ficha: si el lugar no trae frase o dato, no te la inventes (di el nombre del plato y listo).
+"""
+
+
 def build(trip: dict, docs: list[dict] | None = None, mensaje: str = "", memoria: str = "", rutas: str = "") -> str:
     docs = docs if docs is not None else db.rows("documents", trip["id"])
     docs_block = ""
@@ -367,7 +379,7 @@ def build(trip: dict, docs: list[dict] | None = None, mensaje: str = "", memoria
 
     lugares_block = _lugares_block(trip, mensaje)
     ciudad_block = city_knowledge.build_block(trip["ciudad"])
-    gustos_block = _gustos_block(trip) + _ESTRATEGIA_BLOCK
+    gustos_block = _gustos_block(trip) + _ESTRATEGIA_BLOCK + _EXTRANJERO_BLOCK
 
     # Contexto temporal: el Companion debe saber qué hora y qué día del viaje es,
     # o sus respuestas sobre transporte, comida y planes salen genéricas
