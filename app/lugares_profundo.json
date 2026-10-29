@@ -1015,5 +1015,1363 @@
    "https://artsandculture.google.com/partner/museo-botero-bogota"
   ],
   "fecha": "2026-10-29"
+ },
+ "Incorrecto Cocina": {
+  "historia": {
+   "texto": "Restaurante de cocina criolla colombiana contemporánea en Usaquén, en la calle 120a con carrera 3A, en el casco histórico del barrio. Su propuesta parte de sabores tradicionales tratados con técnica moderna y presentaciones cuidadas, con opciones veganas.",
+   "origen": "fuente",
+   "url": "https://mindtrip.ai/restaurant/bogota-colombia/incorrecto-cocina/re-6rBrXOK3"
+  },
+  "hacer": [
+   {
+    "texto": "Pedir varios platos para compartir en el centro de la mesa: la carta está pensada para probar entre varios más que para platos individuales.",
+    "origen": "fuente",
+    "url": "https://www.tripadvisor.es/Restaurant_Review-g294074-d23682369-Reviews-Incorrecto_Cocina-Bogota.html"
+   },
+   {
+    "texto": "Sentarse a la mesa y dejar que el chef cuente la historia de cada plato antes de comerlo.",
+    "origen": "modelo"
+   }
+  ],
+  "no_hacer": [
+   {
+    "texto": "Llegar esperando un menú de cocina de autor con platos individuales: aquí se comparte y se conversa, no es una experiencia de degustación formal.",
+    "origen": "modelo"
+   }
+  ],
+  "fuentes": [
+   "https://mindtrip.ai/restaurant/bogota-colombia/incorrecto-cocina/re-6rBrXOK3",
+   "https://www.tripadvisor.es/Restaurant_Review-g294074-d23682369-Reviews-Incorrecto_Cocina-Bogota.html"
+  ],
+  "fecha": "2026-10-29"
+ },
+ "Coffelia - Café de especialidad": {
+  "historia": {
+   "texto": "Coffelia es un café de especialidad que trabaja con variedades de café colombianas identificadas por su perfil de taza, como Castillo, Caturra, Bourbon Papayo y Bourbon Rosado. Su operación se centra en la venta de café en grano o molido y en la experiencia de cata para quienes quieren entender lo que beben.",
+   "origen": "fuente",
+   "url": "https://coffelia.com.co/"
+  },
+  "hacer": [
+   {
+    "texto": "Pide una cata o un vuelo de filtrados comparando las variedades del catálogo (Castillo, Caturra, Bourbon Papayo, Bourbon Rosado) para notar cómo cambia el perfil entre una y otra.",
+    "origen": "fuente",
+    "url": "https://coffelia.com.co/"
+   },
+   {
+    "texto": "Si te interesa llevarte algo a casa, compra el café en grano o molido: es parte de la operación, no solo de la barra.",
+    "origen": "fuente",
+    "url": "https://coffelia.com.co/"
+   }
+  ],
+  "probar": [
+   {
+    "texto": "Bourbon Papayo: la variedad que la casa describe como tropical y aromática, ideal si buscas un filtrado con perfil frutal.",
+    "origen": "fuente",
+    "url": "https://coffelia.com.co/"
+   },
+   {
+    "texto": "Caturra: la apuesta frutal y refinada del catálogo, buena para un filtrado que no se sienta pesado.",
+    "origen": "fuente",
+    "url": "https://coffelia.com.co/"
+   },
+   {
+    "texto": "Castillo: el perfil vibrante y de carácter, para quien quiere un café con más presencia en taza.",
+    "origen": "fuente",
+    "url": "https://coffelia.com.co/"
+   }
+  ],
+  "fuentes": [
+   "https://coffelia.com.co/",
+   "https://cofi.co/coffelia-cafe-de-especialidad",
+   "https://olofood.com/places/coffelia-caf-de-especialidad-bogot-qhkp"
+  ],
+  "fecha": "2026-10-29"
+ },
+ "Crítico Bar": {
+  "historia": {
+   "texto": "Crítico Bar abrió sus puertas el 26 de junio de 2025 dentro de la Hacienda Santa Bárbara, en Usaquén, como un espacio que mezcla gastronomía y cultura. Hace parte del grupo Distrito Lumina, que lo presenta como un lugar donde cada etiqueta, mezcla y plato tiene intención.",
+   "origen": "fuente",
+   "url": "https://caracol.com.co/2025/08/08/un-nuevo-espacio-cultural-y-gastronomico-en-bogota-critico-bar"
+  },
+  "hacer": [
+   {
+    "texto": "Ir un miércoles, cuando programan bandas de jazz en vivo; es la noche que los clientes repiten en reseñas.",
+    "origen": "fuente",
+    "url": "https://distritolumina.com/critico/"
+   },
+   {
+    "texto": "Dejarse guiar por el mesero para armar el maridaje entre cócteles de autor y platos; varios reseñadores destacan las recomendaciones del personal.",
+    "origen": "fuente",
+    "url": "https://distritolumina.com/critico/"
+   }
+  ],
+  "probar": [
+   {
+    "texto": "El cóctel El Abuelo, el trago que los clientes reseñan como el más recomendado de la casa.",
+    "origen": "fuente",
+    "url": "https://distritolumina.com/critico/"
+   },
+   {
+    "texto": "Las Smoked Sliders, si buscas algo de picar para acompañar los cócteles.",
+    "origen": "modelo"
+   }
+  ],
+  "secretos": [
+   {
+    "texto": "El nombre del bar va con su propia lógica: aquí nada es casual y cada etiqueta y mezcla tiene intención, así que preguntar por el porqué de un cóctel suele abrir la conversación con el bartender.",
+    "origen": "fuente",
+    "url": "https://distritolumina.com/critico/"
+   },
+   {
+    "texto": "Está dentro de la Hacienda Santa Bárbara, no en la calle de restaurantes de Usaquén, así que quien busca el bar recorriendo el centro histórico del barrio no lo encuentra.",
+    "origen": "fuente",
+    "url": "https://lescuentoque.com.co/critico-bar"
+   },
+   {
+    "texto": "Si te atiende Pablo o Cristian, déjales elegir: los clientes que los mencionan en reseñas terminan recomendando el lugar por sus sugerencias.",
+    "origen": "fuente",
+    "url": "https://distritolumina.com/critico/"
+   }
+  ],
+  "fuentes": [
+   "https://distritolumina.com/critico/",
+   "https://lescuentoque.com.co/critico-bar",
+   "https://caracol.com.co/2025/08/08/un-nuevo-espacio-cultural-y-gastronomico-en-bogota-critico-bar"
+  ],
+  "fecha": "2026-10-29"
+ },
+ "Iconico Café": {
+  "historia": {
+   "texto": "Iconico Café es un café de especialidad en La Macarena, el barrio de galerías y restaurantes junto a los Cerros Orientales. Se presenta como un lieu unique con identidad propia, en la Calle 23 con carrera 7, en el corazón de la zona gastronómica del barrio.",
+   "origen": "fuente",
+   "url": "https://co.linkedin.com/company/iconico-caf%C3%A9"
+  },
+  "hacer": [
+   {
+    "texto": "Comer en el local en vez de pedir a domicilio: el servicio de mesa es parte de la experiencia, en un espacio pequeño de barrio.",
+    "origen": "modelo"
+   },
+   {
+    "texto": "Acompañar el café con una copa de vino o cerveza si vas a media tarde, algo poco común en un café de La Macarena.",
+    "origen": "modelo"
+   }
+  ],
+  "no_hacer": [
+   {
+    "texto": "No llegar en plan de mesa larga para trabajar: es un café de barrio para una visita corta, no un espacio de coworking.",
+    "origen": "modelo"
+   },
+   {
+    "texto": "No esperar un local grande con terraza amplia: está sobre la Calle 23, una cuadra estrecha y concurrida del barrio.",
+    "origen": "modelo"
+   }
+  ],
+  "probar": [
+   {
+    "texto": "El café de la casa, preparado para tomar en el local.",
+    "origen": "modelo"
+   }
+  ],
+  "secretos": [
+   {
+    "texto": "La dirección exacta es Calle 23 #7-53, sobre el tramo de la Calle 23 que concentra la oferta gastronómica de La Macarena.",
+    "origen": "fuente",
+    "url": "https://co.linkedin.com/company/iconico-caf%C3%A9"
+   },
+   {
+    "texto": "Aunque es un café, acepta pago con American Express, algo que muchos locales pequeños del barrio no reciben.",
+    "origen": "modelo"
+   },
+   {
+    "texto": "El nombre está en francés en su presentación oficial, un guiño al aire europeo que el local le quiere dar a su identidad.",
+    "origen": "fuente",
+    "url": "https://co.linkedin.com/company/iconico-caf%C3%A9"
+   }
+  ],
+  "fuentes": [
+   "https://co.linkedin.com/company/iconico-caf%C3%A9",
+   "https://www.tripadvisor.es/Restaurant_Review-g294074-d33088102-Reviews-Iconico_Cafe_Bogota-Bogota.html"
+  ],
+  "fecha": "2026-10-29"
+ },
+ "Blues Kitchen": {
+  "historia": {
+   "texto": "Blues Kitchen es un restaurante de soul food en el corazón de La Macarena: cocina del sur de Estados Unidos (BBQ, gumbo, chili) en un barrio de casas bajas y calles tranquilas junto a la carrera 4a. La carta corta y la atención de una casa pequeña lo distinguen de la oferta convencional del sector.",
+   "origen": "fuente",
+   "url": "https://www.blueskitchenmacarena.com/"
+  },
+  "hacer": [
+   {
+    "texto": "Reservar la experiencia alrededor del BBQ: las costillas son el plato que más se asocia al lugar y el que la propia carta de soul food pone al frente.",
+    "origen": "fuente",
+    "url": "https://restaurantguru.com/Blues-Kitchen-Bogota"
+   },
+   {
+    "texto": "Pedir el gumbo si quieres entender la cocina del sur: es uno de los tres platos que la crítica del lugar destaca junto al BBQ y el chili.",
+    "origen": "fuente",
+    "url": "https://restaurantguru.com/Blues-Kitchen-Bogota"
+   }
+  ],
+  "probar": [
+   {
+    "texto": "Costillas BBQ (BBQ ribs).",
+    "origen": "fuente",
+    "url": "https://restaurantguru.com/Blues-Kitchen-Bogota"
+   }
+  ],
+  "secretos": [
+   {
+    "texto": "El secreto está en el nombre: la cocina es soul food, cocina afroamericana del sur de EE. UU., no un bar de blues ni parrilla genérica. Pide pensando en gumbo y chili, no en carta de parrilla colombiana.",
+    "origen": "fuente",
+    "url": "https://www.blueskitchenmacarena.com/"
+   },
+   {
+    "texto": "Funciona también como cocina a domicilio para quienes viven en La Macarena: si estás alojado en el barrio, puedes pedir a la carrera 4a con la dirección exacta del local.",
+    "origen": "fuente",
+    "url": "https://www.blueskitchenmacarena.com/"
+   }
+  ],
+  "fuentes": [
+   "https://www.blueskitchenmacarena.com/",
+   "https://restaurantguru.com/Blues-Kitchen-Bogota"
+  ],
+  "fecha": "2026-10-29"
+ },
+ "Pacha Peruana Gastrobar, parrilla": {
+  "historia": {
+   "texto": "Pacha Peruana es un gastrobar peruano en La Candelaria que suma a la cocina peruana una parrilla y un wok, con barra de cócteles. Su nombre remite al pacha, voz andina para tierra y mundo, guiño a la cocina peruana de raíz andina en el centro histórico de Bogotá.",
+   "origen": "fuente",
+   "url": "https://queresto.com/PachaPeruana"
+  },
+  "hacer": [
+   {
+    "texto": "Pedir de la parrilla y del wok en la misma mesa: son las dos técnicas que el lugar reivindica junto a la cocina peruana.",
+    "origen": "fuente",
+    "url": "https://linktr.ee/pacha.restaurantewok?utm_source=qr_code"
+   },
+   {
+    "texto": "Sentarse en la barra para acompañar la comida con un pisco sour preparado al momento.",
+    "origen": "fuente",
+    "url": "https://es.restaurantguru.com/Pacha-Restaurante-Colombia"
+   },
+   {
+    "texto": "Aprovechar las opciones veganas de la carta si se va en grupo con dietas distintas.",
+    "origen": "modelo"
+   }
+  ],
+  "probar": [
+   {
+    "texto": "Panceta a la parrilla",
+    "origen": "fuente",
+    "url": "https://es.restaurantguru.com/Pacha-Restaurante-Colombia"
+   }
+  ],
+  "fuentes": [
+   "https://linktr.ee/pacha.restaurantewok?utm_source=qr_code",
+   "https://queresto.com/PachaPeruana",
+   "https://es.restaurantguru.com/Pacha-Restaurante-Colombia",
+   "https://www.cybo.com/CO-biz/pacha-peruana-gastrobar-parrilla",
+   "https://es.cybo.com/CO-biz/pacha-peruana-gastrobar-parrilla"
+  ],
+  "fecha": "2026-10-29"
+ },
+ "Dios Restaurant": {
+  "historia": {
+   "texto": "Dios Restaurant forma parte de Hotel Dios, un proyecto boutique de solo cuatro habitaciones en una casona de la Cra. 3 # 10-54, en el corazón de La Candelaria. El hotel se presenta como un espacio donde el arte y el silencio se entrelazan, y el restaurante hereda esa misma idea de calma y diseño dentro del centro histó",
+   "origen": "fuente",
+   "url": "https://diosbta.com/"
+  },
+  "hacer": [
+   {
+    "texto": "Reservar mesa para el desayuno gourmet del hotel, que se sirve como servicio a huéspedes y comensales en el mismo espacio del restaurante.",
+    "origen": "modelo"
+   },
+   {
+    "texto": "Pedir una copa de la cava de vinos del hotel para acompañar la comida, un detalle poco común en restaurantes de La Candelaria.",
+    "origen": "modelo"
+   }
+  ],
+  "no_hacer": [
+   {
+    "texto": "No llegar esperando un restaurante de calle con carta extensa: es el comedor de un hotel boutique de cuatro habitaciones y el ritmo es de casa, no de local concurrido.",
+    "origen": "fuente",
+    "url": "https://diosbta.com/"
+   },
+   {
+    "texto": "No ir con afán de fila o ambiente ruidoso: el concepto del lugar es silencio y desconexión, así que no es la parada para una comida rápida entre recorridos.",
+    "origen": "fuente",
+    "url": "https://diosbta.com/"
+   }
+  ],
+  "probar": [
+   {
+    "texto": "El desayuno gourmet incluido en la operación del hotel, servido en el restaurante.",
+    "origen": "modelo"
+   }
+  ],
+  "secretos": [
+   {
+    "texto": "Al ser el comedor de un hotel de solo cuatro habitaciones, hay pocas mesas y el servicio es muy personal; entrar es casi como comer en una casa privada de La Candelaria.",
+    "origen": "fuente",
+    "url": "https://diosbta.com/"
+   },
+   {
+    "texto": "El hotel se ofrece como guía local de sus huéspedes, así que el personal del restaurante puede orientar sobre el barrio mejor que un mostrador de información turística.",
+    "origen": "modelo"
+   }
+  ],
+  "fuentes": [
+   "https://diosbta.com/",
+   "https://wanderlog.com/place/details/6605694/dios-restaurant"
+  ],
+  "fecha": "2026-10-29"
+ },
+ "La Kasta 106": {
+  "historia": {
+   "texto": "La Kasta 106 es la sede de Usaquén de La Kasta Grill & Wine, una parrilla que gira alrededor del fuego y que también tiene presencia en Parkway. En la calle 106 se consolidó como un punto de carnes en el norte de Bogotá, con calificación de 4.9 en Google y reseñas que destacan tanto los cortes como la atención del equi",
+   "origen": "fuente",
+   "url": "https://wanderlog.com/place/details/8583892/la-kasta-106"
+  },
+  "hacer": [
+   {
+    "texto": "Pedir la sangría como acompañamiento de la carne: los reseñadores la señalan como una buena dupla para la parrilla.",
+    "origen": "fuente",
+    "url": "https://www.tripadvisor.co/Restaurant_Review-g294074-d27697518-Reviews-La_Kasta_106-Bogota.html"
+   },
+   {
+    "texto": "Llegar en plan de celebración: el restaurante suele tener el detalle de llevar una torta si avisas que es cumpleaños.",
+    "origen": "fuente",
+    "url": "https://restaurantguru.com/La-Kasta-Bogota"
+   },
+   {
+    "texto": "Aprovechar el valet parking si vas en carro, porque la zona de la calle 106 tiene parqueaderos cerca pero el servicio lo facilita.",
+    "origen": "fuente",
+    "url": "https://www.tripadvisor.co/Restaurant_Review-g294074-d27697518-Reviews-La_Kasta_106-Bogota.html"
+   }
+  ],
+  "no_hacer": [
+   {
+    "texto": "No pidas el fundido napolitano esperando lo que promete la descripción: un reseñador señala que el orégano seco amarga la preparación.",
+    "origen": "fuente",
+    "url": "https://www.tripadvisor.co/Restaurant_Review-g294074-d27697518-Reviews-La_Kasta_106-Bogota.html"
+   },
+   {
+    "texto": "No vayas con afán ni planees sobremesa larga: hay reseñas que mencionan que el servicio puede hacer sentir que debes desocupar rápido la mesa.",
+    "origen": "fuente",
+    "url": "https://www.tripadvisor.es/Restaurant_Review-g294074-d27697518-Reviews-La_Kasta_106-Bogota.html"
+   },
+   {
+    "texto": "No des por hecho que el término de la carne saldrá exacto: en una reseña, dos de tres cortes pedidos no llegaron en el punto solicitado.",
+    "origen": "fuente",
+    "url": "https://restaurantguru.com/La-Kasta-Bogota"
+   }
+  ],
+  "probar": [
+   {
+    "texto": "El chorizo La Kasta, una de las entradas que las reseñas recomiendan por nombre propio.",
+    "origen": "fuente",
+    "url": "https://www.tripadvisor.co/Restaurant_Review-g294074-d27697518-Reviews-La_Kasta_106-Bogota.html"
+   },
+   {
+    "texto": "La hamburguesa, elogiada por la carne en su punto, la cebolla caramelizada y el queso generoso.",
+    "origen": "fuente",
+    "url": "https://www.tripadvisor.co/Restaurant_Review-g294074-d27697518-Reviews-La_Kasta_106-Bogota.html"
+   },
+   {
+    "texto": "El lomo saltado, que aparece entre los platos que sirven bien según Restaurant Guru.",
+    "origen": "fuente",
+    "url": "https://restaurantguru.com/La-Kasta-Bogota"
+   },
+   {
+    "texto": "La sangría, que los comensales piden como bebida para acompañar los cortes.",
+    "origen": "fuente",
+    "url": "https://www.tripadvisor.co/Restaurant_Review-g294074-d27697518-Reviews-La_Kasta_106-Bogota.html"
+   }
+  ],
+  "secretos": [
+   {
+    "texto": "El nombre del local se escribe con K: La Kasta, no La Casta. Es un detalle que confunde a quien busca la dirección o el teléfono en línea.",
+    "origen": "modelo"
+   },
+   {
+    "texto": "Aunque la ficha actual solo habla de Usaquén, La Kasta tiene otra sede en Parkway; si la 106 está llena, vale preguntar por disponibilidad en la otra.",
+    "origen": "modelo"
+   }
+  ],
+  "fuentes": [
+   "https://linktr.ee/lakasta?fbclid=PAAaYdyVlSJ43lo3WnFwC8DzLSsFPUPquCGP1ivRyIGrzT2al_b9a22Ez2A9c",
+   "https://wanderlog.com/place/details/8583892/la-kasta-106",
+   "https://www.tripadvisor.co/Restaurant_Review-g294074-d27697518-Reviews-La_Kasta_106-Bogota.html",
+   "https://restaurantguru.com/La-Kasta-Bogota",
+   "https://www.tripadvisor.es/Restaurant_Review-g294074-d27697518-Reviews-La_Kasta_106-Bogota.html"
+  ],
+  "fecha": "2026-10-29"
+ },
+ "Afluente": {
+  "historia": {
+   "texto": "El cocinero colombiano Jeferson García abrió Afluente en Chapinero Alto como un restaurante que investiga los páramos y la conectividad entre el agua y la despensa de Colombia. Su cocina parte del agua como hilo conductor: los ecosistemas hídricos del país dictan qué se cocina.",
+   "origen": "fuente",
+   "url": "https://www.afluenterestaurante.com/"
+  },
+  "hacer": [
+   {
+    "texto": "Recorrer la carta como una lectura de ecosistemas: cada plato rinde cuentas de un páramo o una cuenca concreta del país.",
+    "origen": "fuente",
+    "url": "https://elpais.com/gastronomia/restaurantes/2024-07-23/afluente-el-restaurante-colombiano-que-habla-sobre-la-importancia-de-los-paramos-a-traves-de-la-gastronomia.html"
+   },
+   {
+    "texto": "Ir con tiempo para el menú completo: la propuesta es de varias estaciones, no de platos sueltos.",
+    "origen": "fuente",
+    "url": "https://elpais.com/gastronomia/restaurantes/2024-07-23/afluente-el-restaurante-colombiano-que-habla-sobre-la-importancia-de-los-paramos-a-traves-de-la-gastronomia.html"
+   }
+  ],
+  "no_hacer": [
+   {
+    "texto": "No vayas esperando una carta clásica de platos a la carta para picar: la experiencia está armada como un recorrido de temporada.",
+    "origen": "modelo"
+   }
+  ],
+  "probar": [
+   {
+    "texto": "El pato con cebolla roja, papayuela, kale y puerro frito: uno de los platos que la prensa destaca de su cocina.",
+    "origen": "fuente",
+    "url": "https://elpais.com/gastronomia/restaurantes/2024-07-23/afluente-el-restaurante-colombiano-que-habla-sobre-la-importancia-de-los-paramos-a-traves-de-la-gastronomia.html"
+   }
+  ],
+  "secretos": [
+   {
+    "texto": "El nombre no es decorativo: 'afluente' es el brazo de agua que alimenta un río mayor, y así funciona la carta, donde cada preparación desemboca en la siguiente.",
+    "origen": "fuente",
+    "url": "https://www.afluenterestaurante.com/"
+   }
+  ],
+  "fuentes": [
+   "https://www.afluenterestaurante.com/",
+   "https://elpais.com/gastronomia/restaurantes/2024-07-23/afluente-el-restaurante-colombiano-que-habla-sobre-la-importancia-de-los-paramos-a-traves-de-la-gastronomia.html",
+   "https://www.tripadvisor.es/Restaurant_Review-g294074-d34144033-Reviews-Afluente_Restaurante-Bogota.html"
+  ],
+  "fecha": "2026-10-29"
+ },
+ "Pizzardi Artigianale": {
+  "historia": {
+   "texto": "Pizzardi Artigianale nació de la mano de Andrea Bornacelli y Alejandro Sardi con la idea de traer la pizza napolitana auténtica a Bogotá, respetando la tradición italiana en cada detalle. Su masa madurada lentamente y sus ingredientes importados de Italia, como tomates y quesos con denominación de origen, son la base d",
+   "origen": "fuente",
+   "url": "https://www.elcolombiano.com/cultura/gastronomia/pizzardi-artigianale-pizzeria-colombiana-entra-top-20-mundo-pizza-world-LB41371497"
+  },
+  "hacer": [
+   {
+    "texto": "Pedir la burrata como entrada para compartir; es uno de los platos que destacan las reseñas por su frescura y cremosidad.",
+    "origen": "fuente",
+    "url": "https://cielo.travel/es/resena-del-restaurante-pizzardi-en-bogota"
+   },
+   {
+    "texto": "Explorar la coctelería de la mano de la colaboración con Giancarlo Mancino, mixólogo italiano, para acompañar la pizza con un trago bien pensado.",
+    "origen": "fuente",
+    "url": "https://www.pizzardi.com.co/"
+   },
+   {
+    "texto": "Probar la masa madurada en casa: la línea Fatto in Casa ofrece masas de fermentación lenta y salsas artesanales para llevar, disponibles en el local y por Rappi.",
+    "origen": "fuente",
+    "url": "https://www.pizzardi.com.co/"
+   }
+  ],
+  "no_hacer": [
+   {
+    "texto": "No esperes una experiencia silenciosa o íntima: el ambiente es animado y concurrido, especialmente los fines de semana, cuando el servicio puede volverse más lento según algunas reseñas.",
+    "origen": "fuente",
+    "url": "https://www.tripadvisor.es/Restaurant_Review-g294074-d26586372-Reviews-Pizzardi_Artigianale-Bogota.html"
+   },
+   {
+    "texto": "No pidas la pizza para llevar si buscas la textura recién horneada; la masa napolitana está pensada para comerse al momento en el local.",
+    "origen": "modelo"
+   }
+  ],
+  "probar": [
+   {
+    "texto": "La burrata, cremosa y fresca, es una entrada recurrente en las reseñas y perfecta para abrir el apetito.",
+    "origen": "fuente",
+    "url": "https://cielo.travel/es/resena-del-restaurante-pizzardi-en-bogota"
+   },
+   {
+    "texto": "La margherita clásica, hecha con tomates italianos y queso de denominación de origen, es la mejor forma de juzgar la masa fermentada y el horno.",
+    "origen": "fuente",
+    "url": "https://www.pizzardi.com.co/"
+   },
+   {
+    "texto": "Los cócteles de autor creados con la colaboración de Giancarlo Mancino, pensados para maridar con la pizza.",
+    "origen": "fuente",
+    "url": "https://www.pizzardi.com.co/"
+   },
+   {
+    "texto": "La masa de fermentación lenta de la línea Fatto in Casa, para preparar pizza napolitana en tu propia cocina.",
+    "origen": "fuente",
+    "url": "https://www.pizzardi.com.co/"
+   }
+  ],
+  "secretos": [
+   {
+    "texto": "Pide la burrata como entrada y reserva un trozo de pan de la casa para terminarla; el aceite y la cremosidad que quedan en el plato son parte del ritual.",
+    "origen": "modelo"
+   },
+   {
+    "texto": "El nombre 'Artigianale' no es decorativo: la masa se madura hasta 24 horas, un detalle que se nota en la ligereza y digestibilidad de la pizza.",
+    "origen": "fuente",
+    "url": "https://www.pizzardi.com.co/"
+   },
+   {
+    "texto": "La colaboración con Giancarlo Mancino incluye cócteles que no están en la carta principal; pregunta por las creaciones de esa línea al barman.",
+    "origen": "fuente",
+    "url": "https://www.pizzardi.com.co/"
+   }
+  ],
+  "fuentes": [
+   "https://www.pizzardi.com.co/",
+   "https://cielo.travel/es/resena-del-restaurante-pizzardi-en-bogota",
+   "https://www.elcolombiano.com/cultura/gastronomia/pizzardi-artigianale-pizzeria-colombiana-entra-top-20-mundo-pizza-world-LB41371497",
+   "https://www.tripadvisor.es/Restaurant_Review-g294074-d26586372-Reviews-Pizzardi_Artigianale-Bogota.html"
+  ],
+  "fecha": "2026-10-29"
+ },
+ "Catación Pública": {
+  "historia": {
+   "texto": "Nació como proyecto de Jaime Duque, un tostador que quería que el café de alta calidad también se quedara en Colombia en vez de irse entero al exterior. La idea fue convertir el café en una 'universidad del café': formar paladares locales en vez de solo vender taza. Está en una calle tranquila de Usaquén, con barra peq",
+   "origen": "fuente",
+   "url": "https://karlscoffee.wordpress.com/2015/10/27/catacion-publica-must-visit-cafe-in-bogota"
+  },
+  "hacer": [
+   {
+    "texto": "Pide una cata formal o una experiencia comparativa de varios cafés colombianos en vez de solo un filtrado; ahí el café se vuelve clase.",
+    "origen": "fuente",
+    "url": "https://www.filternotes.com/bogota/catacion-publica"
+   },
+   {
+    "texto": "Siéntate en la barra y pide que te expliquen origen, proceso y método antes de servir: el mostrador se convierte en lección.",
+    "origen": "fuente",
+    "url": "https://www.filternotes.com/bogota/catacion-publica"
+   },
+   {
+    "texto": "Pregunta por los cafés de regiones poco conocidas que tienen en la carta; suelen tener más de veinte orígenes colombianos distintos.",
+    "origen": "modelo"
+   },
+   {
+    "texto": "Asómate al laboratorio y a la tostadora del fondo, donde hacen las catas y las certificaciones.",
+    "origen": "fuente",
+    "url": "https://karlscoffee.wordpress.com/2015/10/27/catacion-publica-must-visit-cafe-in-bogota"
+   }
+  ],
+  "no_hacer": [
+   {
+    "texto": "No vayas esperando un café rápido con pastelería: aquí la propuesta es educativa, de extracción y análisis sensorial, no de paso.",
+    "origen": "fuente",
+    "url": "https://www.filternotes.com/bogota/catacion-publica"
+   },
+   {
+    "texto": "No llegues sin reservar a una cata: las experiencias publicadas piden reserva y confirmación de disponibilidad después de la compra.",
+    "origen": "fuente",
+    "url": "https://www.filternotes.com/bogota/catacion-publica"
+   }
+  ],
+  "probar": [
+   {
+    "texto": "El café filtrado tipo pour-over: es la forma más fuerte de la visita y de donde cuelga toda la explicación de origen y proceso.",
+    "origen": "fuente",
+    "url": "https://www.filternotes.com/bogota/catacion-publica"
+   },
+   {
+    "texto": "Los cafés de fermentación, que venden como categoría aparte y son donde se nota el trabajo de laboratorio.",
+    "origen": "fuente",
+    "url": "http://www.catacionpublica.co/"
+   },
+   {
+    "texto": "El Maestro Tostador Gesha de Pitalito, Huila, si quieres probar una variedad que en otros países no llegaría a la mesa local.",
+    "origen": "fuente",
+    "url": "http://www.catacionpublica.co/"
+   },
+   {
+    "texto": "Pregunta por la experiencia de maridaje de cafés con más de 80 puntos SCA junto a whisky y chocolate.",
+    "origen": "fuente",
+    "url": "https://www.getyourguide.com/es-es/catacion-publica-s788502"
+   }
+  ],
+  "secretos": [
+   {
+    "texto": "El nombre es la pista: 'catación pública' es literal, la cata abierta al público, no un club cerrado de expertos.",
+    "origen": "fuente",
+    "url": "https://karlscoffee.wordpress.com/2015/10/27/catacion-publica-must-visit-cafe-in-bogota"
+   },
+   {
+    "texto": "El sitio está montado para entrenar Q-Graders del Coffee Quality Institute, así que lo que te cuenten en la barra viene de formación de evaluadores, no de guion de barista.",
+    "origen": "fuente",
+    "url": "https://karlscoffee.wordpress.com/2015/10/27/catacion-publica-must-visit-cafe-in-bogota"
+   },
+   {
+    "texto": "No confundas sedes: la de Usaquén es la casa tostadora y laboratorio; la pública de Calle 70A en Rosales es otro café más al sur.",
+    "origen": "fuente",
+    "url": "https://www.filternotes.com/bogota/catacion-publica"
+   }
+  ],
+  "fuentes": [
+   "http://www.catacionpublica.co/",
+   "https://www.filternotes.com/bogota/catacion-publica",
+   "https://karlscoffee.wordpress.com/2015/10/27/catacion-publica-must-visit-cafe-in-bogota",
+   "https://www.getyourguide.com/es-es/catacion-publica-s788502"
+  ],
+  "fecha": "2026-10-29"
+ },
+ "Biblioteca Luis Ángel Arango": {
+  "historia": {
+   "texto": "La Biblioteca Luis Ángel Arango nació como biblioteca del Banco de la República y lleva el nombre de un gerente del banco, Luis Ángel Arango, que impulsó su creación. Se ubica en La Candelaria, a pocas cuadras del Museo del Oro y el Teatro Colón, y con el tiempo el complejo creció hasta triplicar su capacidad con el ed",
+   "origen": "fuente",
+   "url": "https://es.wikipedia.org/wiki/Biblioteca_Luis_%C3%81ngel_Arango"
+  },
+  "hacer": [
+   {
+    "texto": "Visitar la colección de arte del banco que se exhibe en las salas del complejo, más allá de la biblioteca misma.",
+    "origen": "modelo"
+   },
+   {
+    "texto": "Recorrer el edificio de 1990 que triplicó la capacidad de la biblioteca y que aporta espacios amplios y flexibles para lectura y eventos.",
+    "origen": "fuente",
+    "url": "https://worldlibraries.dom.edu/index.php/worldlib/article/view/394"
+   }
+  ],
+  "secretos": [
+   {
+    "texto": "Buena parte del valor del lugar está en ser sede cultural del Banco de la República, no solo biblioteca: por eso hay salas de exposición y programación de conciertos en el mismo complejo.",
+    "origen": "modelo"
+   }
+  ],
+  "fuentes": [
+   "https://es.wikipedia.org/wiki/Biblioteca_Luis_%C3%81ngel_Arango",
+   "https://biblored.gov.co/servicios/alianza-blaa",
+   "https://worldlibraries.dom.edu/index.php/worldlib/article/view/394"
+  ],
+  "fecha": "2026-10-29"
+ },
+ "El Mono Bandido": {
+  "historia": {
+   "texto": "Bar de la escena cervecera artesanal bogotana que se hizo conocido por convertir las servilletas de papel en un canal de mensajes entre mesas desconocidas, una dinámica que se volvió su sello. Su lema de carta, \"No hay arte, pero sí picassos\", resume el tono desenfadado con que trata a su clientela.",
+   "origen": "fuente",
+   "url": "http://www.elmonobandido.com/"
+  },
+  "hacer": [
+   {
+    "texto": "Participar en el intercambio de servilletas: escribe un mensaje, mándalo a otra mesa y espera respuesta; es la razón por la que mucha gente vuelve.",
+    "origen": "modelo"
+   },
+   {
+    "texto": "Armar la noche con hamburguesa y cerveza artesanal de la casa, la combinación por la que más lo reseñan.",
+    "origen": "fuente",
+    "url": "https://cielo.travel/es/mono-bandido-bar-bogota-review"
+   },
+   {
+    "texto": "Elegir mesa y quedarse a conversar: la decoración ecléctica y el ambiente relajado son parte del plan, no un trámite antes de comer.",
+    "origen": "fuente",
+    "url": "https://wanderlog.com/es/place/details/1341288/el-mono-bandido-zona-t"
+   }
+  ],
+  "no_hacer": [
+   {
+    "texto": "No esperes un pub silencioso para conversación tranquila: el ambiente es animado y ruidoso, poco apto si buscas intimidad.",
+    "origen": "fuente",
+    "url": "https://wanderlog.com/es/place/details/1341288/el-mono-bandido-zona-t"
+   },
+   {
+    "texto": "No vayas con la idea de una mesa formal de restaurante: es un gastropub de cerveza y comida casera, no un sitio de cena protocolaria.",
+    "origen": "modelo"
+   }
+  ],
+  "probar": [
+   {
+    "texto": "La hamburguesa de la casa, el plato que más aparece en las reseñas del lugar.",
+    "origen": "fuente",
+    "url": "https://cielo.travel/es/mono-bandido-bar-bogota-review"
+   },
+   {
+    "texto": "Una cerveza artesanal de su carta, eje del concepto de cervecería.",
+    "origen": "fuente",
+    "url": "https://cielo.travel/es/mono-bandido-bar-bogota-review"
+   },
+   {
+    "texto": "Uno de sus cócteles si prefieres no empezar por la cerveza.",
+    "origen": "fuente",
+    "url": "https://cielo.travel/es/mono-bandido-bar-bogota-review"
+   }
+  ],
+  "secretos": [
+   {
+    "texto": "El nombre del bar viene del mapache bandido, el animal que aparece en su identidad gráfica; reconocerlo hace que el menú y la decoración lean distinto.",
+    "origen": "modelo"
+   }
+  ],
+  "fuentes": [
+   "http://www.elmonobandido.com/",
+   "https://cielo.travel/es/mono-bandido-bar-bogota-review",
+   "https://wanderlog.com/es/place/details/1341288/el-mono-bandido-zona-t"
+  ],
+  "fecha": "2026-10-29"
+ },
+ "Cinemateca de Bogotá": {
+  "historia": {
+   "texto": "La Cinemateca Distrital nació en 1971 y hoy funciona como Cinemateca de Bogotá - Centro Cultural de las Artes Audiovisuales, bajo el Instituto Distrital de las Artes (Idartes). Su sede está en el Centro Internacional, en la Carrera 8 con calle 15, y combina la exhibición de cine de autor con la preservación del patrimo",
+   "origen": "fuente",
+   "url": "https://tuboleta.com/es/venue/cinemateca"
+  },
+  "hacer": [
+   {
+    "texto": "Consultar la programación por ciclos y retrospectivas en vez de llegar a ver 'lo que haya': la sala rota entre muestras temáticas, cine colombiano restaurado y autores que no entran a cartelera comercial.",
+    "origen": "fuente",
+    "url": "https://es.wikipedia.org/wiki/Cinemateca_Distrital_de_Bogot%C3%A1"
+   },
+   {
+    "texto": "Aprovechar las funciones gratuitas y de bajo costo que programa Idartes como parte de su misión de difusión; es de los pocos cines del centro donde el precio no es filtro.",
+    "origen": "modelo"
+   }
+  ],
+  "no_hacer": [
+   {
+    "texto": "No esperar estreno comercial ni sala llena de multiplex: aquí el atractivo es el ciclo curado, no la película de moda.",
+    "origen": "modelo"
+   },
+   {
+    "texto": "No llegar sin revisar la franja horaria: la sede administrativa de Idartes atiende en horario de oficina y las funciones dependen de la programación, no de un horario continuo de cine.",
+    "origen": "modelo"
+   }
+  ],
+  "probar": [
+   {
+    "texto": "Una retrospectiva de autor programada por la Cinemateca, que suele venir con presentación o material de archivo complementario.",
+    "origen": "modelo"
+   },
+   {
+    "texto": "Una muestra de patrimonio fílmico colombiano restaurado, el eje que distingue a la Cinemateca de una sala de arte cualquiera.",
+    "origen": "fuente",
+    "url": "https://tuboleta.com/es/venue/cinemateca"
+   }
+  ],
+  "secretos": [
+   {
+    "texto": "El nombre oficial completo es Centro Cultural de las Artes Audiovisuales: además de cine, el edificio aloja formación y archivo, así que hay actividades paralelas a la cartelera que casi nadie busca.",
+    "origen": "fuente",
+    "url": "https://tuboleta.com/es/venue/cinemateca"
+   },
+   {
+    "texto": "Queda sobre la Carrera 8 con calle 15, en pleno Centro Internacional: se puede combinar la función con una caminata por la zona en vez de tratarla como salida aislada de barrio.",
+    "origen": "fuente",
+    "url": "http://www.idartes.gov.co/es/escenarios/cinemateca-distrital/quienes-somos"
+   }
+  ],
+  "fuentes": [
+   "https://es.wikipedia.org/wiki/Cinemateca_Distrital_de_Bogot%C3%A1",
+   "http://www.idartes.gov.co/es/escenarios/cinemateca-distrital/quienes-somos",
+   "https://tuboleta.com/es/venue/cinemateca"
+  ],
+  "fecha": "2026-10-29"
+ },
+ "Claustro de San Agustín": {
+  "historia": {
+   "texto": "El Claustro de San Agustín es una construcción colonial de mediados del siglo XVIII (hacia 1740) en el centro histórico de Bogotá. Tras siglos de usos institucionales distintos, pasó a manos de la Universidad Nacional de Colombia, que lo restauró y lo convirtió en sede de su Dirección de Patrimonio Cultural y en sala d",
+   "origen": "fuente",
+   "url": "https://voicemap.me/tour/bogota/colonial-bogota-la-candelaria/sites/claustro-de-san-agustin"
+  },
+  "hacer": [
+   {
+    "texto": "Recorrer el claustro con los planos de primer y segundo piso que la Universidad publica en su web, para no perderte ninguna sala de la exposición de turno.",
+    "origen": "fuente",
+    "url": "https://patrimoniocultural.bogota.unal.edu.co/claustro-san-agustin/"
+   },
+   {
+    "texto": "Consultar la agenda de actividades del claustro antes de ir: además de la muestra permanente de turno, programan charlas y eventos paralelos.",
+    "origen": "fuente",
+    "url": "https://patrimoniocultural.bogota.unal.edu.co/claustro-san-agustin/"
+   },
+   {
+    "texto": "Ver la exposición que esté en cartelera; han pasado por sus salas muestras como la de Débora Arango en diálogo con Alfonso Quijano.",
+    "origen": "fuente",
+    "url": "https://patrimoniocultural.bogota.unal.edu.co/claustro-san-agustin/"
+   }
+  ],
+  "no_hacer": [
+   {
+    "texto": "No confundas este claustro con el de Villa de Leyva: son edificios distintos y el bogotano no es sede del Instituto Humboldt ni alberga sus colecciones biológicas.",
+    "origen": "fuente",
+    "url": "https://www.humboldt.org.co/noticias/claustro-de-san-agustin-reabre-sus-puertas-con-la-exposicion-corpus-paramo"
+   }
+  ],
+  "secretos": [
+   {
+    "texto": "La sede administrativa del claustro está en la Carrera 8 # 7-21, dato útil para ubicarlo si vienes por la carrera Octava y no por la plaza.",
+    "origen": "fuente",
+    "url": "https://patrimoniocultural.bogota.unal.edu.co/claustro-san-agustin/"
+   },
+   {
+    "texto": "El edificio es monumento nacional y su restauración forma parte del programa de patrimonio cultural de la Universidad Nacional, no es solo una sala de arte.",
+    "origen": "fuente",
+    "url": "https://patrimoniocultural.bogota.unal.edu.co/claustro-san-agustin/"
+   }
+  ],
+  "fuentes": [
+   "https://patrimoniocultural.bogota.unal.edu.co/claustro-san-agustin/",
+   "https://es.wikipedia.org/wiki/Claustro_de_San_Agust%C3%ADn",
+   "https://whichmuseum.com/es/museo/claustro-de-san-agustin-universidad-nacional-de-colombia-bogota-21484",
+   "https://voicemap.me/tour/bogota/colonial-bogota-la-candelaria/sites/claustro-de-san-agustin",
+   "https://www.humboldt.org.co/noticias/claustro-de-san-agustin-reabre-sus-puertas-con-la-exposicion-corpus-paramo"
+  ],
+  "fecha": "2026-10-29"
+ },
+ "Chan Chan Latino": {
+  "historia": {
+   "texto": "Chan Chan Latino nace como un 'dinner party' que reúne la cocina del Caribe y la salsa en el corazón de Bogotá, según la prensa económica que lo reseña. Su nombre remite a la ciudad precolombina de Chan Chan, en la costa norte del Perú, y el proyecto apuesta por una experiencia que mezcla mesa y música en vivo.",
+   "origen": "fuente",
+   "url": "https://www.portafolio.co/negocios/empresas/chan-chan-latino-un-dinner-party-del-caribe-y-la-salsa-en-pleno-centro-de-colombia-487434"
+  },
+  "hacer": [
+   {
+    "texto": "Reservar mesa para las noches de salsa en vivo y show, que son el eje de la experiencia según la reseña de Portafolio.",
+    "origen": "fuente",
+    "url": "https://www.portafolio.co/negocios/empresas/chan-chan-latino-un-dinner-party-del-caribe-y-la-salsa-en-pleno-centro-de-colombia-487434"
+   }
+  ],
+  "fuentes": [
+   "https://www.portafolio.co/negocios/empresas/chan-chan-latino-un-dinner-party-del-caribe-y-la-salsa-en-pleno-centro-de-colombia-487434"
+  ],
+  "fecha": "2026-10-29"
+ },
+ "Érase una vez café de especialidad": {
+  "historia": {
+   "texto": "Café de especialidad en el barrio El Recuerdo, en Teusaquillo, montado por Eliana, una barista con formación y certificaciones SCA, con la idea de convertir cada taza en una pieza única a partir de granos seleccionados. El local es pequeño y la atención se apoya en compartir la historia detrás de cada café y cómo se pr",
+   "origen": "modelo"
+  },
+  "hacer": [
+   {
+    "texto": "Pedir la barra y dejar que el barista te cuente el origen del grano y cómo lo prepara; la conversación es parte del servicio, no un extra.",
+    "origen": "fuente",
+    "url": "https://www.tripadvisor.co/Restaurant_Review-g294074-d19333375-Reviews-Erase_Una_Vez_Cafe_de_Especialidad-Bogota.html"
+   },
+   {
+    "texto": "Sentarte a trabajar o estudiar un rato: el café tiene aire acondicionado y es un espacio tranquilo para quedarse.",
+    "origen": "fuente",
+    "url": "https://coool.cafe/cafe/erase-una-vez-cafe-de-especialidad-bogota"
+   }
+  ],
+  "no_hacer": [
+   {
+    "texto": "No esperes un menú extenso: la oferta se limita a dos mezclas de café y unas pocas opciones dulces o saladas.",
+    "origen": "fuente",
+    "url": "https://www.tripadvisor.co/Restaurant_Review-g294074-d19333375-Reviews-Erase_Una_Vez_Cafe_de_Especialidad-Bogota.html"
+   }
+  ],
+  "probar": [
+   {
+    "texto": "El café filtrado, el americano o el latte; quienes lo reseñan destacan la calidad constante de los tres.",
+    "origen": "fuente",
+    "url": "https://coool.cafe/cafe/erase-una-vez-cafe-de-especialidad-bogota"
+   },
+   {
+    "texto": "El capuchino con Nutella, una de las bebidas que más mencionan las reseñas por su sabor.",
+    "origen": "fuente",
+    "url": "https://coool.cafe/cafe/erase-una-vez-cafe-de-especialidad-bogota"
+   },
+   {
+    "texto": "Probar las dos mezclas de la casa: la de la casa y la de especialidad, para compararlas en la misma visita.",
+    "origen": "fuente",
+    "url": "https://www.tripadvisor.co/Restaurant_Review-g294074-d19333375-Reviews-Erase_Una_Vez_Cafe_de_Especialidad-Bogota.html"
+   }
+  ],
+  "secretos": [
+   {
+    "texto": "El local queda en el piso 1 de la Cra. 38a #25-76, en el barrio El Recuerdo: hay que subir, no se ve desde la calle como una cafetería al paso.",
+    "origen": "fuente",
+    "url": "https://coool.cafe/cafe/erase-una-vez-cafe-de-especialidad-bogota"
+   },
+   {
+    "texto": "Las mañanas son el momento más tranquilo; un reseñista que fue temprano encontró el lugar casi vacío y atención dedicada.",
+    "origen": "fuente",
+    "url": "https://coool.cafe/cafe/erase-una-vez-cafe-de-especialidad-bogota"
+   }
+  ],
+  "fuentes": [
+   "https://polomaps.com/places/bogota/erase-una-vez-cafe-de-especialidad",
+   "https://cofi.co/erase-una-vez-cafe-de-especialidad",
+   "https://www.tripadvisor.co/Restaurant_Review-g294074-d19333375-Reviews-Erase_Una_Vez_Cafe_de_Especialidad-Bogota.html",
+   "https://www.tripadvisor.es/Restaurant_Review-g294074-d19333375-Reviews-Erase_Una_Vez_Cafe_de_Especialidad-Bogota.html",
+   "https://www.tripadvisor.com/Restaurant_Review-g294074-d19333375-Reviews-Erase_Una_Vez_Cafe_de_Especialidad-Bogota.html",
+   "https://coool.cafe/cafe/erase-una-vez-cafe-de-especialidad-bogota",
+   "https://guia2x.com/empresa/erase-una-vez-cafe-de-especialidad-bogota"
+  ],
+  "fecha": "2026-10-29"
+ },
+ "Orígenes Café": {
+  "historia": {
+   "texto": "Café de especialidad en La Candelaria que trabaja como tostador y ofrece catas y degustaciones de café, además de cocina de brunch. Es un espacio pequeño y concurrido, con personal que atiende en inglés y español, lo que lo ha vuelto parada habitual de viajeros en el centro histórico.",
+   "origen": "fuente",
+   "url": "https://www.tripadvisor.es/Restaurant_Review-g294074-d17721832-Reviews-or15-Origenes_Cafe-Bogota.html"
+  },
+  "hacer": [
+   {
+    "texto": "Pedir una de las degustaciones de café que ofrece la casa para recorrer los perfiles de sus cafés de especialidad.",
+    "origen": "fuente",
+    "url": "https://www.tripadvisor.es/Restaurant_Review-g294074-d17721832-Reviews-or15-Origenes_Cafe-Bogota.html"
+   },
+   {
+    "texto": "Sentarse a un brunch completo: es tan restaurante de brunch como tostador de café, no solo una parada de café rápido.",
+    "origen": "fuente",
+    "url": "https://wanderlog.com/es/place/details/5281567/or%C3%ADgenes-caf%C3%A9"
+   },
+   {
+    "texto": "Aprovechar que el personal habla inglés si vienes con alguien que no maneja español.",
+    "origen": "fuente",
+    "url": "https://wanderlog.com/es/place/details/5281567/or%C3%ADgenes-caf%C3%A9"
+   }
+  ],
+  "no_hacer": [
+   {
+    "texto": "Esperar un salón amplio y silencioso para trabajar o quedarte horas: es un café pequeño y bullicioso, sobre todo en horas de desayuno.",
+    "origen": "fuente",
+    "url": "https://wanderlog.com/es/place/details/5281567/or%C3%ADgenes-caf%C3%A9"
+   },
+   {
+    "texto": "Ir sin margen si buscas mesa en fin de semana: al ser concurrido y bien calificado, la espera es parte de la visita.",
+    "origen": "modelo"
+   }
+  ],
+  "probar": [
+   {
+    "texto": "El pan francés con mantequilla de maní y plátano, recomendado para quien disfruta esa combinación.",
+    "origen": "fuente",
+    "url": "https://wanderlog.com/es/place/details/5281567/or%C3%ADgenes-caf%C3%A9"
+   },
+   {
+    "texto": "Los panqueques: ligeros, esponjosos y ligeramente crujientes.",
+    "origen": "fuente",
+    "url": "https://wanderlog.com/es/place/details/5281567/or%C3%ADgenes-caf%C3%A9"
+   },
+   {
+    "texto": "El tocino, que las reseñas destacan por encima del resto de la comida.",
+    "origen": "fuente",
+    "url": "https://wanderlog.com/es/place/details/5281567/or%C3%ADgenes-caf%C3%A9"
+   }
+  ],
+  "secretos": [
+   {
+    "texto": "Está rankeado entre los mejores tostadores de café de Bogotá, así que vale más como destino de café de origen que como simple desayunadero.",
+    "origen": "fuente",
+    "url": "https://wanderlog.com/es/place/details/5281567/or%C3%ADgenes-caf%C3%A9"
+   },
+   {
+    "texto": "Pide la degustación si te interesa el café: la casa maneja más de una docena de catas y es la parte que menos se conoce del lugar.",
+    "origen": "fuente",
+    "url": "https://www.tripadvisor.es/Restaurant_Review-g294074-d17721832-Reviews-or15-Origenes_Cafe-Bogota.html"
+   }
+  ],
+  "fuentes": [
+   "https://www.tripadvisor.es/Restaurant_Review-g294074-d17721832-Reviews-or15-Origenes_Cafe-Bogota.html",
+   "https://wanderlog.com/es/place/details/5281567/or%C3%ADgenes-caf%C3%A9"
+  ],
+  "fecha": "2026-10-29"
+ },
+ "Presente Café": {
+  "historia": {
+   "texto": "Presente Café es un café de especialidad en el barrio Alfonso López, en Teusaquillo, con una calificación de 4.8/5 sobre 165 reseñas y presencia en la guía Polomaps. El espacio se organiza en dos ambientes: uno clásico junto a una chimenea con mesas redondas y sillas cómodas, y otro más moderno junto a un mural, con me",
+   "origen": "fuente",
+   "url": "https://pluria.co/es/cafes/colombia/bogota/1767--presente-cafe"
+  },
+  "hacer": [
+   {
+    "texto": "Elegir el ambiente clásico junto a la chimenea, con mesas redondas y sillas cómodas, para una visita tranquila de lectura o conversación.",
+    "origen": "fuente",
+    "url": "https://pluria.co/es/cafes/colombia/bogota/1767--presente-cafe"
+   },
+   {
+    "texto": "Ubicarse en el segundo espacio, junto al mural, con mesas de mármol, si se va a trabajar o a pasar un rato más moderno.",
+    "origen": "fuente",
+    "url": "https://pluria.co/es/cafes/colombia/bogota/1767--presente-cafe"
+   },
+   {
+    "texto": "Ir con el portátil a hacer home office: el café está pensado como espacio de trabajo con WiFi de alta velocidad.",
+    "origen": "fuente",
+    "url": "https://pluria.co/es/cafes/colombia/bogota/1767--presente-cafe"
+   },
+   {
+    "texto": "Leer un rato con un capuccino y la torta de la casa, combinación que reseñan los visitantes.",
+    "origen": "fuente",
+    "url": "https://maps.apple.com/place?place-id=I9C1B4D9D91679787"
+   }
+  ],
+  "no_hacer": [
+   {
+    "texto": "Pedir la torta de la casa si no te gustan los sabores saludables: la reseña advierte que puede no ser para todos.",
+    "origen": "fuente",
+    "url": "https://maps.apple.com/place?place-id=I9C1B4D9D91679787"
+   }
+  ],
+  "probar": [
+   {
+    "texto": "El capuccino, descrito en reseñas como muy superior al de una cafetería de cadena.",
+    "origen": "fuente",
+    "url": "https://maps.apple.com/place?place-id=I9C1B4D9D91679787"
+   },
+   {
+    "texto": "La torta de la casa, que acompaña bien el café de la tarde.",
+    "origen": "fuente",
+    "url": "https://maps.apple.com/place?place-id=I9C1B4D9D91679787"
+   }
+  ],
+  "fuentes": [
+   "https://coool.cafe/cafe/presente-cafe-bogota",
+   "https://maps.apple.com/place?place-id=I9C1B4D9D91679787",
+   "https://pluria.co/es/cafes/colombia/bogota/1767--presente-cafe"
+  ],
+  "fecha": "2026-10-29"
+ },
+ "Santuario Nuestra Señora del Carmen": {
+  "historia": {
+   "texto": "El Santuario y Claustro Nacional de Nuestra Señora del Carmen fue construido a principios del siglo XX en estilo gótico florentino, impulsado por la comunidad salesiana como tributo a la cultura colombiana. Su fachada a rayas rojas y blancas, que se repite en el interior, lo volvió un hito visible desde buena parte de ",
+   "origen": "fuente",
+   "url": "https://www.atlasobscura.com/places/santuario-nuestra-senora-del-carmen"
+  },
+  "hacer": [
+   {
+    "texto": "Recorrer la nave central para ver cómo el patrón de rayas rojas y blancas de la fachada continúa en los muros y arcos del interior.",
+    "origen": "modelo"
+   },
+   {
+    "texto": "Mirar hacia arriba para ver la cúpula, uno de los elementos que más se destaca en el interior del templo.",
+    "origen": "modelo"
+   }
+  ],
+  "secretos": [
+   {
+    "texto": "El templo hace parte de un conjunto mayor: el Santuario y Claustro Nacional de Nuestra Señora del Carmen, así que su historia no se limita a la iglesia que se ve desde la calle.",
+    "origen": "fuente",
+    "url": "https://www.atlasobscura.com/places/santuario-nuestra-senora-del-carmen"
+   }
+  ],
+  "fuentes": [
+   "https://www.atlasobscura.com/places/santuario-nuestra-senora-del-carmen",
+   "https://es.wikipedia.org/wiki/Iglesia_de_Nuestra_Se%C3%B1ora_del_Carmen_(Bogot%C3%A1)",
+   "https://wanderlog.com/place/details/3533/santuario-nuestra-se%C3%B1ora-del-carmen"
+  ],
+  "fecha": "2026-10-29"
+ },
+ "Fragmentos, Espacio de Arte y Memoria": {
+  "historia": {
+   "texto": "Fragmentos nació como un contramonumento concebido por la artista Doris Salcedo, pensado como lugar de reflexión sobre el conflicto armado en Colombia más que como relato épico de la historia. Se creó en 2017 y su inauguración se realizó en 2018, en una casa colonial del centro de Bogotá. Su particularidad es que propo",
+   "origen": "fuente",
+   "url": "https://museodata.com/directorio/9-colombia/79-bogota/332-feam"
+  },
+  "hacer": [
+   {
+    "texto": "Recorrer las salas del contramonumento prestando atención a cómo el edificio colonial dialoga con las obras sobre el conflicto, en vez de buscar una narrativa cronológica.",
+    "origen": "fuente",
+    "url": "https://museodata.com/directorio/9-colombia/79-bogota/332-feam"
+   },
+   {
+    "texto": "Consultar la programación de exposiciones temporales antes de la visita, porque el contenido de las salas rota y no todo lo que se exhibe es la obra de Salcedo.",
+    "origen": "modelo"
+   }
+  ],
+  "no_hacer": [
+   {
+    "texto": "Ir esperando un museo histórico con fechas, batallas o una versión heroica del conflicto: aquí la propuesta es reflexiva y artística, y quien busca datos duros sale decepcionado.",
+    "origen": "fuente",
+    "url": "https://museodata.com/directorio/9-colombia/79-bogota/332-feam"
+   },
+   {
+    "texto": "Tratarlo como una parada rápida de fotos: es un espacio de memoria y duelo, y conviene entrar con disposición de leer y detenerse.",
+    "origen": "fuente",
+    "url": "https://museodata.com/directorio/9-colombia/79-bogota/332-feam"
+   }
+  ],
+  "secretos": [
+   {
+    "texto": "El nombre 'Fragmentos' no es decorativo: remite a la idea de que el monumento se arma con las rupturas y pedazos que dejó el conflicto, no con un relato completo.",
+    "origen": "modelo"
+   },
+   {
+    "texto": "La gestión corre por cuenta del Museo Nacional de Colombia, así que su programación cultural suele estar conectada con las exposiciones y actividades de esa institución.",
+    "origen": "fuente",
+    "url": "https://museodata.com/directorio/9-colombia/79-bogota/332-feam"
+   }
+  ],
+  "fuentes": [
+   "https://museodata.com/directorio/9-colombia/79-bogota/332-feam",
+   "https://en.wikipedia.org/wiki/Fragmentos",
+   "https://es.wikipedia.org/wiki/Fragmentos,_Espacio_de_Arte_y_Memoria",
+   "https://www.museonacional.gov.co/noticias/Paginas/Fragmentos_Pelicula_CC.aspx"
+  ],
+  "fecha": "2026-10-29"
+ },
+ "Calle de los Anticuarios": {
+  "historia": {
+   "texto": "La calle conserva fachadas de finales del siglo XIX, cuando se levantaron allí sus primeras edificaciones, y hoy mezcla anticuarios con moda y diseño contemporáneo. En ese mismo tramo convive la tienda de dos pisos de Artesanías de Colombia, dedicada a los oficios artesanales del país.",
+   "origen": "fuente",
+   "url": "https://artesaniasdecolombia.com.co/PortalAC/Publicacion/calle-de-los-anticuarios-bogota_14817"
+  },
+  "hacer": [
+   {
+    "texto": "Subir a los dos pisos de la tienda de Artesanías de Colombia en la Calle 79B # 8-64, donde se recorre la producción artesanal de distintas regiones del país.",
+    "origen": "fuente",
+    "url": "https://artesaniasdecolombia.com.co/PortalAC/Publicacion/calle-de-los-anticuarios-bogota_14817"
+   },
+   {
+    "texto": "Entrar a la tienda de soloio en el número 7-85, abierta en la calle con un ambiente moderno e íntimo que contrasta con los anticuarios.",
+    "origen": "fuente",
+    "url": "https://soloio.com/es/pages/anticuarios-bogota"
+   },
+   {
+    "texto": "Recorrer el tramo como paseo de moda y diseño, no solo de antigüedades: la calle fusiona historia con propuesta contemporánea.",
+    "origen": "fuente",
+    "url": "https://www.bogotafashionweek.com.co/Bogota-Fashion-Weekend/2024/Calle-de-los-anticuarios"
+   }
+  ],
+  "no_hacer": [
+   {
+    "texto": "No vayas un domingo pensando en el mismo horario de un día de semana: varias tiendas abren más tarde o cierran más temprano.",
+    "origen": "fuente",
+    "url": "https://artesaniasdecolombia.com.co/PortalAC/Publicacion/calle-de-los-anticuarios-bogota_14817"
+   }
+  ],
+  "probar": [
+   {
+    "texto": "El balay de Vaupés, tejido en fibra de guarumo o chambira por etnias indígenas como los Huitoto.",
+    "origen": "fuente",
+    "url": "https://artesaniasdecolombia.com.co/PortalAC/Publicacion/calle-de-los-anticuarios-bogota_14817"
+   },
+   {
+    "texto": "Las gallinas en cerámica peinada, hechas con arcilla.",
+    "origen": "fuente",
+    "url": "https://artesaniasdecolombia.com.co/PortalAC/Publicacion/calle-de-los-anticuarios-bogota_14817"
+   },
+   {
+    "texto": "Las joyas tejidas en filigrana momposina.",
+    "origen": "fuente",
+    "url": "https://artesaniasdecolombia.com.co/PortalAC/Publicacion/calle-de-los-anticuarios-bogota_14817"
+   },
+   {
+    "texto": "Las máscaras talladas en madera de Sibundoy, junto a las del Carnaval de Barranquilla.",
+    "origen": "fuente",
+    "url": "https://artesaniasdecolombia.com.co/PortalAC/Publicacion/calle-de-los-anticuarios-bogota_14817"
+   }
+  ],
+  "secretos": [
+   {
+    "texto": "La calle no es solo de anticuarios: en el mismo tramo conviven marcas de diseño recientes que le dan su mezcla actual.",
+    "origen": "fuente",
+    "url": "https://www.bogotafashionweek.com.co/Bogota-Fashion-Weekend/2024/Calle-de-los-anticuarios"
+   },
+   {
+    "texto": "El detalle que casi nadie mira está arriba: las fachadas conservan la arquitectura de finales del siglo XIX, así que vale alzar la vista al caminar.",
+    "origen": "fuente",
+    "url": "https://artesaniasdecolombia.com.co/PortalAC/Publicacion/calle-de-los-anticuarios-bogota_14817"
+   }
+  ],
+  "fuentes": [
+   "https://artesaniasdecolombia.com.co/PortalAC/Publicacion/calle-de-los-anticuarios-bogota_14817",
+   "https://www.bogotafashionweek.com.co/Bogota-Fashion-Weekend/2024/Calle-de-los-anticuarios",
+   "https://soloio.com/es/pages/anticuarios-bogota",
+   "https://maps.apple.com/place?place-id=IDDACCC0B7F813C21"
+  ],
+  "fecha": "2026-10-29"
+ },
+ "Cotiza Longaniza": {
+  "historia": {
+   "texto": "Cotiza Longaniza se presenta como piqueteadero y refresquería criolla, es decir, cocina colombiana de picada y bebidas refrescantes, no un restaurante de mesa formal. La marca nació en Bucaramanga y abrió sede en Bogotá, en el Chicó, en la Calle 95 con carrera 12.",
+   "origen": "fuente",
+   "url": "https://linktr.ee/cotizalonganiza"
+  },
+  "hacer": [
+   {
+    "texto": "Pedir una picada para compartir: es la lógica del piqueteadero, no el plato individual.",
+    "origen": "fuente",
+    "url": "https://linktr.ee/cotizalonganiza"
+   },
+   {
+    "texto": "Acompañar la picada con una refrescante de las de la casa, que es la otra mitad del concepto del lugar.",
+    "origen": "fuente",
+    "url": "https://linktr.ee/cotizalonganiza"
+   }
+  ],
+  "no_hacer": [
+   {
+    "texto": "Ir esperando un restaurante de plato fuerte individual y servicio de mesa clásico: aquí se viene a picar y compartir.",
+    "origen": "fuente",
+    "url": "https://linktr.ee/cotizalonganiza"
+   }
+  ],
+  "probar": [
+   {
+    "texto": "La longaniza de la casa, que da nombre al lugar.",
+    "origen": "modelo"
+   },
+   {
+    "texto": "Una picada surtida para la mesa, el formato natural del piqueteadero.",
+    "origen": "fuente",
+    "url": "https://linktr.ee/cotizalonganiza"
+   }
+  ],
+  "fuentes": [
+   "https://linktr.ee/cotizalonganiza"
+  ],
+  "fecha": "2026-10-29"
+ },
+ "Bistecca e Vino Da Trattoria de la Plaza (Restaurante Zona G I Chapinero)": {
+  "historia": {
+   "texto": "Bistecca e Vino se presenta como un italian steakhouse y wine bar-store con dos sedes en Bogotá; la de Zona G, en Chapinero, es la segunda. Su carta gira en torno a cortes a la parrilla, con la Bistecca alla Fiorentina como corte de la casa toscano, y una cava de más de 500 etiquetas. El nombre remite a la tradición de",
+   "origen": "modelo"
+  },
+  "hacer": [
+   {
+    "texto": "Pedir la Bistecca alla Fiorentina como corte de la casa, pensada para compartir en el centro de mesa al estilo toscano.",
+    "origen": "fuente",
+    "url": "https://bisteccaevino.com"
+   },
+   {
+    "texto": "Recorrer la carta de vinos para elegir botella: manejan más de 500 etiquetas seleccionadas, así que vale la pena pedir recomendación por estilo o presupuesto.",
+    "origen": "fuente",
+    "url": "https://bisteccaevino.com"
+   },
+   {
+    "texto": "Armar una mesa de entradas italianas y mediterráneas para compartir antes del corte: portobello caprese, alcachofas a la romana y calamares rellenos de morcilla.",
+    "origen": "fuente",
+    "url": "https://bisteccaevino.com"
+   }
+  ],
+  "no_hacer": [
+   {
+    "texto": "Ir esperando solo pasta o pizza: la identidad del lugar es la parrilla y los cortes, y las pastas, risottos y pizzas funcionan como acompañamiento, no como el centro de la experiencia.",
+    "origen": "fuente",
+    "url": "https://bisteccaevino.com"
+   }
+  ],
+  "probar": [
+   {
+    "texto": "Tomahawk a la parrilla entre los cortes especializados de la carta.",
+    "origen": "modelo"
+   }
+  ],
+  "secretos": [
+   {
+    "texto": "El formato es wine bar-store: además de tomar en mesa, puedes llevarte botella de su selección de más de 500 etiquetas.",
+    "origen": "fuente",
+    "url": "https://bisteccaevino.com"
+   },
+   {
+    "texto": "La sede Zona G es la segunda del proyecto: nació después de la sede Centro, así que la carta y el concepto ya venían rodados de la primera.",
+    "origen": "modelo"
+   }
+  ],
+  "fuentes": [
+   "https://www.apparta.co/bistecca-e-vino/reservas/branch?branch_id=7490",
+   "https://bisteccaevino.com"
+  ],
+  "fecha": "2026-10-29"
+ },
+ "Griego Rooftop | Crossover Rooftop & Nightclub in Bogotá": {
+  "historia": {
+   "texto": "Griego Rooftop se presenta como un rooftop crossover que opera los 365 días del año, con cocktails premium y música como eje de la noche. Está en la Calle 82 con 12a, en plena Zona G de Chapinero, sobre un corredor donde conviven restaurantes y bares de noche.",
+   "origen": "fuente",
+   "url": "https://linktr.ee/griegorooftop"
+  },
+  "hacer": [
+   {
+    "texto": "Subir un domingo: abre desde las 6PM, así que se puede empezar la noche antes que el resto de la Zona G y ver el atardecer sobre Chapinero.",
+    "origen": "modelo"
+   },
+   {
+    "texto": "Llegar después de medianoche si la idea es bailar crossover: el horario se extiende hasta las 5AM de lunes a sábado.",
+    "origen": "fuente",
+    "url": "https://griegorooftop.com/"
+   }
+  ],
+  "no_hacer": [
+   {
+    "texto": "Ir un domingo temprano esperando fiesta: a las 6PM el plan arranca como rooftop de conversación y cócteles, no como nightclub.",
+    "origen": "modelo"
+   },
+   {
+    "texto": "Contar con entrar un lunes o martes de madrugada esperando ambiente lleno: el formato crossover es de fin de semana.",
+    "origen": "modelo"
+   }
+  ],
+  "probar": [
+   {
+    "texto": "Cócteles premium de la carta, que es la bandera que el propio lugar promociona como reason para subir.",
+    "origen": "fuente",
+    "url": "https://griegorooftop.com/"
+   }
+  ],
+  "secretos": [
+   {
+    "texto": "El WhatsApp 322 253 6172 del sitio oficial sirve para cuadrar entrada o mesa antes de subir, útil porque el acceso a rooftops de la Calle 82 se complica en fin de semana.",
+    "origen": "fuente",
+    "url": "https://griegorooftop.com/"
+   },
+   {
+    "texto": "El nombre juega con el formato crossover: un solo espacio que cambia de rooftop bar a nightclub según la hora, sin cambiar de dirección.",
+    "origen": "fuente",
+    "url": "https://griegorooftop.com/"
+   }
+  ],
+  "fuentes": [
+   "https://griegorooftop.com/",
+   "https://skylevels.co/en/americas/colombia/bogota/griego-rooftop-crossover-rooftop-nightclub-in-bogota",
+   "https://polomaps.com/fr/places/bogota/griego-rooftop-crossover-rooftop-nightclub-in-bogota",
+   "https://linktr.ee/griegorooftop",
+   "https://mindtrip.ai/restaurant/bogota-colombia/griego-rooftop-crossover-rooftop-nightclub-bogota/re-PACF9hZT"
+  ],
+  "fecha": "2026-10-29"
+ },
+ "Galenos Restaurante": {
+  "historia": {
+   "texto": "Galenos funciona en el piso 8 de un edificio de Chapinero, y su nombre juega con la idea de los médicos antiguos: la casa se presenta como un lugar donde se receta buena mesa. Se ha consolidado como escenario de celebraciones —grados, aniversarios, cumpleaños— más que como restaurante de paso, con una cocina internacio",
+   "origen": "fuente",
+   "url": "https://www.losgalenos.com"
+  },
+  "hacer": [
+   {
+    "texto": "Reservar con motivo declarado: el lugar se organiza alrededor de celebraciones (grados, aniversarios, cumpleaños), así que decir qué se festeja cambia la experiencia.",
+    "origen": "fuente",
+    "url": "https://www.losgalenos.com"
+   },
+   {
+    "texto": "Preguntar por los eventos privados si el plan es grupo grande: el restaurante se ofrece como sede de celebraciones cerradas, no solo de mesa a la carta.",
+    "origen": "fuente",
+    "url": "https://www.losgalenos.com"
+   },
+   {
+    "texto": "Estar atento a las semanas temáticas: han montado festivales de cocina de un país por tiempo limitado, como el Festival Americano.",
+    "origen": "fuente",
+    "url": "https://www.opentable.com/r/galenos-bogota"
+   }
+  ],
+  "no_hacer": [
+   {
+    "texto": "No ir buscando un sitio informal de paso: el formato es de mantel, servicio y celebración, y un almuerzo rápido ahí desentona con la casa.",
+    "origen": "fuente",
+    "url": "https://www.threads.com/@galenosrestaurante/post/DeAvWtCkXiV/hay-lugares-que-no-necesitan-decir-demasiado-para-contar-una-historia-en"
+   },
+   {
+    "texto": "No asumir que la carta es fija: parte de la oferta rota con festivales de cocina de duración corta, así que lo que viste en una reseña puede no estar.",
+    "origen": "fuente",
+    "url": "https://www.opentable.com/r/galenos-bogota"
+   }
+  ],
+  "secretos": [
+   {
+    "texto": "El nombre no es decorativo: 'galenos' era como se llamaba a los médicos en la antigüedad, y la casa juega con esa idea de recetar buena mesa. Menciónalo al reservar y queda como alguien que conoce la historia.",
+    "origen": "modelo"
+   },
+   {
+    "texto": "Pide que te ubiquen en el costado del piso 8 que da hacia la ciudad: al estar en altura, la vista es parte del plan y no todas las mesas la aprovechan igual.",
+    "origen": "modelo"
+   }
+  ],
+  "fuentes": [
+   "https://www.losgalenos.com",
+   "https://www.threads.com/@galenosrestaurante/post/DeAvWtCkXiV/hay-lugares-que-no-necesitan-decir-demasiado-para-contar-una-historia-en",
+   "https://www.opentable.com/r/galenos-bogota"
+  ],
+  "fecha": "2026-10-29"
  }
 }
